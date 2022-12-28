@@ -7,7 +7,7 @@ include("1dFunctions.jl")
 include("1dFunctionsMultiScale.jl")
 
 # Initial Data
-ε = 2^-6
+ε = 2^-8
 u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 A(x) = @. (2 + cos(2π*x/ε))^(-1)
 Dₓu(x) = ForwardDiff.derivative(u, x)
@@ -15,11 +15,10 @@ DₓADₓu(x) = @.  ForwardDiff.derivative(y -> A(y)*Dₓu(y), x)
 f(x) = -DₓADₓu(x)
 ug(x) = @. 0*x
 
-order = 80 # Number of points in local quadrature
+order = Int(1/(ε)) # Number of points in local quadrature
 Ω = (0,1)
 gl = gausslegendre(order)
 Ns = [2,4,8,16,32,64,128]
-#Ns = [2]
 errs = zeros(Float64,length(Ns))
 plts = Vector{Plots.Plot}(undef,length(Ns))
 

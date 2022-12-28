@@ -88,7 +88,7 @@ end
 Function to assemble the local matrices
 """
 function assemble_matrix(ij, nodes, c::Function; quad=gausslegendre(2),
-  local_matrix_vector_function=local_matrix_vector!, N=100)
+  local_matrix_vector_function=local_matrix_vector!)
   i,j = ij
   nel = size(i,1)
   # Matrices
@@ -102,7 +102,7 @@ function assemble_matrix(ij, nodes, c::Function; quad=gausslegendre(2),
   res = Vector{Float64}(undef,2)
   res1 = Vector{Float64}(undef,2)
 
-  cache = Me, Ke, Fe, res, res1, N
+  cache = Me, Ke, Fe, res, res1
   # Do the assembly
   for t=1:nel
     cs = view(nodes, view(i, t,:,1))
@@ -122,7 +122,7 @@ end
 Function to assemble the local vector
 """
 function assemble_vector(i, nodes, f::Function; quad=gausslegendre(2), 
-  local_matrix_vector_function=local_matrix_vector!, N=100)
+  local_matrix_vector_function=local_matrix_vector!)
   nel = size(i,1)
 
   # Vector
@@ -135,7 +135,7 @@ function assemble_vector(i, nodes, f::Function; quad=gausslegendre(2),
   res = Vector{Float64}(undef,2)
   res1 = Vector{Float64}(undef,2)
 
-  cache = Me, Ke, Fe, res, res1, N
+  cache = Me, Ke, Fe, res, res1
 
   for t=1:nel
     cs = view(nodes, view(i, t,:))
