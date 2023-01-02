@@ -40,7 +40,7 @@ end
 Function to generate the local matrix-vector system using the given data
 """
 function local_matrix_vector!(cache, xn, c::Function, f::Function, quad)
-  Me, Ke, Fe, res, res1, Nothing = cache
+  Me, Ke, Fe, res, res1 = cache
   fill!(Me, 0.); fill!(Ke, 0.); fill!(Fe, 0.);
   fill!(res, 0.); fill!(res1, 0.)
 
@@ -121,7 +121,7 @@ end
 """
 Function to assemble the local vector
 """
-function assemble_vector(i, nodes, f::Function; quad=gausslegendre(2), 
+function assemble_vector(i, nodes, f::Function; quad=gausslegendre(2),
   local_matrix_vector_function=local_matrix_vector!)
   nel = size(i,1)
 
