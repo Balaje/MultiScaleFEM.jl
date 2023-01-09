@@ -95,7 +95,8 @@ function _local_matrix_vector_H¹_H¹(xn, A::Function, f::Function, quad, h, p)
   res1 = Vector{Float64}(undef, p+1)
 
   fill!(Me, 0.); fill!(Ke, 0.); fill!(Fe, 0.);
-  fill!(res, 0.); fill!(res1, 0.)
+  fill!(res,0.); fill!(res1,0)
+
   qs,ws = quad
   J = 0.5*h
   for q=1:length(qs)
@@ -160,13 +161,23 @@ function _localvector_L²(xn, p::Int64, f::Function; qorder=10, h=2)
   res
 end
 
+# Function to obtain the elem arrays with
+function new_connectivity_matrices(elem, (q,p))
+  # Returns the H¹ (q-polynomial) and L² (p-polynomial)
+  nel = size(elem,1)
+  new_elem = Matrix{Int64}(undef, nel, q+1)
+  new_elem_1 = Matrix{Int64}(undef, nel, p+1)
+  for i=1:nel
+    new_elem[i,:] = elem[i,1]+(i-1)*(q-1): elem[i,2]+i*(q-1)
+    new_elem_1[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
+  end
+  new_elem, new_elem_1
+end
+
 # Function to get the assembler for any polynomial of order p
 function get_assembler(elem, p)
   nel = size(elem,1)
-  new_elem = Matrix{Int64}(undef, nel, p+1)
-  for i=1:nel
-    new_elem[i,:] = elem[i,1]+(i-1)*(p-1): elem[i,2]+i*(p-1)
-  end
+  new_elem, _ = new_connectivity_matrices(elem, (p,p))
   iM = Array{Int64}(undef, nel, p+1, p+1)
   jM = Array{Int64}(undef, nel, p+1, p+1)
   iV = Array{Int64}(undef, nel, p+1)
@@ -188,7 +199,6 @@ function assemble_matrix_H¹_H¹(ijk, nodes, els, A::Function, f::Function, p; q
   i,j,k = ijk
   nel = size(i,1)
   hlocal = nodes[2]-nodes[1]
-  new_nodes = nodes[1]:(hlocal/p):nodes[end]
   quad = gausslegendre(qorder)
 
   sKe = Array{Float64}(undef, nel, p+1, p+1)
@@ -223,12 +233,13 @@ function assemble_matrix_H¹_L²(node, elem, (p₁,p₂))
   hlocal = node[2,1]-node[1,1]
   Mlocal = _localmassmatrix_H¹_L²((p₁,p₂); h=hlocal) #(p+1) × p matrix
   nel = size(elem,1)
-  new_elem = Matrix{Int64}(undef, nel, p₁+1)
-  new_elem_1 = Matrix{Int64}(undef, nel, p₂+1)
-  for i=1:nel
-    new_elem[i,:] = elem[i,1]+(i-1)*(p₁-1): elem[i,2]+i*(p₁-1)
-    new_elem_1[i,:] = elem[i,1]+(i-1)*(p₂): elem[i,2]+i*(p₂)-1
-  end
+  # new_elem = Matrix{Int64}(undef, nel, p₁+1)
+  # new_elem_1 = Matrix{Int64}(undef, nel, p₂+1)
+  # for i=1:nel
+  #   new_elem[i,:] = elem[i,1]+(i-1)*(p₁-1): elem[i,2]+i*(p₁-1)
+  #   new_elem_1[i,:] = elem[i,1]+(i-1)*(p₂): elem[i,2]+i*(p₂)-1
+  # end
+  new_elem, new_elem_1 = new_connectivity_matrices(elem, (p₁,p₂))
   # Size of the index vectors = (dim*p+1)*(dim*p)*nel
   ii = Vector{Int64}(undef, (p₁+1)*(p₂+1)*nel)
   jj = Vector{Int64}(undef, (p₁+1)*(p₂+1)*nel)
@@ -251,10 +262,11 @@ function assemble_matrix_L²_L²(node, elem, p)
   hlocal = node[2,1]-node[1,1]
   Mlocal = _localmassmatrix_L²_L²(p; h=hlocal)
   nel = size(elem,1)
-  new_elem = Matrix{Int64}(undef, nel, p+1)
-  for i=1:nel
-    new_elem[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
-  end
+  # new_elem = Matrix{Int64}(undef, nel, p+1)
+  # for i=1:nel
+  #   new_elem[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
+  # end
+  _, new_elem = new_connectivity_matrices(elem, (p,p))
   ii = Vector{Int64}(undef, (p+1)*(p+1)*nel)
   jj = Vector{Int64}(undef, (p+1)*(p+1)*nel)
   sA = Vector{Float64}(undef, (p+1)*(p+1)*nel)
@@ -279,10 +291,11 @@ function assemble_vector_L²(node, elem, p, f::Function; qorder=10)
   nel = size(elem,1)
   res = Vector{Float64}(undef, nel*(p+1))
   fill!(res,0.)
-  new_elem = Matrix{Int64}(undef, nel, p+1)
-  for i=1:nel
-    new_elem[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
-  end
+  # new_elem = Matrix{Int64}(undef, nel, p+1)
+  # for i=1:nel
+  #   new_elem[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
+  # end
+  _, new_elem = new_connectivity_matrices(elem, (p,p))
   for i=1:nel
     cs = node[elem[i,:],:]
     Felocal = _localvector_L²(cs, p, f; qorder=qorder, h=hlocal)
@@ -340,7 +353,7 @@ function Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
   nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
   q,p=fespace
   nel = size(elem,1)
-  new_elem = Matrix{Int64}(undef,nel,q+1)
+  new_elem, _ = new_connectivity_matrices(elem,(q,p))
   for i=1:nel
     new_elem[i,:] = elem[i,1]+(i-1)*(q-1): elem[i,2]+i*(q-1)
     uh_elem = uh[new_elem[i,:]]
@@ -354,46 +367,154 @@ function Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
     end
   end
 end
+function ∇Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
+  nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
+  q,p=fespace
+  nel = size(elem,1)
+  new_elem, _ = new_connectivity_matrices(elem,(q,p))
+  for i=1:nel
+    new_elem[i,:] = elem[i,1]+(i-1)*(q-1): elem[i,2]+i*(q-1)
+    uh_elem = uh[new_elem[i,:]]
+    nds_elem = nds[elem[i,:]]
+    hl = nds_elem[2]-nds_elem[1]
+    if(nds_elem[1] ≤ x ≤ nds_elem[2])
+      x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
+      return dot(uh_elem, ∇ϕ̂(x̂,q))*(2/hl)
+    else
+      continue
+    end
+  end
+end
 
-# Solve the multiscale FEM problem
-using Plots
-A(x) = @. 1
-# Define the coarse and fine space
-nodes, elems = mesh((0,1), 5)
-H = nodes[2]-nodes[1]
-# Define some parameter
-p = 2 # Order of the method i.e., degree of the L² subspace
-q = 2 # Polynomial degree of the fine mesh
-l = 1 # Size of the support of the new basis
-# Basis of the L² subspace
-function Λₖ(x,(l,p),nds)
+# Basis of the L² subspace (Legendre polynomials)
+function Bₖ(x,(l,p),nds)
   # nds is the coordinates of the element
   a,b=nds
   x̂ = -(a+b)/(b-a) + 2/(b-a)*x
   (a < x < b) ? ψ̂(x̂,p) : zeros(Float64,p+1)
 end
-fespace = (q,p)
 
+# Function to obtain the new multiscale method connectivity matrix
+# The connectivity depends on the support of the basis (parameter, l)
+# (Overload the previous connectivity matrix function)
+function new_connectivity_matrices(elems, (q,p), l)
+  new_elem, _ = new_connectivity_matrices(elems, (q,p))
+  new_elem_ms = Matrix{Int64}(undef,nel,(p+1)*(2l+1))
+  fill!(new_elem_ms,0)
+  for i=1:nel
+    #start = (new_elem[i,1]-(p+1)*l ≤ 0) ? 1 : new_elem[i,1]-(p+1)*l
+    #last = (new_elem[i,end]+(p+1)*l ≥ new_elem[nel,end]) ? new_elem[nel,end] : new_elem[i,end]+(p+1)*l
+    #new_elem_ms[i,1:length(start:last)] =  start:last
+    start = ((i-l) ≤ 0) ? 1 : (i-l)
+    last = ((i+l) ≥ nel) ? nel : (i+l)
+    elinds = vec(permutedims(new_elem[start:last,:],[2,1]))
+    new_elem_ms[i,1:length(elinds)] = elinds
+  end
+  new_elem_ms
+end
 
+function _local_matrix_vector_MS_MS(xn, A::Function, f::Function, quad, H, fespace,
+                                    dim, R::Vector{Rˡₕ})
+  Ke = Array{Float64}(undef, dim, dim)
+  Fe = Vector{Float64}(undef, dim)
+  Me = Array{Float64}(undef, dim, dim)
+  @assert dim == length(R)
+  q,p=fespace
+  fill!(Ke, 0.); fill!(Fe, 0.); fill!(Me,0.)
+  qs, ws = quad
+  J = 0.5*H
+  for qp=1:length(qs)
+    x̂ = qs[qp]
+    x = (xn[2]+xn[1])*0.5 + 0.5*H*x̂
+    for i=1:dim
+      Fe[i] += ws[qp] * f(x) * Λ̃ₖˡ(x, R[i]; fespace=fespace) * J
+      for j=1:dim
+        Ke[i,j] += ws[qp] * A(x) * ∇Λ̃ₖˡ(x, R[i]; fespace=fespace)*
+          ∇Λ̃ₖˡ(x, R[j]; fespace=fespace) * J
+        Me[i,j] += ws[qp] * Λ̃ₖˡ(x, R[i]) * Λ̃ₖˡ(x, R[j]) * J
+      end
+    end
+  end
+  Ke, Me, Fe
+end
+function assemble_matrix_MS_MS(nodes, els, ms_elems, A::Function, f::Function, fespace; qorder=10, Nfine=100, plot_basis=1)
+  q,p = fespace
+  nel = size(els,1)
+  hlocal = nodes[2]-nodes[1]
+  quad  = gausslegendre(qorder)
+  sKe = Array{Float64}(undef, nel, (2l+1)*(p+1), (2l+1)*(p+1))
+  sMe = Array{Float64}(undef, nel, (2l+1)*(p+1), (2l+1)*(p+1))
+  sFe = Array{Float64}(undef, nel, (2l+1)*(p+1))
+  fill!(sKe,0.0); fill!(sMe,0.0); fill!(sFe,0.0)
+  # Compute all the basis
+  RˡₕΛₖ = Matrix{Rˡₕ}(undef,nel,p+1)
+  for k=1:nel
+    elcoords = (nodes[els[k,1]],nodes[els[k,2]])
+    start = (k-l)>0 ? k-l : 1
+    last = (k+l)<nel ? k+l : nel
+    for i=1:p+1
+      Λₖ(y) = Bₖ(y, (l,p), elcoords)[i]
+      RˡₕΛₖ[k,i] = Rˡₕ(Λₖ, A, (nodes[els[start,1]], nodes[els[last,2]]);
+                       fespace=fespace, N=Nfine, qorder=10)
+    end
+  end
+  if(plot_basis > 0)
+    plt = plot()
+    for i=1:p+1
+      xs = RˡₕΛₖ[plot_basis,i].nds                  
+      fxs = map(x->Λ̃ₖˡ(x, RˡₕΛₖ[plot_basis,i]; fespace=fespace), xs)      
+      plot!(plt, xs, fxs, lw=2, label="Basis "*string(i))
+      xlims!(plt, (0,1))            
+    end
+    savefig(plt, "local_basis.pdf")
+  end
+  # Do the assembly
+  K = spzeros(Float64, maximum(ms_elems), maximum(ms_elems))
+  M = spzeros(Float64, maximum(ms_elems), maximum(ms_elems))
+  F = Vector{Float64}(undef, maximum(ms_elems))
+
+  # Let us use the naive way to assemble the matrices for now
+  for t=1:nel
+    cs = nodes[els[t,:],:]
+    el = nonzeros(sparsevec(ms_elems[t,:]))
+    start = (t-l)>0 ? t-l : 1
+    last = (t+l)<nel ? t+l : nel
+    R = RˡₕΛₖ[start:last,:]
+    R = permutedims(R, [2,1])
+    Ke,Me,Fe = _local_matrix_vector_MS_MS(cs, A, f, quad, hlocal, fespace,
+                                          length(el), vec(R))
+    for i in 1:length(el)
+      F[el[i]] += Fe[i]
+      for j in 1:length(el)
+        K[el[i],el[j]] += Ke[i,j]
+        M[el[i],el[j]] += Me[i,j]
+      end
+    end
+  end
+  droptol!(K, 1e-20), droptol!(M, 1e-20), F
+end
+
+# Solve the multiscale FEM problem
+using Plots
+#ε = 1
+#A(x) = @. (2 + cos(2π*x/ε))^-1
+A(x) = @. 1
+# Define the coarse and fine space
+nodes, elems = mesh((0,1), 10)
+H = nodes[2]-nodes[1]
+# Define some parameter
+p = 2 # Order of the method i.e., degree of the L² subspace
+q = 1 # Polynomial degree of the fine mesh
+l = 1 # Size of the support of the new basis
+fespace = (q,p) # FESpace pair (H¹, L²)
 nel = size(elems,1)
-fem_data = Matrix{Rˡₕ}(undef,nel,p+1)
-for k=1:nel
-  elcoords = (nodes[elems[k,1]],nodes[elems[k,2]])
-  for i=1:p+1
-    data = Rˡₕ(y->Λₖ(y,(l,p),elcoords)[i], A, (0,1);
-               fespace=fespace, N=200, qorder=3)
-    fem_data[k,i] = data
-  end
-end
-
-xval = 0:0.005:1
-fxval = Vector{Float64}(undef,length(xval))
-plt = plot()
-j = 1
-for elem in (2,3)
-  for i=1:length(xval)
-    fxval[i] = Λ̃ₖˡ(xval[i], fem_data[elem,j]; fespace=fespace)
-  end
-  plot!(plt,xval,fxval,label="Basis "*string(j)*" of element "*string(elem), lw=2)
-  xlims!(plt,(0,1))
-end
+new_nodes = nodes[1]:H/p:nodes[end]
+tn = 1:length(new_nodes)
+bn = [1, length(new_nodes)]
+fn = setdiff(tn, bn)
+ms_elem_matrix = new_connectivity_matrices(elems, (p,p), l)
+#assem = new_assembler(ms_elem_matrix, p, l)
+# Compute the projection of the L² functions onto the H¹ space
+K,M,F = assemble_matrix_MS_MS(nodes, elems, ms_elem_matrix, A, x-> 1, fespace; qorder=10, Nfine=2^9, plot_basis=5)
+#sol = K[fn,fn]\F[fn]
+#plt = plot(new_nodes, vcat(0,sol,0))
