@@ -10,9 +10,8 @@ Function to evaluate the multiscale basis at any point x:
     (4) Connectivity of the mesh
     (5) Order of polynomial (p)
 """
-function uᵐˢₕ(x, sol, R::Matrix{Rˡₕ}, nodes, elem::Matrix{Int64}, fespace)
-    _,p = fespace
-    new_elem, _ = new_connectivity_matrices(elem, (p,p))  
+function uᵐˢₕ(x, sol, R::Matrix{Rˡₕ}, elem)    
+    _,new_elem = new_connectivity_matrices(elem, (p,p))  
     nel = size(elem,1)    
     for i=1:nel
       nds_elem = nodes[elem[i,:]]    
@@ -20,7 +19,7 @@ function uᵐˢₕ(x, sol, R::Matrix{Rˡₕ}, nodes, elem::Matrix{Int64}, fespac
         val=0
         uh_elem = sol[new_elem[i,:]]
         for j=1:p+1
-          val = val + Λ̃ₖˡ(x, R[i,j]; fespace=fespace)*uh_elem[j]
+          val = val + Λ̃ₖˡ(x, R[i,j])*uh_elem[j]
         end 
         return val
       end 

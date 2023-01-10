@@ -1,9 +1,9 @@
-###################################################################################
+############################################################################################
 # Functions to generate the basis functions for the functions spaces Vₕ and Vₕᵖ(K)
 # Here:
-# 1) Vₕ is the fine scale space (order q) - Lagrange basis functions 
+# 1) Vₕ is the fine scale space (order q) - Lagrange basis functions (Handled using Gridap)
 # 2) Vₕᵖ(K) is the L² space (order p) - Shifted Legendre polynomials
-###################################################################################
+############################################################################################
 
 """
 Function to generate the Legendre polynomials upto order p.
@@ -23,28 +23,6 @@ function Λₖᵖ(x, p::Int64)
     return res
   end
 end
-
-"""
-Lagrange basis function and gradient for the fine scale problem.  
-    Works for any order q
-"""
-function ϕ̂(x, p::Int64)
-  xq = LinRange(-1,1,p+1)
-  Q = [xq[i]^j for i=1:p+1, j=0:p]
-  IdMatrix = I(p+1)
-  A = Q\IdMatrix
-  A'*[x^i for i=0:p]
-end
-function ∇ϕ̂(x, p::Int64)
-  res = Vector{Float64}(undef,p+1)
-  fill!(res,0.0)
-  for i=1:p+1
-    φᵢ(y) = ϕ̂(y, p)[i]
-    res[i] = ForwardDiff.derivative(φᵢ, x)
-  end
-  res
-end
-
 """
 Basis function and gradient for the Lagrange multiplier of order p:
   (This is the L² function and is equal to the Legendre polynomials)
@@ -67,54 +45,16 @@ function ∇ψ̂(x, p)
   end
 end
 
-
-########################################################################################################################################
-########################################################################################################################################
-########################################################################################################################################
 """
 Value of the multiscale basis at x:
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
-    nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
-    q,p=fespace
-    nel = size(elem,1)
-    new_elem, _ = new_connectivity_matrices(elem,(q,p))
-    for i=1:nel
-      new_elem[i,:] = elem[i,1]+(i-1)*(q-1): elem[i,2]+i*(q-1)
-      uh_elem = uh[new_elem[i,:]]
-      nds_elem = nds[elem[i,:]]
-      hl = nds_elem[2]-nds_elem[1]
-      if(nds_elem[1] ≤ x ≤ nds_elem[2])
-        x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
-        return dot(uh_elem, ϕ̂(x̂,q))
-      else
-        continue
-      end
-    end
-end
+Λ̃ₖˡ(x, R::Rˡₕ) = R.Λ(Point(x))
 """
 Gradient of the multiscale bases at x
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function ∇Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
-    nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
-    q,p=fespace
-    nel = size(elem,1)
-    new_elem, _ = new_connectivity_matrices(elem,(q,p))
-    for i=1:nel
-      new_elem[i,:] = elem[i,1]+(i-1)*(q-1): elem[i,2]+i*(q-1)
-      uh_elem = uh[new_elem[i,:]]
-      nds_elem = nds[elem[i,:]]
-      hl = nds_elem[2]-nds_elem[1]
-      if(nds_elem[1] ≤ x ≤ nds_elem[2])
-        x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
-        return dot(uh_elem, ∇ϕ̂(x̂,q))*(2/hl)
-      else
-        continue
-      end
-    end
-end
+∇Λ̃ₖˡ(x, R::Rˡₕ) = ∇(R.Λ)(Point(x))[1]
 """
 Bₖ is the Legendre polynomial with support K=(a,b)
 """
@@ -122,7 +62,7 @@ function Bₖ(x,(l,p),nds)
     # nds is the coordinates of the element
     a,b=nds
     x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-    (a < x < b) ? ψ̂(x̂,p) : zeros(Float64,p+1)
+    (a < x < b) ? ψ̂(x̂,p)[l] : 0.0
 end
 """
 Returns the projection of Bₖ on H¹₀(D): RˡₕBₖ
@@ -137,13 +77,10 @@ function compute_ms_basis(nodes, els, A::Function, fespace, l; Nfine=200, qorder
       start = (k-l)>0 ? k-l : 1
       last = (k+l)<nel ? k+l : nel
       for i=1:p+1
-        Λₖ(y) = Bₖ(y, (l,p), elcoords)[i]
-        RˡₕBₖ[k,i] = Rˡₕ(Λₖ, A, (nodes[els[start,1]], nodes[els[last,2]]);
-                       fespace=fespace, N=Nfine, qorder=qorder)
+        Λₖ(y) = Bₖ(y[1], (i,p), elcoords)
+        domain = (nodes[els[start,1]], nodes[els[last,2]])        
+        RˡₕBₖ[k,i] = Rˡₕ(Λₖ, A, domain; fespace=fespace, N=Nfine, qorder=qorder)
       end
     end
     RˡₕBₖ
-end 
-########################################################################################################################################
-########################################################################################################################################
-########################################################################################################################################
+end

@@ -1,19 +1,18 @@
 ###############################################################################
 # Functions to compute the multi-scale basis by solving the localized problem.
 ###############################################################################
+using Gridap
 """
 mutable struct Rˡₕ <: Any
-    nds
-    els::Matrix{Int64}
-    Λ⃗::Vector{Float64}
-    λ⃗::Vector{Float64}
+Λ::FEFunction
+λ::FEFunction
+Ω::Triangulation
 end
 """
 mutable struct Rˡₕ <: Any
-    nds
-    els::Matrix{Int64}
-    Λ⃗::Vector{Float64}
-    λ⃗::Vector{Float64}
+    Λ::FEFunction
+    λ::FEFunction
+    Ω::Triangulation
 end
 """
 Function to solve the local problem on Vₕᵖ(Nˡ(K)). We input:
@@ -26,34 +25,33 @@ Function to solve the local problem on Vₕᵖ(Nˡ(K)). We input:
         3) qorder = Quadrature order for the fine-scale problem.
 """
 function Rˡₕ(Λₖ::Function, A::Function, xn::Tuple; fespace=(1,1), N=50, qorder=10)
-    q,p=fespace
-    # Now solve the problem
-    nds, els = mesh(xn, N)
-    hlocal = (xn[2]-xn[1])/N
-    new_nodes = xn[1]:(hlocal)/q:xn[2]
-    nel = size(els,1)    
-    # Boundary, Interior and Total Nodes
-    tn = 1:size(new_nodes,1)
-    bn = [1, length(new_nodes)]
-    fn = setdiff(tn,bn)
-    # Assemble the system
-    assembler = get_assembler(els,q)
-    ~, KK, ~ = assemble_matrix_H¹_H¹(assembler, nds, els, A, x-> 0*x, q; qorder=qorder)
-    LL = assemble_matrix_H¹_L²(nds, els, (q,p))
-    MM = assemble_matrix_L²_L²(nds, els, p)
-    FF = assemble_vector_L²(nds, els, p, Λₖ; qorder=qorder)
-    ## Apply the boundary conditions
-    K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; M = MM; F = FF
-    A = [K L; Lᵀ 1e-10*M]
-    b = Vector{Float64}(undef, (p+1)*nel+length(fn))
-    fill!(b,0.0)
-    b[length(fn)+1:end] = F
-    sol = A\b;
-    Λ⃗ = sol[1:length(fn)]
-    λ⃗ = sol[length(fn):end]
-    Rˡₕ(nds,
-        els,
-        vcat(0,Λ⃗,0),
-        λ⃗)
+    q,p=fespace   
+    # Solve the problem using Gridap
+    domain = xn
+    partition = (N,)
+    model = CartesianDiscreteModel(domain, partition)
+    Ω = Triangulation(model)
+    dΩ = Measure(Ω,qorder)
+    # H¹ subspace    
+    rq = ReferenceFE(lagrangian, Float64, q)
+    U = TestFESpace(model, rq, conformity=:H1, dirichlet_tags="boundary")
+    U₀ = TrialFESpace(U, x->0*x[1])
+    # L² subspace
+    rp = ReferenceFE(lagrangian, Float64, p)
+    V = TestFESpace(model, rp, conformity=:L2)
+    V₀ = TrialFESpace(V)
+    # Multifield space
+    X = MultiFieldFESpace([U,V])
+    X₀ = MultiFieldFESpace([U₀,V₀])
+    # Bilinear forms
+    a(u,v) = ∫( A*∇(u)⊙∇(v) )dΩ
+    b(λ,v) = ∫( λ*v )dΩ
+    lₕ(v) = ∫( Λₖ*v )dΩ
+    ã((Λ,λ), (v,μ)) = a(Λ,v) + b(λ,v) + b(μ,Λ) 
+    l̃((v,μ)) = lₕ(μ)
+    # Solve the problem
+    op = AffineFEOperator(ã, l̃, X₀, X)
+    Λ,λ = solve(op)
+    Rˡₕ(Λ,λ,Ω)
 end
-Base.show(io::IO, z::Rˡₕ) = print(io, "Local basis Rˡₕ on [",z.nds[1],",",z.nds[end],"], ")
+Base.show(io::IO, z::Rˡₕ) = print(io, "Local basis Rˡₕ on [",z.Ω.grid.node_coords[1],",",z.Ω.grid.node_coords[end],"], ")
