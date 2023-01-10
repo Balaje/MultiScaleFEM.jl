@@ -41,7 +41,8 @@ fn = setdiff(tn, bn)
 RˡₕΛₖ = compute_ms_basis(nodes, elems, A, fespace, l; Nfine=Nfine, qorder=qorder)
 # Plot the basis
 plt = plot()
-for el=1:nel  
+#for el=1:nel  
+for el=3
   for  i=1:p+1
     Rₖ = RˡₕΛₖ[el,i]
     xs = getindex.(Rₖ.Ω.grid.node_coords,1)        
@@ -50,7 +51,7 @@ for el=1:nel
   end
 end
 display(plt)
-
+savefig(plt,"./BasisFunctions.pdf")
 
 """
 In progress:
