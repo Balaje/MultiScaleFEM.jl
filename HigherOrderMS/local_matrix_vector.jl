@@ -9,7 +9,16 @@ Function to compute the element matrix-vector system for the multiscale method:
   (f, vᵐˢ) = ∫ₖ (f)*(vᵐˢ)dx
 where uᵐˢ,vᵐˢ ∈ Ṽₕᵖˡ and f is a known function.
 """
-function _local_matrix_vector_MS_MS(xn, A::Function, f::Function, quad, H, fespace, dim, R::VecOrMat{Rˡₕ})  
+function _local_matrix_vector_MS_MS(xn, A::Function, f::Function, quad, H, fespace, dim, R::VecOrMat{Rˡₕ}) 
+  # plt = plot()
+  # for i=1:lastindex(R)
+  #   xs = getindex.(R[i].Ω.grid.node_coords,1)        
+  #   fxs = map(x->Λ̃ₖˡ(x, R[i]), xs)     
+  #   plot!(plt, xs, fxs, lw=2, label="Basis "*string(i))
+  #   xlims!(plt, (0,1))            
+  # end 
+  # display(plt)
+  # sleep(10)
   Ke = Array{Float64}(undef, dim, dim)
   Fe = Vector{Float64}(undef, dim)
   Me = Array{Float64}(undef, dim, dim)
@@ -29,5 +38,6 @@ function _local_matrix_vector_MS_MS(xn, A::Function, f::Function, quad, H, fespa
       end
     end
   end  
+  display( Me )
   Ke, Me, Fe
 end

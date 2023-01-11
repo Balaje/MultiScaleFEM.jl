@@ -11,7 +11,8 @@ Function to evaluate the multiscale basis at any point x:
     (5) Order of polynomial (p)
 """
 function uᵐˢₕ(x, sol, R::Matrix{Rˡₕ}, elem)    
-    _,new_elem = new_connectivity_matrices(elem, (p,p))  
+    #_,new_elem = new_connectivity_matrices(elem, (p,p))  
+    new_elem, _ = new_connectivity_matrices(elem, (p,p))  
     nel = size(elem,1)    
     for i=1:nel
       nds_elem = nodes[elem[i,:]]    

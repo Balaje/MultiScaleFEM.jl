@@ -19,7 +19,7 @@ function assemble_matrix_MS_MS(nodes, els, ms_elems, RˡₕΛₖ::Matrix{Rˡₕ}
         xs = getindex.(RˡₕΛₖ[plot_basis,i].Ω.grid.node_coords,1)        
         fxs = map(x->Λ̃ₖˡ(x, RˡₕΛₖ[plot_basis,i]), xs)     
         plot!(plt, xs, fxs, lw=2, label="Basis "*string(i))
-        xlims!(plt, (0,1))            
+        xlims!(plt, (0,1))
       end
       savefig(plt, "local_basis.pdf")
     end
@@ -32,9 +32,10 @@ function assemble_matrix_MS_MS(nodes, els, ms_elems, RˡₕΛₖ::Matrix{Rˡₕ}
       cs = nodes[els[t,:],:]
       el = nonzeros(sparsevec(ms_elems[t,:]))
       start = (t-l)>0 ? t-l : 1
-      last = (t+l)<nel ? t+l : nel
-      R = RˡₕΛₖ[start:last,:]                
-      R = permutedims(R,[2,1])      
+      last = (t+l)<nel ? t+l : nel                            
+      inds = vcat(t, setdiff(start:last, t))      
+      R = collect(view(RˡₕΛₖ, inds, :))    
+      R = permutedims(R, [2,1])      
       Ke,Me,Fe = _local_matrix_vector_MS_MS(cs, A, f, quad, hlocal, fespace,
                                             length(el), vec(R))       
       for i=1:lastindex(el)
