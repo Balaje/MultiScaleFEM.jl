@@ -60,6 +60,21 @@ function _local_matrix_H¹_Vₕᵖ(Λₖ::Function, nds::Tuple, fespace; h=2, qo
   res*h*0.5
 end
 
+function _local_vector_Vₕᵖ(f::Function, Λₖ::Function, nds::Tuple, fespace;
+                           h=2, qorder=10)
+  qs, ws = gausslegendre(qorder)
+  q,p = fespace
+  res = Vector{Float64}(undef,p+1)
+  fill!(res,0.0)
+  for qⱼ=1:lastindex(qs)
+    x̂ = (nds[1]+nds[2])/2 + (nds[2]-nds[1])/2*qs[qⱼ]
+    for i=1:p+1
+      res[i] += ws[qⱼ]*f(x̂)*Λₖ(x̂)[i]
+    end
+  end
+  res*0.5*h
+end
+
 
 ########################################################################################################################################
   """

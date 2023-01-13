@@ -25,9 +25,10 @@ Function to solve the local problem on Vₕᵖ(Nˡ(K)). We input:
         2) N = Number of points in the fine space.
         3) qorder = Quadrature order for the fine-scale problem.
 """
-function Rˡₕ(Λₖ::Function, A::Function, xn::Tuple,
+function Rˡₕ(Λₖ::Function, A::Function,
              nodes_coarse::AbstractVector{Float64}, elem_coarse::Matrix{Int64};
              fespace=(1,1), N=50, qorder=10)
+  xn = (nodes_coarse[1], nodes_coarse[end])
   q,p=fespace
   # Now solve the problem
   nds, els = mesh(xn, N)
@@ -42,11 +43,20 @@ function Rˡₕ(Λₖ::Function, A::Function, xn::Tuple,
   assem₁ = get_assembler(els,q) # H¹×H¹ innerproduct
   H¹L² = (els,elem_coarse)
   assem₂ = get_assembler(H¹L²,fespace)
-  assemble_matrix_vector_H¹_Vₕᵖ(assem₂, (nodes_coarse, nds), (elem_coarse,els),
-                                x-> 1, fespace; qorder=qorder)
-  # Rˡₕ(nds,
-  #     els,
-  #     vcat(0,Λ⃗,0),
-  #     λ⃗)
+
+  ~, KK, ~ = assemble_matrix_H¹_H¹(assem₁, nds, els, A, x->0*x, q; qorder=qorder)
+  LL, FF = assemble_matrix_vector_H¹_Vₕᵖ(assem₂, (nodes_coarse, nds), (elem_coarse,els),
+                                         Λₖ, fespace; qorder=qorder)
+  K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
+  A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
+  dropzeros!(A)
+  #display(L)
+  b = Vector{Float64}(undef, length(fn)+(p+1)*size(elem_coarse,1))
+  fill!(b,0.0)
+  b[length(fn)+1:end] = F
+  sol = A\b
+  X = sol[1:length(fn)]
+  Y = sol[length(fn):end]
+  Rˡₕ(nds, els, vcat(0,X,0), Y)
 end
-Base.show(io::IO, z::Rˡₕ) = print(io, "Local basis Rˡₕ on [",z.nds[1],",",z.nds[end],"], ")
+Base.show(io::IO, z::Rˡₕ) = print(io, "Local basis Rˡₕ on [",z.nds[1],",",z.nds[end],"] ")

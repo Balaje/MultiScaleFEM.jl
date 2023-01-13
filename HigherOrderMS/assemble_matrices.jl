@@ -109,7 +109,8 @@ function assemble_matrix_vector_H¹_Vₕᵖ(ijk, nodes::Tuple, elems::Tuple,
   function Bₖ(x,p,nds)
     a,b=nds
     x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-    (a < x < b) ? ψ̂(x̂,p) : zeros(Float64,p+1)
+    (a ≤ x ≤ b) ? ψ̂(x̂,p) : zeros(Float64,p+1)
+    # ψ̂(x̂,p)
   end
 
   # Do the assembly
@@ -119,10 +120,11 @@ function assemble_matrix_vector_H¹_Vₕᵖ(ijk, nodes::Tuple, elems::Tuple,
       for P=1:nel_coarse
         CP = nodes_coarse[elem_coarse[P,:]]
         Λₖ(y) = Bₖ(y,p,CP)
-        Mlocal = _local_matrix_H¹_Vₕᵖ(Λₖ, (CQ[1],CQ[2]), fespace; h=CQ[2]-CQ[1])
+        Mlocal = _local_matrix_H¹_Vₕᵖ(Λₖ, (CQ[1],CQ[2]), fespace; h=CQ[2]-CQ[1], qorder=qorder)
+        Flocal = _local_vector_Vₕᵖ(f, Λₖ, (CQ[1],CQ[2]), fespace; h=CQ[2]-CQ[1], qorder=qorder)
         for pᵢ=1:p+1
           sMe[Q,P,qᵢ,pᵢ] = Mlocal[qᵢ,pᵢ]
-          sFe[Q,P,pᵢ] = 0
+          sFe[Q,P,pᵢ] = Flocal[pᵢ]
         end
       end
     end
