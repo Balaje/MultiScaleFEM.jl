@@ -138,7 +138,9 @@ end
 """
 Function to assemble the Multiscale matrix-vector system
 """
-function assemble_matrix_MS_MS(nodes, els, ms_elems, RˡₕΛₖ::Matrix{Rˡₕ}, A::Function, f::Function, fespace; qorder=10, Nfine=100, plot_basis=1)
+function assemble_matrix_MS_MS(nodes, els, ms_elems, RˡₕΛₖ::Matrix{Rˡₕ},
+                               A::Function, f::Function, fespace;
+                               qorder=10, plot_basis=-1)
   q,p = fespace
   nel = size(els,1)
   hlocal = nodes[2]-nodes[1]
@@ -179,6 +181,6 @@ function assemble_matrix_MS_MS(nodes, els, ms_elems, RˡₕΛₖ::Matrix{Rˡₕ}
       end
     end
   end
-  droptol!(K, 1e-20), droptol!(M, 1e-20), F
+  droptol!(K, 1e-20), droptol!(M, 1e-20), collect(droptol!(sparsevec(F),1e-20))
 end
 ########################################################################################################################################

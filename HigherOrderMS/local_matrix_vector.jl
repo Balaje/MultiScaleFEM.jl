@@ -85,7 +85,6 @@ Function to compute the element matrix-vector system for the multiscale method:
 where uᵐˢ,vᵐˢ ∈ Ṽₕᵖˡ and f is a known function.
 """
   function _local_matrix_vector_MS_MS(xn, A::Function, f::Function, quad, H, fespace, dim, R::VecOrMat{Rˡₕ})
-    display(R)
     Ke = Array{Float64}(undef, dim, dim)
     Fe = Vector{Float64}(undef, dim)
     Me = Array{Float64}(undef, dim, dim)
@@ -98,10 +97,10 @@ where uᵐˢ,vᵐˢ ∈ Ṽₕᵖˡ and f is a known function.
       x̂ = qs[qp]
       x = (xn[2]+xn[1])*0.5 + 0.5*H*x̂
       for i=1:dim
-        Fe[i] += ws[qp] * f(x) * Λ̃ₖˡ(x, R[i]; fespace=fespace) * J
+        Fe[i] += ws[qp] * f(x) * Λ̃ₖˡ(x, R[i], fespace) * J
         for j=1:dim
-          Ke[i,j] += ws[qp] * A(x) * ∇Λ̃ₖˡ(x, R[i]; fespace=fespace)* ∇Λ̃ₖˡ(x, R[j]; fespace=fespace) * J
-          Me[i,j] += ws[qp] * Λ̃ₖˡ(x, R[i]) * Λ̃ₖˡ(x, R[j]) * J
+          Ke[i,j] += ws[qp] * A(x) * ∇Λ̃ₖˡ(x, R[i], fespace)* ∇Λ̃ₖˡ(x, R[j], fespace) * J
+          Me[i,j] += ws[qp] * Λ̃ₖˡ(x, R[i], fespace) * Λ̃ₖˡ(x, R[j], fespace) * J
         end
       end
     end

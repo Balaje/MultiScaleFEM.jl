@@ -72,7 +72,7 @@ end
 Value of the multiscale basis at x:
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
+function Λ̃ₖˡ(x, R::Rˡₕ, fespace)
   nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
   q,p=fespace
   nel = size(elem,1)
@@ -94,7 +94,7 @@ end
 Gradient of the multiscale bases at x
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function ∇Λ̃ₖˡ(x, R::Rˡₕ; fespace=(1,1))
+function ∇Λ̃ₖˡ(x, R::Rˡₕ, fespace)
   nds = R.nds; elem=R.els; uh = R.Λ⃗; λₕ = R.λ⃗
   q,p=fespace
   nel = size(elem,1)

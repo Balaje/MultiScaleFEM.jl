@@ -56,7 +56,7 @@ function Rˡₕ(Λₖ::Function, A::Function,
   b[length(fn)+1:end] = F
   sol = A\b
   X = sol[1:length(fn)]
-  Y = sol[length(fn):end]
+  Y = sol[length(fn)+1:end]
   Rˡₕ(nds, els, vcat(0,X,0), Y)
 end
 Base.show(io::IO, z::Rˡₕ) = print(io, "Local basis Rˡₕ on [",z.nds[1],",",z.nds[end],"] ")
