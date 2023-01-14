@@ -10,69 +10,73 @@ Function to get the local matrix-vector system corresponding to the inner produc
     (f,v)  = ∫ₖ f*v dx
 Here u,v ∈ H¹₀(K) and f is a known function.
 """
-function _local_matrix_vector_H¹_H¹(xn, A::Function, f::Function, quad, h, p)
+function _local_matrix_H¹_H¹(xn, ϕ̂::Function, A::Function, quad, h, p)
   Me = Array{Float64}(undef, p+1, p+1)
   Ke = Array{Float64}(undef, p+1, p+1)
-  Fe = Vector{Float64}(undef, p+1)
-  res = Vector{Float64}(undef, p+1)
-  res1 = Vector{Float64}(undef, p+1)
-  fill!(Me, 0.); fill!(Ke, 0.); fill!(Fe, 0.);
-  fill!(res,0.); fill!(res1,0)
+  fill!(Me, 0.)
+  fill!(Ke, 0.)
   qs,ws = quad
   J = 0.5*h
   for q=1:lastindex(qs)
     x̂ = qs[q]
     x = (xn[2] + xn[1])*0.5 .+ 0.5*h*x̂
-    res = ϕ̂(x̂,p)
-    res1 = ∇ϕ̂(x̂,p)
+    res = ϕ̂(x̂)
+    res1 = ∇(ϕ̂, x̂)
     # Loop over the local matrices
-    for i=1:p+1
-      ϕᵢ = res[i]
-      ∇ϕᵢ = res1[i]
-      Fe[i] += ws[q]*( f(x)*ϕᵢ )*J
-      for j=1:p+1
-        ϕⱼ = res[j]
-        ∇ϕⱼ = res1[j]
-        Me[i,j] += ws[q]*( ϕᵢ * ϕⱼ )*J
-        Ke[i,j] += ws[q]*( A(x) * ∇ϕᵢ * ∇ϕⱼ )*J^-1
-      end
+    for i=1:p+1, j=1:p+1
+        Me[i,j] += ws[q]*( res[i] * res[j] )*J
+        Ke[i,j] += ws[q]*( A(x) * res1[i] * res1[j] )*J^-1
     end
   end
-  Me, Ke, Fe
+  Me, Ke
+end
+function _local_vector_H¹(xn, ϕ̂::Function, f::Function, quad, h, p)
+  Fe = Vector{Float64}(undef, p+1)
+  fill!(Fe, 0.)
+  qs,ws = quad
+  J = 0.5*h
+  for q=1:lastindex(qs)
+    x̂ = qs[q]
+    x = (xn[2]+xn[1])*0.5 .+ 0.5*h*x̂
+    res = ϕ̂(x̂)
+    for i=1:p+1
+      Fe[i] += ws[q]*( f(x)*res[i] )*J
+    end
+  end
+  Fe
 end
 """
 Function to get the rectangular matrix corresponding to the inner product:
     (u,Λₖ) = ∫ₕ u*Λₖ dx
 Here u ∈ H¹₀(K), v ∈ Vₕᵖ(K)
 """
-function _local_matrix_H¹_Vₕᵖ(Λₖ::Function, nds::Tuple, fespace; h=2, qorder=10)
+function _local_matrix_H¹_Vₕᵖ(nds, A::Function, basis::Tuple{Function,Function},
+                              quad, hlocal, fespace)
   # nds should be the fine-scale interval
-  qs, ws = gausslegendre(qorder)
+  qs, ws = quad
   q,p = fespace
-  res = Matrix{Float64}(undef, q+1, p+1)
-  fill!(res,0.0)
+  Me = Matrix{Float64}(undef, q+1, p+1)
+  fill!(Me,0.0)
+  ϕ̂,Λₖ = basis
   for qⱼ=1:lastindex(qs)
     x̂ = (nds[1]+nds[2])/2 + (nds[2]-nds[1])/2*qs[qⱼ]
     for i=1:q+1, j=1:p+1
-      res[i,j] += ws[qⱼ]*Λₖ(x̂)[j]*ϕ̂(x̂,q)[i]
+      Me[i,j] += ws[qⱼ]*A(x̂)*Λₖ(x̂)[j]*ϕ̂(x̂)[i]
     end
   end
-  res*h*0.5
+  Me*hlocal*0.5
 end
-
-function _local_vector_Vₕᵖ(f::Function, Λₖ::Function, nds::Tuple, fespace;
-                           h=2, qorder=10)
-  qs, ws = gausslegendre(qorder)
-  q,p = fespace
-  res = Vector{Float64}(undef,p+1)
-  fill!(res,0.0)
+function _local_vector_Vₕᵖ(nds, f::Function, Λₖ::Function, quad, hlocal, p)
+  qs, ws = quad
+  Fe = Vector{Float64}(undef,p+1)
+  fill!(Fe,0.0)
   for qⱼ=1:lastindex(qs)
     x̂ = (nds[1]+nds[2])/2 + (nds[2]-nds[1])/2*qs[qⱼ]
     for i=1:p+1
-      res[i] += ws[qⱼ]*f(x̂)*Λₖ(x̂)[i]
+      Fe[i] += ws[qⱼ]*f(x̂)*Λₖ(x̂)[i]
     end
   end
-  res*0.5*h
+  Fe*0.5*hlocal
 end
 
 
