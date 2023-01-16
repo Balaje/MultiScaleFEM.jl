@@ -9,26 +9,26 @@ Function to assemble the standard H¹(D) × H¹(D) matrix and vector:
     (f,v)  = ∫ₖ f*v dx
 Returns the tuple containing (mass, stiffness, load) vectors
 """
-function assemble_matrix_H¹_H¹(assem::MatrixVectorAssembler, A::Function; qorder=10)
-  (U,V),_ = get_fespaces(assem)
-  @assert typeof(U) == typeof(V)
+function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) where {T<:Union{H¹Conforming,MultiScale}}
   trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems
   p = U.p
   quad = gausslegendre(qorder)
-  i,j = assem.mAssem.iM, assem.mAssem.jM
+  i,j = assem.iM, assem.jM
   nel = size(els,1)
-  # Initialize the local matrix vector
+  # Initialize the element-wise local matrices
   sKe = Array{Float64}(undef, size(i))
   sMe = Array{Float64}(undef, size(i))
-  fill!(sKe,0.0)
-  fill!(sMe,0.0)
+  fill!(sKe,0.0); fill!(sMe,0.0)
+  Me = Array{Float64}(undef, p+1, p+1)
+  Ke = Array{Float64}(undef, p+1, p+1)
   # Do the assembly
   for t=1:nel
     cs = nodes[els[t,:],:]
     hlocal = cs[2] - cs[1]
-    Me, Ke = _local_matrix_H¹_H¹(cs, U.ϕ̂, A, quad, hlocal, p)
+    _local_matrix!(Me, cs, (U.basis,U.basis), A, quad, hlocal, (p,p))
+    _local_matrix!(Ke, cs, (y->∇(U.basis,y),y->∇(U.basis,y)), A, quad, hlocal, (p,p))
     for ti=1:p+1, tj=1:p+1
       sMe[t,ti,tj] = Me[ti,tj]
       sKe[t,ti,tj] = Ke[ti,tj]
@@ -39,24 +39,23 @@ function assemble_matrix_H¹_H¹(assem::MatrixVectorAssembler, A::Function; qord
   droptol!(M,1e-20), droptol!(K,1e-20)
 end
 
-function assemble_vector_H¹(assem::MatrixVectorAssembler, f::Function,
-                            fespaces::H¹Conforming; qorder=10)
-  _,W = get_fespaces(assem)
-  trian = get_trian(W)
+function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10) where {T<:FiniteElementSpace}
+  trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems
-  p = W.p
+  p = U.p
   quad = gausslegendre(qorder)
-  k = assem.vAssem.iV
+  k = assem.iV
   nel = size(els,1)
   # Initialize the local vector
   sFe = Array{Float64}(undef, size(k))
   fill!(sFe,0.0)
+  Fe = Vector{Float64}(undef, p+1)
   # Do the assembly
   for t=1:nel
     cs = nodes[els[t,:],:]
     hlocal = cs[2]-cs[1]
-    Fe = _local_vector_H¹(cs, W.ϕ̂, f, quad, hlocal, p)
+    _local_vector!(Fe, cs, U.basis, f, quad, hlocal, p)
     for ti=1:p+1
       sFe[t,ti] = Fe[ti]
     end
@@ -69,29 +68,26 @@ Function to assemble the H¹(D) × Vₕᵖ(K) matrix and the 1 × Vₕᵖ(K) vec
     (f,Λₖ) = ∫ₖ f*Λₖ dx: Vector
 Here u ∈ H¹₀(K), Λₖ ∈ Vₕᵖ(K) and f is a known function
 """
-function assemble_matrix_H¹_Vₕᵖ(assem::MatrixVectorAssembler, A::Function; qorder=10)
+function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qorder=10) where {T1<:H¹Conforming, T2<:L²Conforming}  
   # Get the data
-  (U,V),_ = get_fespaces(assem)
-  @assert typeof(U) != typeof(V)
   trian₁ = get_trian(U) # Fine
   trian₂ = get_trian(V) # Coarse
-  nodes₁ = U.nodes
-  nodes₂ = V.nodes
   els₁ = U.elem
   els₂ = V.elem
   q = U.p
   p = V.p
   quad = gausslegendre(qorder)
-  i,j = assem.mAssem.iM, assem.mAssem.jM
+  i,j = assem.iM, assem.jM
   nel₁ = size(els₁,1)
   nel₂ = size(els₂,1)
   sMe = Array{Float64}(undef, size(i))
   fill!(sMe, 0.0);
+  Me = Matrix{Float64}(undef, q+1, p+1)
   # The Legendre basis function Λₖⱼ with supp(Λₖⱼ) = K
   function Bₖ(x,nds)
     a,b=nds
     x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-    (a ≤ x ≤ b) ? V.Λₖᵖ(x̂) : zeros(Float64,p+1)
+    (a ≤ x ≤ b) ? V.basis(x̂) : zeros(Float64,p+1)
   end
   # Do the assembly
   for Q=1:nel₁
@@ -100,9 +96,9 @@ function assemble_matrix_H¹_Vₕᵖ(assem::MatrixVectorAssembler, A::Function; 
     for qᵢ=1:q+1, P=1:nel₂
       CP = trian₂.nds[trian₂.elems[P,:]]
       Λₖ(y) = Bₖ(y,CP)
-      Mlocal = _local_matrix_H¹_Vₕᵖ(CQ, A, (U.ϕ̂,Λₖ), quad, hlocal, (q,p))
+      _local_matrix!(Me, CQ, (U.basis,Λₖ), A, quad, hlocal, (q,p))
       for pᵢ=1:p+1
-        sMe[Q,P,qᵢ,pᵢ] = Mlocal[qᵢ,pᵢ]
+        sMe[Q,P,qᵢ,pᵢ] = Me[qᵢ,pᵢ]
       end
     end
   end
@@ -110,44 +106,6 @@ function assemble_matrix_H¹_Vₕᵖ(assem::MatrixVectorAssembler, A::Function; 
   dropzeros!(K)
 end
 
-function assemble_vector_Vₕᵖ(assem::MatrixVectorAssembler, f::Function; qorder=10)
-  (U,V),W = get_fespaces(assem)
-  @assert typeof(U) != typeof(V)
-  trian₁ = get_trian(U) # Fine
-  trian₂ = get_trian(V) # Coarse
-  nodes₁ = U.nodes
-  nodes₂ = V.nodes
-  els₁ = U.elem
-  els₂ = V.elem
-  q = U.p
-  p = V.p
-  quad = gausslegendre(qorder)
-  k = assem.vAssem.iV
-  nel₁ = size(els₁,1)
-  nel₂ = size(els₂,1)
-  sFe = Array{Float64}(undef, size(k))
-  fill!(sFe, 0.0);
-  # The Legendre basis function Λₖⱼ with supp(Λₖⱼ) = K
-  function Bₖ(x,nds)
-    a,b=nds
-    x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-    (a ≤ x ≤ b) ? V.Λₖᵖ(x̂) : zeros(Float64,p+1)
-  end
-  # Do the assembly
-  for Q=1:nel₁
-    CQ = trian₁.nds[trian₁.elems[Q,:]]
-    hlocal = CQ[2]-CQ[1]
-    for qᵢ=1:q+1, P=1:nel₂
-      CP = trian₂.nds[trian₂.elems[P,:]]
-      Λₖ(y) = Bₖ(y,CP)
-      Flocal = _local_vector_Vₕᵖ(CQ, f, Λₖ, quad, hlocal, p)
-      for pᵢ=1:p+1
-        sFe[Q,P,pᵢ] = Flocal[pᵢ]
-      end
-    end
-  end
-  F = collect(sparsevec(vec(k),vec(sFe)))
-end
 ########################################################################################################################################
 """
 Function to assemble the Multiscale matrix-vector system

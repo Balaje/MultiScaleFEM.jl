@@ -22,18 +22,13 @@ end
 mutable struct H¹Conforming <: FiniteElementSpace
   trian::MeshType
   p::Int64
-  ϕ̂::Function
+  basis::Function
   nodes::AbstractVector{Float64}
   elem::Matrix{Int64}
   dirichletNodes::Vector{Int64}
 end
 function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshType
-  N = size(trian.elems,1)
   elem = trian.elems
-  elems = Matrix{Int64}(undef,N,p+1)
-  for i=1:N
-    elems[i,:] = elem[i,1]+(i-1)*(p-1): elem[i,2]+i*(p-1)
-  end
   function ϕ̂(x̂)
     xq = LinRange(-1,1,p+1)
     Q = [xq[i]^j for i=1:p+1, j=0:p]
@@ -42,7 +37,7 @@ function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshT
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  H¹Conforming(trian,p,ϕ̂,nodes,elems,dNodes)
+  H¹Conforming(trian,p,ϕ̂,nodes,elem,dNodes)
 end
 
 """
@@ -61,17 +56,12 @@ end
 mutable struct L²Conforming <: FiniteElementSpace
   trian::MeshType
   p::Int64
-  Λₖᵖ::Function
+  basis::Function
   nodes::AbstractVector{Float64}
   elem::Matrix{Int64}
 end
 function L²Conforming(trian::T, p::Int64) where T<:MeshType
-  N = size(trian.elems,1)
-  elems = Matrix{Int64}(undef,N,p+1)
   elem = trian.elems
-  for i=1:N
-    elems[i,:] = elem[i,1]+(i-1)*(p): elem[i,2]+i*(p)-1
-  end
   function Λₖᵖ(x)
     if (p==0)
       return [1.0]
@@ -88,7 +78,7 @@ function L²Conforming(trian::T, p::Int64) where T<:MeshType
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  L²Conforming(trian,p,Λₖᵖ,nodes,elems)
+  L²Conforming(trian,p,Λₖᵖ,nodes,elem)
 end
 
 function get_trian(fespace::T) where T<:FiniteElementSpace
@@ -96,20 +86,20 @@ function get_trian(fespace::T) where T<:FiniteElementSpace
 end
 
 """
-mutable struct Rˡₕ <: Any
+mutable struct Rˡₕ{T<:FiniteElementSpace} <: Any
     nds
     els::Matrix{Int64}
     Λ⃗::Vector{Float64}
     λ⃗::Vector{Float64}
 end
 """
-mutable struct Rˡₕ <: Any
+mutable struct Rˡₕ{T<:FiniteElementSpace} <: Any
   nds::AbstractVector{Float64}
   els::Matrix{Int64}
-  Λ⃗::Vector{Float64}
-  λ⃗::Vector{Float64}
+  Λ::Vector{Float64}
+  λ::Vector{Float64}
+  U::T
 end
-
 """
 mutable struct MultiScale <: FiniteElementSpace
   𝒯::MeshType
@@ -124,7 +114,48 @@ mutable struct MultiScale <: FiniteElementSpace
   Λ̃ₖᵖs::Matrix{Rˡₕ}
   elem::Vector{Vector{Int64}}
 end
-
+"""
+Value of the multiscale basis at x:
+(1) Accepts the basis FEM solution and returns the value at x
+"""
+function Λ̃ₖˡ(x, R::Rˡₕ)
+  nds = R.nds; elem=R.els; uh = R.Λ;
+  @assert R.U isa H¹Conforming
+  new_elem = R.U.elem  
+  nel = size(elem,1)
+  for i=1:nel    
+    uh_elem = uh[new_elem[i,:]]
+    nds_elem = nds[elem[i,:]]
+    hl = nds_elem[2]-nds_elem[1]
+    if(nds_elem[1] ≤ x ≤ nds_elem[2])
+      x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
+      return dot(uh_elem, U.ϕ̂(x̂))
+    else
+      continue
+    end
+  end
+end
+"""
+Gradient of the multiscale bases at x
+(1) Accepts the basis FEM solution and returns the value at x
+"""
+function ∇Λ̃ₖˡ(x, R::Rˡₕ)
+  nds = R.nds; elem=R.els; uh = R.Λ⃗;
+  @assert R.U isa H¹Conforming
+  new_elem = R.U.elem  
+  nel = size(elem,1)
+  for i=1:nel    
+    uh_elem = uh[new_elem[i,:]]
+    nds_elem = nds[elem[i,:]]
+    hl = nds_elem[2]-nds_elem[1]
+    if(nds_elem[1] ≤ x ≤ nds_elem[2])
+      x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
+      return dot(uh_elem, ∇(ϕ̂,x̂))*(2/hl)
+    else
+      continue
+    end
+  end
+end
 """
 ∇(ϕ, x)Function to obtain the gradient of the function ϕ
 """
