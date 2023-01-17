@@ -132,8 +132,8 @@ function _get_assembler_matrix(elem::Tuple{Matrix{Int64}, Matrix{Int64}},
   jM = Array{Int64}(undef, nel_1, nel_2, q+1, p+1)  
   fill!(iM, 0); fill!(jM, 0)
   for Q=1:nel_1, P=1:nel_2, pᵢ=1:p+1, qᵢ=1:q+1
-    iM[Q,P,qᵢ,pᵢ] = elem_2[P,pᵢ]
-    jM[Q,P,qᵢ,pᵢ] = elem_1[Q,qᵢ]        
+    iM[Q,P,qᵢ,pᵢ] = elem_1[Q,qᵢ]
+    jM[Q,P,qᵢ,pᵢ] = elem_1[P,pᵢ]        
   end
   iM, jM
 end 

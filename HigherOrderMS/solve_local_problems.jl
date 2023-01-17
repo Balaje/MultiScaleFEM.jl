@@ -16,16 +16,18 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   bn = U.dirichletNodes
   fn = setdiff(tn,bn)
   # Use the assemblers and assemble the system
-  MM,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
-  LL = assemble_matrix(U, V, Lₐ, A; qorder=qorder)
-  # K = KK[fn,fn]; M = MM[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
-  # A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
-  # dropzeros!(A)
-  # b = Vector{Float64}(undef, length(fn)+(V.p+1)*size(V.elem,1))
-  # fill!(b,0.0)
-  # b[length(fn)+1:end] = F
+  ~,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
+  LL = assemble_matrix(U, V, Lₐ, x->1; qorder=qorder)
+  FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
+  K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
+  A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
+  b = Vector{Float64}(undef, length(fn)+length(F))
+  @show size(K), size(L), size(b), size(A), size(F)
+  dropzeros!(A)  
+  fill!(b,0.0)
+  b[length(fn)+1:end] = F
   # sol = A\b
   # X = sol[1:length(fn)]
   # Y = sol[length(fn)+1:end]
-  # Rˡₕ(nodes, elems, vcat(0,X,0), Y, U)
+  # Rˡₕ(nodes, U.elem, vcat(0,X,0), Y, U)
 end

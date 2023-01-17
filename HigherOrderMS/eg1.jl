@@ -7,9 +7,9 @@ include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 include("solve_local_problems.jl");
 
-#A(x) = @. 1
-ε = 2^-5
-A(x) = @. (2 + cos(2π*x/ε))^-1
+A(x) = @. 1
+#ε = 2^-5
+#A(x) = @. (2 + cos(2π*x/ε))^-1
 
 p = 1
 q = 1
@@ -26,15 +26,15 @@ V = H¹Conforming(mesh_fine,q,[1,nel_fine+1]); # Fine
 Kₐ = MatrixAssembler(H¹ConformingSpace(), q, V.elem)
 Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (V.elem, U.elem))
 Fₐ = VectorAssembler(L²ConformingSpace(), p, U.elem)
-Rˡₕ(x->1, A, (V,U), [Kₐ,Lₐ'], [Fₐ])
 
-# # Now to compute the new basis functions
-# function Bₖ(x,nds)
-#   a,b=nds
-#   x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-#   (a ≤ x ≤ b) ? U.Λₖᵖ(x̂) : zeros(Float64,U.p+1)
-# end
-# # R = Rˡₕ(y->Bₖ(y,(0.2,0.4))[2], A, assem₁, assem₂; qorder=3)
+# Now to compute the new basis functions
+function Bₖ(x,nds)
+    a,b=nds
+    x̂ = -(a+b)/(b-a) + 2/(b-a)*x
+    (a ≤ x ≤ b) ? U.basis(x̂) : zeros(Float64,U.p+1)
+  end
+R = Rˡₕ(y->Bₖ(y,(0.2,0.4))[1], A, (V,U), [Kₐ,Lₐ], [Fₐ]; qorder=10)
+#R = Rˡₕ(y->1, A, (V,U), [Kₐ,Lₐ], [Fₐ]; qorder=10)
 # function compute_ms_basis(patch::A, fine_mesh::B,
 #                assem_coarse::MatrixVectorAssembler, assem_fine::MatrixVectorAssembler) where {A<:MeshType, B<:MeshType}
 #   els

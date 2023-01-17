@@ -19,10 +19,9 @@ function _local_matrix!(Me, xn, basis::Tuple{Function,Function}, A::Function, qu
     x = (xn[2]+xn[1])*0.5 .+ 0.5*h*x̂    
     # Loop over the local matrices
     for i=1:q+1, j=1:p+1
-        Me[i,j] += ws[qk]*( A(x̂) * basis_1(x̂)[i] * basis_2(x̂)[j] )      
+      Me[i,j] += ws[qk]*( A(x) * basis_1(x)[i] * basis_2(x)[j] )*(0.5*h)
     end
   end
-  Me*0.5*h
 end
 function _local_vector!(Fe, xn, basis::Function, f::Function, quad, h, fespace)
   fill!(Fe, 0.)
@@ -32,10 +31,9 @@ function _local_vector!(Fe, xn, basis::Function, f::Function, quad, h, fespace)
     x̂ = qs[q]
     x = (xn[2]+xn[1])*0.5 .+ 0.5*h*x̂
     for i=1:p+1
-      Fe[i] += ws[q]*( f(x) * basis(x̂)[i] )*J
+      Fe[i] += ws[q]*( f(x) * basis(x)[i] )*(0.5*h)
     end
   end
-  Fe
 end
 
 
