@@ -16,7 +16,7 @@ q = 1
 l = 1
 nel_patch = 2l+1 
 nel_coarse = 5
-nel_fine = 10
+nel_fine = 100
 # Precompute the assembly matrix for the patch, nel = 2*l + 1 using a dummy mesh
 mesh_coarse = 𝒯((0,0.6),2l+1) # nel = 2l+1
 mesh_fine = 𝒯((0,0.6),nel_fine)
@@ -33,7 +33,7 @@ function Bₖ(x,nds)
     x̂ = -(a+b)/(b-a) + 2/(b-a)*x
     (a ≤ x ≤ b) ? U.basis(x̂) : zeros(Float64,U.p+1)
   end
-R = Rˡₕ(y->Bₖ(y,(0.2,0.4))[1], A, (V,U), [Kₐ,Lₐ], [Fₐ]; qorder=10)
+R = Rˡₕ(y->Bₖ(y,(0.2,0.4))[2], A, (V,U), [Kₐ,Lₐ], [Fₐ]; qorder=10)
 #R = Rˡₕ(y->1, A, (V,U), [Kₐ,Lₐ], [Fₐ]; qorder=10)
 # function compute_ms_basis(patch::A, fine_mesh::B,
 #                assem_coarse::MatrixVectorAssembler, assem_fine::MatrixVectorAssembler) where {A<:MeshType, B<:MeshType}

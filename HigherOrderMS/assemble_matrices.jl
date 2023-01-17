@@ -31,7 +31,7 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) w
     hlocal = cs[2] - cs[1]
     ϕᵢ(x) = U.basis(-(cs[2]+cs[1])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
     _local_matrix!(Me, cs, (ϕᵢ,ϕᵢ), A, quad, hlocal, (p,p))
-    _local_matrix!(Ke, cs, (y->∇(ϕᵢ,y)*(2/hlocal),y->∇(ϕᵢ,y)*(2/hlocal)), A, quad, hlocal, (p,p))
+    _local_matrix!(Ke, cs, (y->∇(ϕᵢ,y),y->∇(ϕᵢ,y)), A, quad, hlocal, (p,p))
     for ti=1:p+1, tj=1:p+1
       sMe[t,ti,tj] = Me[ti,tj]
       sKe[t,ti,tj] = Ke[ti,tj]      
