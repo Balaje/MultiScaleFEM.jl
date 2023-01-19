@@ -117,8 +117,8 @@ end
 function get_assembler(elem::Tuple{Matrix{Int64}, Matrix{Int64}},
                        fespace::Tuple{Int64, Int64},
                        ::H¹ConformingSpace, ::L²ConformingSpace)
-  iM, jM = _get_assembler_matrix(elem, fespaces, H¹ConformingSpace(), L²ConformingSpace())
-  iV = _get_assembler_vector(elem[2], q)
+  iM, jM = _get_assembler_matrix(elem, fespace, H¹ConformingSpace(), L²ConformingSpace())
+  iV = _get_assembler_vector(elem[2], fespace[2])
   iM, jM, iV
 end
 function _get_assembler_matrix(elem::Tuple{Matrix{Int64}, Matrix{Int64}},
