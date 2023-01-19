@@ -23,7 +23,7 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) w
   fill!(sKe,0.0); fill!(sMe,0.0)
   Me = Array{Float64}(undef, p+1, p+1)
   Ke = Array{Float64}(undef, p+1, p+1)
-  fill!(Me, 0.0) 
+  fill!(Me, 0.0)
   fill!(Ke, 0.0)
   # Do the assembly
   for t=1:nel
@@ -34,7 +34,7 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) w
     _local_matrix!(Ke, cs, (y->∇(ϕᵢ,y),y->∇(ϕᵢ,y)), A, quad, hlocal, (p,p))
     for ti=1:p+1, tj=1:p+1
       sMe[t,ti,tj] = Me[ti,tj]
-      sKe[t,ti,tj] = Ke[ti,tj]      
+      sKe[t,ti,tj] = Ke[ti,tj]
     end
   end
   K = sparse(vec(i), vec(j), vec(sKe))
@@ -72,7 +72,7 @@ Function to assemble the H¹(D) × Vₕᵖ(K) matrix and the 1 × Vₕᵖ(K) vec
     (f,Λₖ) = ∫ₖ f*Λₖ dx: Vector
 Here u ∈ H¹₀(K), Λₖ ∈ Vₕᵖ(K) and f is a known function
 """
-function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qorder=10) where {T1<:H¹Conforming, T2<:L²Conforming}  
+function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qorder=10) where {T1<:H¹Conforming, T2<:L²Conforming}
   # Get the data
   trian₁ = get_trian(U) # Fine
   trian₂ = get_trian(V) # Coarse
@@ -99,11 +99,11 @@ function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qord
     hlocal = CQ[2]-CQ[1]
     for P=1:nel₂
       CP = trian₂.nds[trian₂.elems[P,:]] # Coarse space
-      Λₖ(y) = Bₖ(y,CP) 
+      Λₖ(y) = Bₖ(y,CP)
       ϕᵢ(y) = U.basis(-(CQ[2]+CQ[1])/(CQ[2]-CQ[1]) + 2/(CQ[2]-CQ[1])*y)
-      _local_matrix!(Me, CQ, (ϕᵢ,Λₖ), A, quad, hlocal, (q,p))      
+      _local_matrix!(Me, CQ, (ϕᵢ,Λₖ), A, quad, hlocal, (q,p))
       for qᵢ=1:q+1, pᵢ=1:p+1
-          sMe[Q,P,qᵢ,pᵢ] = Me[qᵢ,pᵢ]
+        sMe[Q,P,qᵢ,pᵢ] = Me[qᵢ,pᵢ]
       end
     end
   end

@@ -30,7 +30,7 @@ Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (NˡK�
 Fₐ = VectorAssembler(L²ConformingSpace(), p, NˡK.elems) # Construct the vector assembler for (Λₖ,μ)
 
 # Bₖ is the Legendre polynomial with support K=(a,b)
-function Bₖ(x,nds,V)        
+function Bₖ(x,nds,V)
   a,b=nds
   x̂ = -(a+b)/(b-a) + 2/(b-a)*x
   (a ≤ x ≤ b) ? V.basis(x̂) : zeros(Float64,V.p+1)
@@ -41,14 +41,14 @@ local_basis = 1 # Local Basis Index 1:p+1
 elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]; # Get the nodes of element 3.
 
 # Solve the saddle point problem. (Found in fespaces.jl, line 100)
-RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4); 
+RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4);
 
 
 using Plots
 plt = plot(RˡₕΛₖ.nds, RˡₕΛₖ.Λ, label="Basis 2 on element 3", lc=:blue, lw=2)
 
 # Legendre Polynomials basis at the FE nodes
-LP = map(y->Bₖ(y,elem,VₕᵖNˡK)[local_basis], RˡₕΛₖ.nds); 
+LP = map(y->Bₖ(y,elem,VₕᵖNˡK)[local_basis], RˡₕΛₖ.nds);
 
 plot!(plt, RˡₕΛₖ.nds, LP, label="Legendre Polynomial", lc=:red, lw=2)
 plot!(plt, elem[1]:0.01:elem[2], 0*(elem[1]:0.01:elem[2]), label="Element 3", lc=:black, lw=4)
@@ -68,11 +68,11 @@ function Λ̃ˡₚ(x, R::Rˡₕ, V::A) where A <: H¹Conforming
     if(cs[1] ≤ x ≤ cs[2])
       x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
       return dot(uh,V.basis(x̂))
-    else 
+    else
       continue
-    end 
+    end
   end
-end 
+end
 #plt1 = plot(RˡₕΛₖ.nds, map(y->Λ̃ˡₚ(y, RˡₕΛₖ, H¹₀NˡK), RˡₕΛₖ.nds));
 #plot!(plt1, RˡₕΛₖ.nds, RˡₕΛₖ.Λ)
 
@@ -83,12 +83,12 @@ F₁ = assemble_vector(VₕᵖNˡK, Fₐ, y->Bₖ(y, elem, VₕᵖNˡK)[local_ba
 # Check if they are equal in element el??
 display(hcat(F₀, F₁))
 #= 4.33681e-19   0.0
-  3.39256e-9    0.0
-  4.33681e-18   0.0
-  1.69628e-8    0.0
-  0.1           0.1
-  2.51535e-17  -2.25514e-17
- -4.33681e-18   0.0
- -1.69628e-8    0.0
-  3.27971e-18   0.0
- -3.39256e-9    0.0 =#
+3.39256e-9    0.0
+4.33681e-18   0.0
+1.69628e-8    0.0
+0.1           0.1
+2.51535e-17  -2.25514e-17
+-4.33681e-18   0.0
+-1.69628e-8    0.0
+3.27971e-18   0.0
+-3.39256e-9    0.0 =#

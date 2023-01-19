@@ -57,7 +57,7 @@ mutable struct L²Conforming <: FiniteElementSpace
   trian::MeshType
   p::Int64
   basis::Function
-  nodes::AbstractVector{Float64}  
+  nodes::AbstractVector{Float64}
 end
 function L²Conforming(trian::T, p::Int64) where T<:MeshType
   function Λₖᵖ(x)
@@ -97,8 +97,8 @@ mutable struct Rˡₕ{T<:FiniteElementSpace} <: Any
   λ::Vector{Float64}
   U::T
 end
-function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOrMat{MatrixAssembler}, 
-    VecAssems::VecOrMat{VectorAssembler}; qorder=3) where {T1<:FiniteElementSpace, T2<:FiniteElementSpace}
+function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOrMat{MatrixAssembler},
+             VecAssems::VecOrMat{VectorAssembler}; qorder=3) where {T1<:FiniteElementSpace, T2<:FiniteElementSpace}
   U,V = Us
   Kₐ, Lₐ = MatAssems
   Fₐ, = VecAssems
@@ -113,8 +113,8 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
   A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
-  b = Vector{Float64}(undef, length(fn)+length(F))  
-  dropzeros!(A)  
+  b = Vector{Float64}(undef, length(fn)+length(F))
+  dropzeros!(A)
   fill!(b,0.0)
   b[length(fn)+1:end] = F
   sol = A\b
@@ -143,9 +143,9 @@ Value of the multiscale basis at x:
 function Λ̃ₖˡ(x, R::Rˡₕ)
   nds = R.nds; elem=R.els; uh = R.Λ;
   @assert R.U isa H¹Conforming
-  new_elem = R.U.elem  
+  new_elem = R.U.elem
   nel = size(elem,1)
-  for i=1:nel    
+  for i=1:nel
     uh_elem = uh[new_elem[i,:]]
     nds_elem = nds[elem[i,:]]
     hl = nds_elem[2]-nds_elem[1]
@@ -164,9 +164,9 @@ Gradient of the multiscale bases at x
 function ∇Λ̃ₖˡ(x, R::Rˡₕ)
   nds = R.nds; elem=R.els; uh = R.Λ⃗;
   @assert R.U isa H¹Conforming
-  new_elem = R.U.elem  
+  new_elem = R.U.elem
   nel = size(elem,1)
-  for i=1:nel    
+  for i=1:nel
     uh_elem = uh[new_elem[i,:]]
     nds_elem = nds[elem[i,:]]
     hl = nds_elem[2]-nds_elem[1]
