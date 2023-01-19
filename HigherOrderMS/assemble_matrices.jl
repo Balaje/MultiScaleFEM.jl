@@ -76,8 +76,8 @@ function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qord
   # Get the data
   trian₁ = get_trian(U) # Fine
   trian₂ = get_trian(V) # Coarse
-  els₁ = U.elem
-  els₂ = V.elem
+  els₁ = trian₁.elems
+  els₂ = trian₂.elems
   q = U.p
   p = V.p
   quad = gausslegendre(qorder)

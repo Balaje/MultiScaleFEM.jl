@@ -10,7 +10,7 @@ mutable struct 𝒯 <: MeshType
   elems::Matrix{Int64}
 end
 
-Structure to store the information of the coarse mesh
+Structure To Store The Connectivity Information Of The Mesh.
 """
 mutable struct 𝒯 <: MeshType
   H::Float64

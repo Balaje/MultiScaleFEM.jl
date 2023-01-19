@@ -21,12 +21,12 @@ function φ̂ₘₛ(x, A::Function, xn; order=40)
     qs,ws = gausslegendre(order)
     res = [0.,0.]
     num = 0.    
-    x̂ = (xn[1] + xn[2])/2 .+ (xn[2] - xn[1])/2*x[1] # Transform to local coordinates
+    #x̂ = (xn[1] + xn[2])/2 .+ (xn[2] - xn[1])/2*x[1] # Transform to local coordinates
     for q = 1:order
         xq = qs[q]        
         # Numerator integral
-        J_num = abs(x̂ - xn[1])/2  # Jacobian of the numerator
-        x_num = (x̂ + xn[1])/2 .+ (x̂ - xn[1])/2*xq                                        
+        J_num = abs(x - xn[1])/2  # Jacobian of the numerator
+        x_num = (x + xn[1])/2 .+ (x - xn[1])/2*xq                                        
         num += ws[q]*(A(x_num))^(-1)*J_num
     end 
     den = ms_basis_den(A, xn; order=order)  # Get the denominator integral   
@@ -36,22 +36,20 @@ function φ̂ₘₛ(x, A::Function, xn; order=40)
     res
 end 
 function ∇φ̂ₘₛ(x, A::Function, xn; order=40)
-    x̂ = (xn[1] + xn[2])/2 .+ (xn[2] - xn[1])/2*x[1] # Transform to local coordinates 
     res = [0., 0.]
     den = ms_basis_den(A, xn; order=order)
-    num = (A(x̂))^(-1)*(xn[2] - xn[1])/2
+    num = (A(x))^(-1)
     res[1] = num/den
     res[2] = -num/den
     res
 end
-function φ̂ₘₛ!(res, x, A::Function, xn; order=10)
+function φ̂ₘₛ!(res, x, A::Function, xn; order=40)
     qs,ws = gausslegendre(order)
     num = 0.   
-    x̂ = (xn[1] + xn[2])/2 .+ (xn[2] - xn[1])/2*x[1]
     for q = 1:order
         xq = qs[q]
-        x_num = (x̂ + xn[1])/2 .+ (x̂ - xn[1])/2*xq                
-        J_num = abs(x̂ - xn[1])/2        
+        x_num = (x + xn[1])/2 .+ (x - xn[1])/2*xq                
+        J_num = abs(x - xn[1])/2        
         num += ws[q]*(A(x_num))^(-1)*J_num
     end 
     den = ms_basis_den(A, xn; order=order)  # Get the denominator integral
@@ -60,9 +58,8 @@ function φ̂ₘₛ!(res, x, A::Function, xn; order=10)
     res[2] = 1 - num/den    
 end
 function ∇φ̂ₘₛ!(res, x, A::Function, xn; order=40)
-    x̂ = (xn[1] + xn[2])/2 .+ (xn[2] - xn[1])/2*x[1] # Transform to local coordinates     
     den = ms_basis_den(A, xn; order=order)
-    num = (A(x̂))^(-1)*(xn[2] - xn[1])/2
+    num = (A(x))^(-1)
     res[1] = num/den
     res[2] = -num/den
 end
@@ -79,11 +76,11 @@ function local_matrix_vector_multiscale!(cache, xn, A::Function, f::Function, qu
     qs,ws = quad
     J = (xn[2] - xn[1])/2
   
-    for q=1:order
+    for q=1:lastindex(qs)
       x̂ = qs[q]
       x = (xn[2] + xn[1])/2 .+ (xn[2] - xn[1])/2*x̂
-      φ̂ₘₛ!(res, x̂, A, xn; order=order)
-      ∇φ̂ₘₛ!(res1, x̂, A, xn; order=order)
+      φ̂ₘₛ!(res, x, A, xn; order=order)
+      ∇φ̂ₘₛ!(res1, x, A, xn; order=order)
       for i=1:2
         ϕᵢᵐˢ = res[i]
         ∇ϕᵢᵐˢ = res1[i]
@@ -92,7 +89,7 @@ function local_matrix_vector_multiscale!(cache, xn, A::Function, f::Function, qu
           ϕⱼᵐˢ = res[j]
           ∇ϕⱼᵐˢ = res1[j]
           Me[i,j] += ws[q]*( ϕᵢᵐˢ * ϕⱼᵐˢ )*J
-          Ke[i,j] += ws[q]*( A(x) * ∇ϕᵢᵐˢ * ∇ϕⱼᵐˢ )*J^-1
+          Ke[i,j] += ws[q]*( A(x) * ∇ϕᵢᵐˢ * ∇ϕⱼᵐˢ )*J
         end
       end
     end
@@ -112,11 +109,9 @@ function l2err_multiscale(uh::AbstractVector, u::Function, nodes, elem, A::Funct
         val = 0
         for t=2:nverts-1
             if(nodes[t-1] ≤ x ≤  nodes[t])                              
-                x̂ = 2*(x[1] - (nodes[t]+nodes[t-1])/2)/(nodes[t]-nodes[t-1]);
-                val = val + uh[t]*φ̂ₘₛ(x̂, A, [nodes[t-1], nodes[t]]; order=length(qs))[1]
-            elseif(nodes[t] ≤ x ≤ nodes[t+1])
-                x̂ = 2*(x[1] - (nodes[t+1]+nodes[t])/2)/(nodes[t+1]-nodes[t]);            
-                val = val + uh[t]*φ̂ₘₛ(x̂, A, [nodes[t], nodes[t+1]]; order=length(qs))[2]
+                val = val + uh[t]*φ̂ₘₛ(x[1], A, [nodes[t-1], nodes[t]]; order=length(qs))[1]
+            elseif(nodes[t] ≤ x ≤ nodes[t+1])                
+                val = val + uh[t]*φ̂ₘₛ(x[1], A, [nodes[t], nodes[t+1]]; order=length(qs))[2]
             else
                 val = val + 0
             end 
@@ -127,7 +122,7 @@ function l2err_multiscale(uh::AbstractVector, u::Function, nodes, elem, A::Funct
     res = zeros(Float64,2)
     for t=1:nel
         nds = nodes[elem[t,:]]
-        for q=1:length(qs)
+        for q=1:lastindex(qs)
             x̂ = qs[q]
             uhx̂ = uhx((nds[2]+nds[1])/2 + (nds[2]-nds[1])/2*x̂)            
             ux̂ = u((nds[2]+nds[1])/2 + (nds[2]-nds[1])/2*x̂)            

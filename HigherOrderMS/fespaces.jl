@@ -3,6 +3,8 @@
 ######################################################################
 using LinearAlgebra
 using ForwardDiff
+using FastGaussQuadrature
+using SparseArrays
 
 abstract type FiniteElementSpace <: Any end
 
@@ -24,11 +26,9 @@ mutable struct H¹Conforming <: FiniteElementSpace
   p::Int64
   basis::Function
   nodes::AbstractVector{Float64}
-  elem::Matrix{Int64}
   dirichletNodes::Vector{Int64}
 end
 function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshType
-  elem = trian.elems
   function ϕ̂(x̂)
     xq = LinRange(-1,1,p+1)
     Q = [xq[i]^j for i=1:p+1, j=0:p]
@@ -37,7 +37,7 @@ function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshT
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  H¹Conforming(trian,p,ϕ̂,nodes,elem,dNodes)
+  H¹Conforming(trian,p,ϕ̂,nodes,dNodes)
 end
 
 """
@@ -57,11 +57,9 @@ mutable struct L²Conforming <: FiniteElementSpace
   trian::MeshType
   p::Int64
   basis::Function
-  nodes::AbstractVector{Float64}
-  elem::Matrix{Int64}
+  nodes::AbstractVector{Float64}  
 end
 function L²Conforming(trian::T, p::Int64) where T<:MeshType
-  elem = trian.elems
   function Λₖᵖ(x)
     if (p==0)
       return [1.0]
@@ -78,7 +76,7 @@ function L²Conforming(trian::T, p::Int64) where T<:MeshType
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  L²Conforming(trian,p,Λₖᵖ,nodes,elem)
+  L²Conforming(trian,p,Λₖᵖ,nodes)
 end
 
 function get_trian(fespace::T) where T<:FiniteElementSpace
@@ -95,10 +93,34 @@ end
 """
 mutable struct Rˡₕ{T<:FiniteElementSpace} <: Any
   nds::AbstractVector{Float64}
-  els::Matrix{Int64}
   Λ::Vector{Float64}
   λ::Vector{Float64}
   U::T
+end
+function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOrMat{MatrixAssembler}, 
+    VecAssems::VecOrMat{VectorAssembler}; qorder=3) where {T1<:FiniteElementSpace, T2<:FiniteElementSpace}
+  U,V = Us
+  Kₐ, Lₐ = MatAssems
+  Fₐ, = VecAssems
+  nodes = U.nodes
+  # Collect the free-nodes
+  tn = 1:length(nodes)
+  bn = U.dirichletNodes
+  fn = setdiff(tn,bn)
+  # Use the assemblers and assemble the system
+  ~,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
+  LL = assemble_matrix(U, V, Lₐ, x->1; qorder=qorder)
+  FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
+  K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
+  A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
+  b = Vector{Float64}(undef, length(fn)+length(F))  
+  dropzeros!(A)  
+  fill!(b,0.0)
+  b[length(fn)+1:end] = F
+  sol = A\b
+  X = sol[1:length(fn)]
+  Y = sol[length(fn)+1:end]
+  Rˡₕ(nodes, vcat(0,X,0), Y, U)
 end
 """
 mutable struct MultiScale <: FiniteElementSpace
