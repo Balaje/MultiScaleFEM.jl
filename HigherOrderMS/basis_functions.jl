@@ -25,7 +25,7 @@ function compute_basis_functions(
   n = size(Ω.elems,1)
   Kₐ, Lₐ = MatAssems
   Fₐ, = VecAssems
-  Rₛ = Vector{Vector{Rˡₕ}}(undef,n)
+  Rₛ = Matrix{Rˡₕ}(undef, n, p+1)
   for el=1:n
     # Get the start and last index of the patch
     start = (el-l)<1 ? 1 : el-l; last = start+2l
@@ -36,9 +36,10 @@ function compute_basis_functions(
     NˡKₕ = 𝒯(Ωₚ, Nfine)
     VₕᵖNˡK = L²Conforming(NˡK, p); # Coarse Mesh
     H¹₀NˡK = H¹Conforming(NˡKₕ ,q, [1,(q*Nfine+1)]); # Fine Mesh
-    R = map(i->Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[i], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=qorder),
-            1:p+1)
-    Rₛ[el] = R
+    for i=1:p+1
+      R = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[i], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=qorder)
+      Rₛ[el,i] = R
+    end
   end
   Rₛ
 end

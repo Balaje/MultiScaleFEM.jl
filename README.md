@@ -149,6 +149,10 @@ OUTPUT:
 
 *A detailed description of the routines will be provided soon.*
 
+## A note about the assembler
+
+The matrix assembler contains the data structures to assemble the system of matrices. Looking at `Kₐ`, for example, it contains three matrices
+
 ## References
 
 - Målqvist, A. and Peterseim, D., 2020. Numerical homogenization by localized orthogonal decomposition. Society for Industrial and Applied Mathematics.

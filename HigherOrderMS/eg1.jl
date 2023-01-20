@@ -13,9 +13,9 @@ A(x) = @. (2 + cos(2π*x/ε))^-1
 
 p = 1
 q = 1
-l = 3
-n = 20
-nₚ = 200
+l = 1
+n = 6
+nₚ = 50
 Ω = 𝒯((0,1),n)
 
 # - Pre-Compute the assembler using the first patch size.
@@ -28,9 +28,9 @@ Fₐ = VectorAssembler(L²ConformingSpace(), p, patch.elems)
 Rₛ = compute_basis_functions(Ω, A, (q,p), [Kₐ,Lₐ], [Fₐ]; qorder=10, Nfine=nₚ)
 ## Plot to verify the basis functions
 plt = plot()
-el = 10;
+el = 3
 for local_basis = 1:p+1
-  plot!(plt, Rₛ[el][local_basis].nds, Rₛ[el][local_basis].Λ,
+  plot!(plt, Rₛ[el,local_basis].nds, Rₛ[el,local_basis].Λ,
         label="Element el="*string(el)*" Local Basis i="*string(local_basis), lw=2)
 end
 xlims!(plt, (0,1))

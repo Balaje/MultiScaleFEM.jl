@@ -12,8 +12,8 @@ include("assemble_matrices.jl")
 
 A(x) = @. 1; # Diffusion coefficient
 n = 10; Nfine = 200; # Coarse and fine mesh size.
-p = 1 # Polynomial orders for  L²
-q = 2 # Polynomial orders for H¹
+p = 2 # Polynomial orders for  L²
+q = 1 # Polynomial orders for H¹
 
 Ω = 𝒯((0,1),n); # The full coarse mesh.
 
