@@ -113,7 +113,8 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
   A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
-  b = Vector{Float64}(undef, length(fn)+length(F))
+  # b = Vector{Float64}(undef, length(fn)+length(F))
+  b = Vector{Float64}(undef, size(A,1))
   dropzeros!(A)
   fill!(b,0.0)
   b[length(fn)+1:end] = F
@@ -133,25 +134,27 @@ end
 mutable struct MultiScale <: FiniteElementSpace
   trian::MeshType
   bgSpace::L²Conforming
-  Λ̃ₖᵖs::Matrix{Rˡₕ}
-  elem::Vector{Vector{Int64}}
+  basis::Matrix{Rˡₕ}
+  nodes::AbstractVector{Float64}
+  dNodes::Vector{Int64}
 end
 """
 Value of the multiscale basis at x:
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function Λ̃ₖˡ(x, R::Rˡₕ)
-  nds = R.nds; elem=R.els; uh = R.Λ;
-  @assert R.U isa H¹Conforming
-  new_elem = R.U.elem
+function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
+  Ω = V.trian
+  p = V.p
+  elem = Ω.elems
+  nds = Ω.nds
   nel = size(elem,1)
+  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
   for i=1:nel
-    uh_elem = uh[new_elem[i,:]]
-    nds_elem = nds[elem[i,:]]
-    hl = nds_elem[2]-nds_elem[1]
-    if(nds_elem[1] ≤ x ≤ nds_elem[2])
-      x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
-      return dot(uh_elem, U.ϕ̂(x̂))
+    cs = nds[elem[i,:]]
+    uh = R.Λ[new_elem[i,:]]
+    if(cs[1] ≤ x ≤ cs[2])
+      x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
+      return dot(uh,V.basis(x̂))
     else
       continue
     end
@@ -161,18 +164,19 @@ end
 Gradient of the multiscale bases at x
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function ∇Λ̃ₖˡ(x, R::Rˡₕ)
-  nds = R.nds; elem=R.els; uh = R.Λ⃗;
-  @assert R.U isa H¹Conforming
-  new_elem = R.U.elem
+function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
+  Ω = V.trian
+  p = V.p
+  elem = Ω.elems
+  nds = Ω.nds
   nel = size(elem,1)
+  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
   for i=1:nel
-    uh_elem = uh[new_elem[i,:]]
-    nds_elem = nds[elem[i,:]]
-    hl = nds_elem[2]-nds_elem[1]
-    if(nds_elem[1] ≤ x ≤ nds_elem[2])
-      x̂ = -(nds_elem[2]+nds_elem[1])/hl + (2/hl)*x
-      return dot(uh_elem, ∇(ϕ̂,x̂))*(2/hl)
+    cs = nds[elem[i,:]]
+    uh = R.Λ[new_elem[i,:]]
+    if(cs[1] ≤ x ≤ cs[2])
+      x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
+      return dot(uh,∇(V.basis,x̂))*(cs[2]-cs[1])/2
     else
       continue
     end

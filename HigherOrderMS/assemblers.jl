@@ -18,21 +18,25 @@ Structure containing the local--global map for assembling the matrices
 mutable struct MatrixAssembler <: Assembler
   iM::Array{Int64}
   jM::Array{Int64}
+  vM::Array{Float64}
 end
 function MatrixAssembler(x::A, y::B,
                          fespaces::Tuple{Int64,Int64},
                          elem::Tuple{Matrix{Int64}, Matrix{Int64}}) where {A,B<:Union{H¹ConformingSpace, L²ConformingSpace}}
   new_elem = _new_elem_matrices(elem, fespaces, x, y)
   iM, jM = _get_assembler_matrix(new_elem, fespaces, x, y)
-  MatrixAssembler(iM, jM)
+  vM = Array{Float64}(undef, size(iM))
+  fill!(vM,0.0)
+  MatrixAssembler(iM, jM, vM)
 end
 function MatrixAssembler(x::A, fespace::Int64, elem::Matrix{Int64}) where A<:Union{H¹ConformingSpace, L²ConformingSpace}
   new_elem = _new_elem_matrices(elem, fespace, x)
   iM, jM = _get_assembler_matrix(new_elem, fespace)
-  MatrixAssembler(iM, jM)
+  vM = Array{Float64}(undef, size(iM))
+  MatrixAssembler(iM, jM, vM)
 end
-Base.transpose(m::MatrixAssembler) = MatrixAssembler(m.jM, m.iM)
-Base.adjoint(m::MatrixAssembler) = MatrixAssembler(m.jM, m.iM)
+Base.transpose(m::MatrixAssembler) = MatrixAssembler(m.jM, m.iM, m.vM)
+Base.adjoint(m::MatrixAssembler) = MatrixAssembler(m.jM, m.iM, m.vM)
 
 """
 mutable struct VectorAssembler <: Assembler
@@ -43,11 +47,14 @@ Structure containing the local--global map for assembling the vectors
 """
 mutable struct VectorAssembler <: Assembler
   iV::Array{Int64}
+  vV::Array{Float64}
 end
 function VectorAssembler(x::A, p::Int64, elem::Matrix{Int64}) where {A<:Union{H¹ConformingSpace, L²ConformingSpace}}
   new_elems = _new_elem_matrices(elem, p, x)
   iV = _get_assembler_vector(new_elems, p)
-  VectorAssembler(iV)
+  vV = Array{Float64}(undef, size(iV))
+  fill!(vV, 0.0)
+  VectorAssembler(iV, vV)
 end
 
 """

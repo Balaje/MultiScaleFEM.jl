@@ -16,16 +16,15 @@ end
 """
 Returns the projection of Bₖ on H¹₀(D): RˡₕBₖ
 """
-function compute_basis_functions(
+function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
   Ω::T, A::Function, fespace, MatAssems::Vector{MatrixAssembler},
   VecAssems::Vector{VectorAssembler};
-  qorder=3, Nfine=nₚ) where T<:MeshType
+  qorder=3, Nfine=100) where T<:MeshType
 
   q,p = fespace
   n = size(Ω.elems,1)
   Kₐ, Lₐ = MatAssems
   Fₐ, = VecAssems
-  Rₛ = Matrix{Rˡₕ}(undef, n, p+1)
   for el=1:n
     # Get the start and last index of the patch
     start = (el-l)<1 ? 1 : el-l; last = start+2l

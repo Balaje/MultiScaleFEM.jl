@@ -1,6 +1,7 @@
 #####################################################################
 # File containing all the data structures for the mesh connectivity #
 #####################################################################
+using BenchmarkTools
 
 abstract type MeshType <: Any end
 """

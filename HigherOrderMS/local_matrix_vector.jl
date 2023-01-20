@@ -9,7 +9,8 @@ Function to get the local matrix-vector system corresponding to the inner produc
     (f,v)  = ∫ₖ f*v dx
 Here u,v ∈ H¹₀(K) and f is a known function.
 """
-function _local_matrix!(Me, xn, basis::Tuple{Function,Function}, A::Function, quad, h, fespace)
+function _local_matrix!(Me::Array{Float64}, xn::VecOrMat{Float64}, basis::Tuple{Function,Function}, A::Function, 
+  quad::Tuple{Vector{Float64},Vector{Float64}}, h::Float64, fespace::Tuple{Int64,Int64})
   fill!(Me, 0.)
   qs,ws = quad
   q,p = fespace
@@ -23,7 +24,8 @@ function _local_matrix!(Me, xn, basis::Tuple{Function,Function}, A::Function, qu
     end
   end
 end
-function _local_vector!(Fe, xn, basis::Function, f::Function, quad, h, fespace)
+function _local_vector!(Fe::Array{Float64}, xn::VecOrMat{Float64}, basis::Function, f::Function, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}, h::Float64, fespace::Int64)
   fill!(Fe, 0.)
   qs,ws = quad
   p = fespace

@@ -11,13 +11,13 @@ include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
 A(x) = @. 1; # Diffusion coefficient
-n = 10; Nfine = 200; # Coarse and fine mesh size.
-p = 2 # Polynomial orders for  L²
+n = 6; Nfine = 100; # Coarse and fine mesh size.
+p = 1 # Polynomial orders for  L²
 q = 1 # Polynomial orders for H¹
 
 Ω = 𝒯((0,1),n); # The full coarse mesh.
 
-start=1; last=5;
+start=2; last=4;
 NˡK = Ω[start:last];# The submesh from element=start to element=last
 VₕᵖNˡK = L²Conforming(NˡK, p); # The L²Conforming space on the coarse mesh
 
@@ -42,7 +42,7 @@ elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]; # Get the nodes of element 3.
 
 # Solve the saddle point problem. (Found in fespaces.jl, line 100)
 RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4);
-
+# @btime Rˡₕ($(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis]), $A, $(H¹₀NˡK, VₕᵖNˡK), $[Kₐ,Lₐ], $[Fₐ]; qorder=$4);
 
 using Plots
 plt = plot(RˡₕΛₖ.nds, RˡₕΛₖ.Λ, label="Basis 2 on element 3", lc=:blue, lw=2)
