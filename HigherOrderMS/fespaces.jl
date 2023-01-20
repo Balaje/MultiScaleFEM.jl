@@ -181,7 +181,7 @@ function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
     uh = R.Λ[new_elem[i,:]]
     if(cs[1] ≤ x ≤ cs[2])
       x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-      res = dot(uh,∇(V.basis,x̂))*(cs[2]-cs[1])/2
+      res = dot(uh,∇(V.basis,x̂))*(2/(cs[2]-cs[1]))
       return res
     else
       res = 0

@@ -45,8 +45,7 @@ Function to assemble the standard Xₕ × 1 load vector
 where f is a known function and Xₕ = Union{H¹Conforming, L²Conforming, MultiScale} = Type{FiniteElementSpace}.
 NOTE: This routine holds universally
 """
-
-function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10) where {T<:FiniteElementSpace}
+function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10) where {T<:Union{H¹Conforming, L²Conforming}}
   trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems
