@@ -133,6 +133,7 @@ end
 """
 mutable struct MultiScale <: FiniteElementSpace
   trian::MeshType
+  l::Int64
   bgSpace::L²Conforming
   basis::Matrix{Rˡₕ}
   nodes::AbstractVector{Float64}
@@ -149,16 +150,19 @@ function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
   nds = Ω.nds
   nel = size(elem,1)
   new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
+  res = 0
   for i=1:nel
     cs = nds[elem[i,:]]
     uh = R.Λ[new_elem[i,:]]
     if(cs[1] ≤ x ≤ cs[2])
       x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-      return dot(uh,V.basis(x̂))
+      res = dot(uh,V.basis(x̂))
+      return res
     else
-      continue
+      res = 0
     end
   end
+  res
 end
 """
 Gradient of the multiscale bases at x
@@ -171,16 +175,19 @@ function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
   nds = Ω.nds
   nel = size(elem,1)
   new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
+  res = 0
   for i=1:nel
     cs = nds[elem[i,:]]
     uh = R.Λ[new_elem[i,:]]
     if(cs[1] ≤ x ≤ cs[2])
       x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-      return dot(uh,∇(V.basis,x̂))*(cs[2]-cs[1])/2
+      res = dot(uh,∇(V.basis,x̂))*(cs[2]-cs[1])/2
+      return res
     else
-      continue
+      res = 0
     end
   end
+   res
 end
 """
 ∇(ϕ, x)Function to obtain the gradient of the function ϕ

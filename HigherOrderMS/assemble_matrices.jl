@@ -8,7 +8,7 @@ Function to assemble the standard Xₕ × Xₕ matrices
   a(u,v) = ∫ₖ ∇(u)⋅∇(v) dx
 where Xₕ = Union{H¹Conforming, MultiScale}
 """
-function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) where T<:{H¹Conforming}
+function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) where T<:H¹Conforming
   trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems

@@ -63,11 +63,11 @@ function MultiScale(trian::T, A::Function, fespace::Tuple{Int,Int}, l::Int64, dN
   Kₐ = MatrixAssembler(H¹ConformingSpace(), q, patch_mesh.elems)
   Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (patch_mesh.elems, patch.elems))
   Fₐ = VectorAssembler(L²ConformingSpace(), p, patch.elems)  
-  Rₛ = Matrix{Rˡₕ}(undef,nel,p+1)
+  Rₛ = Matrix{Rˡₕ}(undef,p+1,nel)
   compute_basis_functions!(Rₛ, trian, A, fespace, [Kₐ,Lₐ], [Fₐ]; qorder=qorder, Nfine=Nfine)
   bgSpace = L²Conforming(trian, p)
   nodes = bgSpace.nodes
-  MultiScale(trian, bgSpace, Rₛ, nodes, dNodes)
+  MultiScale(trian, l, bgSpace, Rₛ, nodes, dNodes)
 end 
 
 # Compute and store all the basis functions
@@ -76,6 +76,42 @@ Vₕᴹˢ = MultiScale(Ω, A, (q,p), l, [1,(p+1)*n]; Nfine=nₚ);
 
 # Function to assemble the matrices corresponding to the multiscale space is similar to the one
 # given in fespace.jl (line 11)
+function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) where T<:MultiScale
+  trian = get_trian(U)
+  nodes = trian.nds
+  els = trian.elems
+  p = U.bgSpace.p
+  l = U.l
+  new_els = _new_elem_matrices(els, p, l, MultiScaleSpace())
+  quad = gausslegendre(qorder)
+  i,j,sKe = assem.iM, assem.jM, assem. vM
+  sMe = similar(sKe)
+  fill!(sKe,0.0); fill!(sMe,0.0)
+  nel = size(els,1)
+  # Initializa the element-wise local matrices
+  Me = Array{Float64}(undef,(p+1)*(l+2),(p+1)*(l+2))
+  Ke = Array{Float64}(undef,(p+1)*(l+2),(p+1)*(l+2))
+  fill!(Me,0.0); fill!(Ke,0.0)
+  vecBasis = vec(U.basis)
+  for t=1:nel
+    cs = nodes[els[t,:],:]
+    b_inds = new_els[t,:]
+    ϕᵢ(x) = map(i->Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U), b_inds)
+    (t==1) && begin
+      plt = plot()
+      xvals = vecBasis[b_inds[1]].nds[1]:0.01:vecBasis[b_inds[end]].nds[end]
+      @show xvals
+      for mm=1:2       
+        fxvals = map(x->ϕᵢ(x)[mm], xvals)
+        plot!(plt, xvals, fxvals)
+        #display(fxvals)
+      end
+      display(plt)
+    end
+  end
+  # Do the assembly
+end 
 
+assemble_matrix(Vₕᴹˢ, MSₐ, A)
 # Function to assmeble the vector corresponding to the multiscale space is given in fespace.jl (line 51)
 # The above two are the same as assembline the H¹Conforming elements

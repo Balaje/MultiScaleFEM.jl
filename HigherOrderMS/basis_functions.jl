@@ -37,7 +37,7 @@ function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
     H¹₀NˡK = H¹Conforming(NˡKₕ ,q, [1,(q*Nfine+1)]); # Fine Mesh
     for i=1:p+1
       R = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[i], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=qorder)
-      Rₛ[el,i] = R
+      Rₛ[i,el] = R
     end
   end
   Rₛ
