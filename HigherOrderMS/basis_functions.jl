@@ -29,6 +29,8 @@ function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
     # Get the start and last index of the patch
     start = (el-l)<1 ? 1 : el-l; last = start+2l
     last = (last>n) ? n : last; start = last-2l
+    start = (start ≤ 0) ? 1 : start
+    last = (last ≥ n) ? n : last
     NˡK = Ω[start:last]
     Ωₚ = (NˡK.nds[1], NˡK.nds[end])
     elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]

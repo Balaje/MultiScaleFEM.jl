@@ -13,7 +13,7 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) w
   nodes = trian.nds
   els = trian.elems
   p = U.p
-  quad = gausslegendre(qorder)
+  qs,ws = gausslegendre(qorder)
   i,j,sKe = assem.iM, assem.jM, assem.vM
   sMe = similar(sKe)
   fill!(sKe,0.0); fill!(sMe,0.0)
@@ -21,14 +21,19 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function; qorder=10) w
   # Initialize the element-wise local matrices
   Me = Array{Float64}(undef, p+1, p+1)
   Ke = Array{Float64}(undef, p+1, p+1)
-  fill!(Me, 0.0);  fill!(Ke, 0.0)
   # Do the assembly
   for t=1:nel
     cs = nodes[els[t,:],:]
     hlocal = cs[2] - cs[1]
-    ϕᵢ(x) = U.basis(-(cs[2]+cs[1])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
-    _local_matrix!(Me, cs, (ϕᵢ,ϕᵢ), A, quad, hlocal, (p,p))
-    _local_matrix!(Ke, cs, (y->∇(ϕᵢ,y),y->∇(ϕᵢ,y)), A, quad, hlocal, (p,p))
+    fill!(Me, 0.0)
+    fill!(Ke, 0.0)
+    for k=1:lastindex(qs)
+      x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
+      ϕᵢ = U.basis(-(cs[2]+cs[1])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
+      ∇ϕᵢ = ∇(U.basis, x)*(2/hlocal)
+      _local_matrix!(Me, A(x)*ws[k].*(ϕᵢ,ϕᵢ), hlocal, (p,p))
+      _local_matrix!(Ke, A(x)*ws[k].*(∇ϕᵢ,∇ϕᵢ), hlocal, (p,p))
+    end    
     for ti=1:p+1, tj=1:p+1
       sMe[t,ti,tj] = Me[ti,tj]
       sKe[t,ti,tj] = Ke[ti,tj]
@@ -50,7 +55,7 @@ function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10) w
   nodes = trian.nds
   els = trian.elems
   p = U.p
-  quad = gausslegendre(qorder)
+  qs,ws = gausslegendre(qorder)
   k, sFe = assem.iV, assem.vV
   fill!(sFe,0.0)
   nel = size(els,1)
@@ -60,13 +65,18 @@ function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10) w
   for t=1:nel
     cs = nodes[els[t,:],:]
     hlocal = cs[2]-cs[1]
-    ϕᵢ(x) = U.basis(-(cs[2]+cs[1])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
-    _local_vector!(Fe, cs, ϕᵢ, f, quad, hlocal, p)
+    fill!(Fe,0.0)
+    for k=1:lastindex(qs)
+      x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
+      ϕᵢ = U.basis(-(cs[2]+cs[1])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
+      _local_vector!(Fe, f(x)*ws[k]*ϕᵢ, hlocal, p)
+    end
     for ti=1:p+1
       sFe[t,ti] = Fe[ti]
     end
   end
   F = collect(sparsevec(vec(k),vec(sFe)))
+  F
 end
 """
 Function to assemble the Xₕ × Vₕ matrix 
@@ -81,7 +91,7 @@ function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qord
   els₂ = trian₂.elems
   q = U.p
   p = V.p
-  quad = gausslegendre(qorder)
+  qs,ws = gausslegendre(qorder)
   i,j,sMe = assem.iM, assem.jM, assem.vM
   fill!(sMe,0.0)
   nel₁ = size(els₁,1)
@@ -101,7 +111,13 @@ function assemble_matrix(U::T1, V::T2, assem::MatrixAssembler, A::Function; qord
       CP = trian₂.nds[trian₂.elems[P,:]] # Coarse space
       Λₖ(y) = Bₖ(y,CP)
       ϕᵢ(y) = U.basis(-(CQ[2]+CQ[1])/(CQ[2]-CQ[1]) + 2/(CQ[2]-CQ[1])*y)
-      _local_matrix!(Me, CQ, (ϕᵢ,Λₖ), A, quad, hlocal, (q,p))
+      fill!(Me,0.0)
+      for k=1:lastindex(qs)
+        x = (CQ[2]+CQ[1])*0.5 .+ 0.5*hlocal*qs[k]
+        ϕᵢ = U.basis(-(CQ[2]+CQ[1])/(CQ[2]-CQ[1]) + 2/(CQ[2]-CQ[1])*x)
+        Λᵢ = Λₖ(x)
+        _local_matrix!(Me, A(x)*ws[k].*(ϕᵢ,Λᵢ), hlocal, (q,p))
+      end 
       for qᵢ=1:q+1, pᵢ=1:p+1
         sMe[Q,P,qᵢ,pᵢ] = Me[qᵢ,pᵢ]
       end

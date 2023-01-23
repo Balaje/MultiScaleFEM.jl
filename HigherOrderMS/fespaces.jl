@@ -27,6 +27,7 @@ mutable struct H¹Conforming <: FiniteElementSpace
   basis::Function
   nodes::AbstractVector{Float64}
   dirichletNodes::Vector{Int64}
+  new_elem::Matrix{Int64}
 end
 function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshType
   function ϕ̂(x̂)
@@ -37,7 +38,8 @@ function H¹Conforming(trian::T, p::Int64, dNodes::Vector{Int64}) where T<:MeshT
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  H¹Conforming(trian,p,ϕ̂,nodes,dNodes)
+  new_elem = _new_elem_matrices(trian.elems, p, H¹ConformingSpace())
+  H¹Conforming(trian,p,ϕ̂,nodes,dNodes,new_elem)
 end
 
 """
@@ -58,6 +60,7 @@ mutable struct L²Conforming <: FiniteElementSpace
   p::Int64
   basis::Function
   nodes::AbstractVector{Float64}
+  new_elem::Matrix{Int64}
 end
 function L²Conforming(trian::T, p::Int64) where T<:MeshType
   function Λₖᵖ(x)
@@ -76,7 +79,8 @@ function L²Conforming(trian::T, p::Int64) where T<:MeshType
   end
   h = trian.H/p
   nodes = trian.nds[1]:h:trian.nds[end]
-  L²Conforming(trian,p,Λₖᵖ,nodes)
+  new_elem = _new_elem_matrices(trian.elems, p, L²ConformingSpace())
+  L²Conforming(trian,p,Λₖᵖ,nodes,new_elem)
 end
 
 function get_trian(fespace::T) where T<:FiniteElementSpace
@@ -108,7 +112,7 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   bn = U.dirichletNodes
   fn = setdiff(tn,bn)
   # Use the assemblers and assemble the system
-  ~,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
+  _,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
   LL = assemble_matrix(U, V, Lₐ, x->1; qorder=qorder)
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
@@ -138,78 +142,62 @@ mutable struct MultiScale <: FiniteElementSpace
   basis::Matrix{Rˡₕ}
   nodes::AbstractVector{Float64}
   dNodes::Vector{Int64}
+  new_elem::Matrix{Int64}
 end
 """
 Value of the multiscale basis at x:
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
+function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: H¹Conforming
   Ω = V.trian
   p = V.p
   elem = Ω.elems
+  new_elem = V.new_elem
   nds = Ω.nds
   nel = size(elem,1)
-  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
-  res = 0
-  for i=1:nel
-    cs = nds[elem[i,:]]
-    uh = R.Λ[new_elem[i,:]]
-    if(cs[1] ≤ x ≤ cs[2])
-      x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-      res = dot(uh,V.basis(x̂))
-      return res
-    else
-      res = 0
-    end
-  end
-  res
-end
-function new_function_tree(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A<:H¹Conforming
-  Ω = V.trian
-  p = V.p
-  elem = Ω.elems
-  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
-  nds = Ω.nds
   tree = Ω.tree
-  idx, = knn(tree, [x], num_neighbours)
+  idx, = knn(tree,[x], num_neighbours)
   elem_indx = -1
   for i in idx
-    (i ≥ size(elem,1)) && continue
+    (i ≥ nel) && continue # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
-    (difference[1]*difference[2] ≤ 0 ) ? begin elem_indx = i; break; end : continue 
-  end 
+    (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
+  end
   (elem_indx == -1) && return 0
   uh = R.Λ[new_elem[elem_indx,:]]
   cs = nds[elem[elem_indx,:]]
   x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-  res = dot(uh, V.basis(x̂))
+  res = dot(uh,V.basis(x̂))
   res
-end 
+end
 """
 Gradient of the multiscale bases at x
 (1) Accepts the basis FEM solution and returns the value at x
 """
-function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
+function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: H¹Conforming
   Ω = V.trian
   p = V.p
   elem = Ω.elems
+  new_elem = V.new_elem
   nds = Ω.nds
   nel = size(elem,1)
-  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
-  res = 0
-  for i=1:nel
-    cs = nds[elem[i,:]]
-    uh = R.Λ[new_elem[i,:]]
-    if(cs[1] ≤ x ≤ cs[2])
-      x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
-      res = dot(uh,∇(V.basis,x̂))*(2/(cs[2]-cs[1]))
-      return res
-    else
-      res = 0
-    end
+  tree = Ω.tree
+  idx, = knn(tree,[x], num_neighbours)
+  elem_indx = -1
+  for i in idx
+    (i ≥ nel) && continue # Finds last point
+    interval = nds[elem[i,:]]
+    difference = interval .- x
+    (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
-   res
+  (elem_indx == -1) && return 0
+  uh = R.Λ[new_elem[elem_indx,:]]
+  cs = nds[elem[elem_indx,:]]
+  ϕᵢ(x) = V.basis(-(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
+  ∇ϕᵢ(x) = ∇(ϕᵢ,x)
+  res = dot(uh, ∇ϕᵢ(x))
+  res
 end
 """
 ∇(ϕ, x)Function to obtain the gradient of the function ϕ
