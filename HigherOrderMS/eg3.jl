@@ -18,8 +18,8 @@ f(x) = @. 1
 
 p = 1
 q = 1
-l = 1
-n = 10
+l = 4
+n = 50
 nₚ = 100
 Ω = 𝒯((0,1),n)
 
@@ -75,7 +75,7 @@ end
 
 # Compute and store all the basis functions
 # @btime Vₕᴹˢ = MultiScale(Ω, A, (q,p), l, [1,(p+1)*n]; Nfine=nₚ); 
-Vₕᴹˢ = MultiScale(Ω, A, (q,p), l, [1,(p+1)*n]; Nfine=nₚ); 
+Vₕᴹˢ = MultiScale(Ω, A, (q,p), l, [1,n*p+n-p]; Nfine=nₚ); 
 
 # Function to assemble the matrices corresponding to the multiscale space is similar to the one
 # given in fespace.jl (line 11)
@@ -152,7 +152,51 @@ end
 Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A)
 Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f)
 
-tn = 1:(Vₕᴹˢ.bgSpace.p+1)*n
+#--
+# Begin applying the boundary conditions
+#--
+tn = 1:(p*n+n)
 bn = Vₕᴹˢ.dNodes
+# Get the boundary contributitons
+ϕᵢ⁰ = map(i->Λ̃ˡₚ(0, Vₕᴹˢ.basis[i,1], Vₕᴹˢ.basis[i,1].U),2:p+1)
+ϕᵢᴺ = map(i->Λ̃ˡₚ(1, Vₕᴹˢ.basis[i,n], Vₕᴹˢ.basis[i,n].U),2:p+1)
+BCₘₛ⁰ = Kₘₛ[:,bn[1]].*ϕᵢ⁰'
+BCₘₛᴺ = Kₘₛ[:,bn[2]].*ϕᵢᴺ'
+# Change the LHS matrix
+Kₘₛ[:,2:p+1] -= BCₘₛ⁰
+Kₘₛ[:,(p*n+n)-p+1:(p*n+n)] -= BCₘₛᴺ
 fn = setdiff(tn,bn)
-sol = Kₘₛ[fn,fn]\Fₘₛ[fn];
+Fₘₛ = Fₘₛ - Kₘₛ[:,bn[1]]*0 - Kₘₛ[:,bn[2]]*0 
+# Solve the remaining system of equations
+sol = Kₘₛ[fn,fn]\collect(Fₘₛ[fn])
+# Put back the boundary values
+uh = Vector{Float64}(undef,n*p+n)
+uh[fn] = collect(sol)
+uh[bn[1]] = 0 - dot(ϕᵢ⁰,uh[2:p+1])
+uh[bn[2]] = 0 - dot(ϕᵢᴺ,uh[(p*n+n)-p+1:(p*n+n)])
+
+function uₘₛ(x::Float64, sol::Vector{Float64}, U::T) where T<:MultiScale
+  trian = U.trian
+  elem = trian.elems
+  nel = size(elem,1)
+  nds = trian.nds
+  p = U.bgSpace.p
+  l = U.l
+  new_els = _new_elem_matrices(elem, p, l, MultiScaleSpace())
+  vecBasis = vec(U.basis)
+  for t=1:nel
+    cs = nds[elem[t,:],:]
+    b_inds = new_els[t,:]
+    uh = sol[b_inds]
+    if(cs[1] ≤ x ≤ cs[2])
+      ϕᵢ = map(i->Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U), b_inds)
+      return dot(uh, ϕᵢ)
+    else
+      continue
+    end 
+  end
+end 
+
+xvals = Vₕᴹˢ.nodes
+uhxvals =  map(x->uₘₛ(x, uh, Vₕᴹˢ), xvals)
+plt = plot(xvals, uhxvals)

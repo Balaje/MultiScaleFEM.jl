@@ -164,6 +164,28 @@ function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A) where A <: H¹Conforming
   end
   res
 end
+function new_function_tree(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A<:H¹Conforming
+  Ω = V.trian
+  p = V.p
+  elem = Ω.elems
+  new_elem = _new_elem_matrices(elem, p, H¹ConformingSpace())
+  nds = Ω.nds
+  tree = Ω.tree
+  idx, = knn(tree, [x], num_neighbours)
+  elem_indx = -1
+  for i in idx
+    (i ≥ size(elem,1)) && continue
+    interval = nds[elem[i,:]]
+    difference = interval .- x
+    (difference[1]*difference[2] ≤ 0 ) ? begin elem_indx = i; break; end : continue 
+  end 
+  (elem_indx == -1) && return 0
+  uh = R.Λ[new_elem[elem_indx,:]]
+  cs = nds[elem[elem_indx,:]]
+  x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
+  res = dot(uh, V.basis(x̂))
+  res
+end 
 """
 Gradient of the multiscale bases at x
 (1) Accepts the basis FEM solution and returns the value at x
