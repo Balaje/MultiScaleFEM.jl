@@ -10,16 +10,18 @@ include("basis_functions.jl")
 include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
-ε = 2^-6
-A(x) = @. (2 + cos(2π*x/ε))^(-1)
+#ε = 2^-2
+#A(x) = @. (2 + cos(2π*x/ε))^(-1)
+#u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 f(x) = @. 1.0
-# A(x) = @. 0.5
-u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
+A(x) = @. 0.5
+u(x) = @. x*(1-x)
+
 # Problem parameters
-p = 1
+p = 3
 q = 1
-l = 6
-n = 2^3
+l = 5
+n = 2^2
 nₚ = 2^12
 num_nei = 2
 qorder = 4

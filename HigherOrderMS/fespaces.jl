@@ -156,7 +156,7 @@ function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: H¹
   idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
-    (i ≥ nel) && (i=nel-1) # Finds last point
+    (i ≥ nel) && (i=nel) # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
@@ -183,7 +183,7 @@ function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: 
   idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
-    (i ≥ nel) && (i=nel-1) # Finds last point
+    (i ≥ nel) && (i=nel) # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
@@ -249,7 +249,7 @@ function uₘₛ(x::Float64, sol::Vector{Float64}, U::T; num_neighbours=2) where
   idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
-    (i ≥ nel) && (i=nel-1) # Finds last point
+    (i ≥ nel) && (i=nel) # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
