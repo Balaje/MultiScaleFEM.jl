@@ -18,11 +18,11 @@ u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4
 # Problem parameters
 p = 1
 q = 1
-l = 8
-n = 2^5
-nₚ = 2^10
-num_nei = 5
-qorder = 2
+l = 6
+n = 2^3
+nₚ = 2^12
+num_nei = 2
+qorder = 4
 # Discretize the domain
 Ω = 𝒯((0,1),n)
 # Build the Multiscale space. Contains the basis functions in the global sense
@@ -40,14 +40,14 @@ end
 MSₐ = MatrixAssembler(MultiScaleSpace(), p, Ω.elems, l)
 MSₗ = VectorAssembler(MultiScaleSpace(), p, Ω.elems, l)
 # Compute the full stiffness and mass matrices
-Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, num_neighbours=num_nei)
-Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, num_neighbours=num_nei)
+Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder)
+Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder)
 #--
 # Boundary conditions are applied into the basis functions
 #--
 uh = Kₘₛ\Fₘₛ
 xvals = Vₕᴹˢ.nodes
-uhxvals =  map(x->uₘₛ(x, uh, Vₕᴹˢ; num_neighbours=num_nei), xvals)
+uhxvals =  [uₘₛ(x, uh, Vₕᴹˢ) for x in collect(xvals)]
 uxvals = u.(xvals)
 plt = plot(xvals, uhxvals, label="Multiscale FEM")
 plot!(plt, xvals, uxvals, label="Exact sol")

@@ -152,23 +152,23 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function, M::Function;
   Me = Array{Float64}(undef,ndofs,ndofs)
   Ke = Array{Float64}(undef,ndofs,ndofs)
   vecBasis = U.basis # Arrange element-wise functions into a vector
-    # Do the assembly
-    for t=1:nel
-      cs = nodes[els[t,:],:]
-      b_inds = new_els[t,:]
-      hlocal = cs[2]-cs[1]
-      fill!(Me,0.0); fill!(Ke,0.0)
-      for k=1:lastindex(qs)
-        x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
-        ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
-        ∇ϕᵢ = [∇Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
-        _local_matrix!(Ke, (∇ϕᵢ,∇ϕᵢ), A(x), ws[k], hlocal, (ndofs-1,ndofs-1))
-        _local_matrix!(Me, (ϕᵢ,ϕᵢ), M(x), ws[k], hlocal, (ndofs-1,ndofs-1))
-      end
-      for tj=1:ndofs, ti=1:ndofs
-        sMe[t,ti,tj] = Me[ti,tj]
-        sKe[t,ti,tj] = Ke[ti,tj] 
-      end   
+  # Do the assembly
+  for t=1:nel
+    cs = nodes[els[t,:],:]
+    b_inds = new_els[t,:]
+    hlocal = cs[2]-cs[1]
+    fill!(Me,0.0); fill!(Ke,0.0)
+    for k=1:lastindex(qs)
+      x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
+      ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
+      ∇ϕᵢ = [∇Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
+      _local_matrix!(Ke, (∇ϕᵢ,∇ϕᵢ), A(x), ws[k], hlocal, (ndofs-1,ndofs-1))
+      _local_matrix!(Me, (ϕᵢ,ϕᵢ), M(x), ws[k], hlocal, (ndofs-1,ndofs-1))
+    end
+    for tj=1:ndofs, ti=1:ndofs
+      sMe[t,ti,tj] = Me[ti,tj]
+      sKe[t,ti,tj] = Ke[ti,tj] 
+    end   
   end
   K = sparse(vec(i),vec(j),vec(sKe))
   M = sparse(vec(i),vec(j),vec(sMe))

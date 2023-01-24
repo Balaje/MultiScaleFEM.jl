@@ -148,13 +148,12 @@ Value of the multiscale basis at x:
 """
 function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: H¹Conforming
   Ω = V.trian
-  p = V.p
   elem = Ω.elems
   new_elem = V.new_elem
   nds = Ω.nds
   nel = size(elem,1)
   tree = Ω.tree
-  idx, = knn(tree,[x], num_neighbours)
+  idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
     (i ≥ nel) && (i=nel-1) # Finds last point
@@ -181,7 +180,7 @@ function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: 
   nds = Ω.nds
   nel = size(elem,1)
   tree = Ω.tree
-  idx, = knn(tree,[x], num_neighbours)
+  idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
     (i ≥ nel) && (i=nel-1) # Finds last point
@@ -247,10 +246,10 @@ function uₘₛ(x::Float64, sol::Vector{Float64}, U::T; num_neighbours=2) where
   nds = Ω.nds
   nel = size(elem,1)
   tree = Ω.tree
-  idx, = knn(tree,[x], num_neighbours)
+  idx, = knn(tree, [x], num_neighbours, true)
   elem_indx = -1
   for i in idx
-    (i ≥ nel) && continue # Finds last point
+    (i ≥ nel) && (i=nel-1) # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
@@ -258,8 +257,7 @@ function uₘₛ(x::Float64, sol::Vector{Float64}, U::T; num_neighbours=2) where
   (elem_indx == -1) && return 0
   uh = sol[new_els[elem_indx,:]]
   b_inds = new_els[elem_indx,:]
-  vecBasis = vec(U.basis)
-  ϕᵢ = map(i->Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours), b_inds)
+  ϕᵢ = map(i->Λ̃ˡₚ(x, U.basis[i], U.basis[i].U; num_neighbours=num_neighbours), b_inds)
   res = dot(uh, ϕᵢ)
   res
 end 
