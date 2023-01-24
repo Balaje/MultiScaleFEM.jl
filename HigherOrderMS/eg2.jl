@@ -10,16 +10,17 @@ include("basis_functions.jl")
 include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
-ε = 2^-6
-A(x) = @. (2+cos(2π*x/ε)); # Diffusion coefficient
+# ε = 2^-6
+# A(x) = @. (2+cos(2π*x/ε)); # Diffusion coefficient
+A(x) = @. 1
 n = 2^3; Nfine = 2^9; # Coarse and fine mesh size.
-p = 1 # Polynomial orders for  L²
+p = 3 # Polynomial orders for  L²
 q = 1 # Polynomial orders for H¹
 
 Ω = 𝒯((0,1),n); # The full coarse mesh.
 
 l = 4
-el = 7
+el = 3
 start = (el-l)<1 ? 1 : el-l; last = start+2l; 
 last = (last>n) ? n : last; start = last-2l;
 start = (start ≤ 0) ? 1 : start
@@ -44,11 +45,11 @@ function Bₖ(x,nds,V)
 end
 
 #el = 1 # Element Index
-local_basis = 2 # Local Basis Index 1:p+1
+local_basis = 3 # Local Basis Index 1:p+1
 elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]; # Get the nodes of element 3.
 
 # Solve the saddle point problem. (Found in fespaces.jl, line 100)
-RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4);
+RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, x->1, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4);
 # @btime Rˡₕ($(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis]), $A, $(H¹₀NˡK, VₕᵖNˡK), $[Kₐ,Lₐ], $[Fₐ]; qorder=$4);
 
 using Plots

@@ -7,6 +7,7 @@ abstract type Strategy <: Any end
 
 struct H¹ConformingSpace <: Strategy end
 struct L²ConformingSpace <: Strategy end
+struct MultiScaleSpace <: Strategy end
 """
 mutable struct MatrixAssembler <: Assembler
   iM::Array{Int64}
@@ -145,7 +146,6 @@ function _get_assembler_matrix(elem::Tuple{Matrix{Int64}, Matrix{Int64}},
   iM, jM
 end
 
-
 function _get_assembler_vector(elem::Matrix{Int64}, p::Int64)
   nel = size(elem,1)
   iV = Array{Int64}(undef, nel, p+1)
@@ -154,4 +154,39 @@ function _get_assembler_vector(elem::Matrix{Int64}, p::Int64)
     iV[t,ti] = elem[t,ti]
   end
   iV
+end
+
+"""
+Functions to handle assmebly containing multi-scale bases
+"""
+function MatrixAssembler(x::MultiScaleSpace, fespace::Int64, elem::Matrix{Int64}, l::Int64)
+  ndofs = ((fespace+1)*(2l+1) < size(elem,1)*(fespace+1)) ? (fespace+1)*(2l+1) : size(elem,1)*(fespace+1)
+  new_elem = _new_elem_matrices(elem, fespace, l, x)
+  iM, jM = _get_assembler_matrix(new_elem, ndofs-1)
+  iV = Array{Float64}(undef,size(iM))
+  fill!(iV,0.0)
+  MatrixAssembler(iM, jM, iV)
+end 
+function VectorAssembler(x::MultiScaleSpace, fespace::Int64, elem::Matrix{Int64}, l::Int64)
+  ndofs = ((fespace+1)*(2l+1) < size(elem,1)*(fespace+1)) ? (fespace+1)*(2l+1) : size(elem,1)*(fespace+1)
+  new_elem = _new_elem_matrices(elem, fespace, l, x)
+  iV = _get_assembler_vector(new_elem, (ndofs-1))
+  vV = Array{Float64}(undef,size(iV))
+  VectorAssembler(iV, vV)
+end 
+function _new_elem_matrices(elem, fespace, l, ::MultiScaleSpace)
+  N = size(elem,1)
+  p = fespace
+  l2elems = _new_elem_matrices(elem, p, L²ConformingSpace())
+  ndofs = ((p+1)*(2l+1) < (p+1)*N) ? (p+1)*(2l+1) : (p+1)*N
+  elems = Matrix{Int64}(undef, N, ndofs)
+  fill!(elems,0)
+  for el=1:N
+    start = (el-l)<1 ? 1 : el-l; last = start+2l
+    last = (last>N) ? N : last; start = last-2l
+    start = (start ≤ 0) ? 1 : start
+    last = (last ≥ N) ? N : last
+    elems[el,:] = l2elems[start,1]:l2elems[last,p+1]   
+  end
+  elems
 end

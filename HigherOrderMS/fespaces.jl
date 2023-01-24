@@ -7,6 +7,19 @@ using FastGaussQuadrature
 using SparseArrays
 
 abstract type FiniteElementSpace <: Any end
+"""
+∇(ϕ, x)Function to obtain the gradient of the function ϕ
+"""
+function ∇(ϕ::Function, x)
+  p = length(ϕ(x))-1
+  res = Vector{Float64}(undef,p+1)
+  fill!(res,0.0)
+  for i=1:p+1
+    ϕᵢ(y) = ϕ(y)[i]
+    res[i] = ForwardDiff.derivative(ϕᵢ,x)
+  end
+  res
+end
 
 """
 mutable struct H¹Conforming <: FiniteElementSpace
@@ -72,8 +85,10 @@ function L²Conforming(trian::T, p::Int64) where T<:MeshType
       res = Vector{Float64}(undef, p+1)
       fill!(res,0.)
       res[1] = 1.0
-      res[2] = x[1]
-      res[3:end] = [(2j-1)/(j)*x*res[j] + (1-j)/(j)*res[j-1] for j=2:p]
+      res[2] = x
+      for j=2:p
+        res[j+1] = (2j+1)/(j+1)*x*res[j] - (j)/(j+1)*res[j-1]
+      end
       return res
     end
   end
@@ -101,7 +116,7 @@ mutable struct Rˡₕ{T<:FiniteElementSpace} <: Any
   λ::Vector{Float64}
   U::T
 end
-function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOrMat{MatrixAssembler},
+function Rˡₕ(Λₖ::Function, A::Function, M::Function, Us::Tuple{T1,T2}, MatAssems::VecOrMat{MatrixAssembler},
              VecAssems::VecOrMat{VectorAssembler}; qorder=3) where {T1<:FiniteElementSpace, T2<:FiniteElementSpace}
   U,V = Us
   Kₐ, Lₐ = MatAssems
@@ -112,8 +127,8 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   bn = U.dirichletNodes
   fn = setdiff(tn,bn)
   # Use the assemblers and assemble the system
-  _,KK = assemble_matrix(U, Kₐ, A; qorder=qorder)
-  LL = assemble_matrix(U, V, Lₐ, x->1; qorder=qorder)
+  _,KK = assemble_matrix(U, Kₐ, A, M; qorder=qorder)
+  LL = assemble_matrix(U, V, Lₐ, x->1.0; qorder=qorder)
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
   A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
@@ -126,23 +141,6 @@ function Rˡₕ(Λₖ::Function, A::Function, Us::Tuple{T1,T2}, MatAssems::VecOr
   X = sol[1:length(fn)]
   Y = sol[length(fn)+1:end]
   Rˡₕ(nodes, vcat(0,X,0), Y, U)
-end
-"""
-mutable struct MultiScale <: FiniteElementSpace
-  𝒯::MeshType
-  bgSpace::L²Conforming
-  Λ̃ₖᵖs::Matrix{Rˡₕ}
-  elem::Vector{Vector{Int64}}
-end
-"""
-mutable struct MultiScale <: FiniteElementSpace
-  trian::MeshType
-  l::Int64
-  bgSpace::L²Conforming
-  basis::Matrix{Rˡₕ}
-  nodes::AbstractVector{Float64}
-  dNodes::Vector{Int64}
-  new_elem::Matrix{Int64}
 end
 """
 Value of the multiscale basis at x:
@@ -159,12 +157,12 @@ function Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: H¹
   idx, = knn(tree,[x], num_neighbours)
   elem_indx = -1
   for i in idx
-    (i ≥ nel) && continue # Finds last point
+    (i ≥ nel) && (i=nel-1) # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
-  (elem_indx == -1) && return 0
+  (elem_indx == -1) && return 0.0
   uh = R.Λ[new_elem[elem_indx,:]]
   cs = nds[elem[elem_indx,:]]
   x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
@@ -186,29 +184,82 @@ function ∇Λ̃ˡₚ(x::Float64, R::Rˡₕ, V::A; num_neighbours=2) where A <: 
   idx, = knn(tree,[x], num_neighbours)
   elem_indx = -1
   for i in idx
+    (i ≥ nel) && (i=nel-1) # Finds last point
+    interval = nds[elem[i,:]]
+    difference = interval .- x
+    (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
+  end
+  (elem_indx == -1) && return 0.0
+  uh = R.Λ[new_elem[elem_indx,:]]
+  cs = nds[elem[elem_indx,:]]
+  x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x  
+  ϕᵢ(x) = V.basis(x)
+  ∇ϕᵢ = ∇(ϕᵢ,x̂)*2/(cs[2]-cs[1])
+  res = dot(uh, ∇ϕᵢ)
+  res
+end
+
+######### ######### ######### ######### ######### ######### 
+######### Definition of the Multiscale space #### #########
+######### ######### ######### ######### ######### ######### 
+"""
+mutable struct MultiScale <: FiniteElementSpace
+  𝒯::MeshType
+  bgSpace::L²Conforming
+  Λ̃ₖᵖs::Matrix{Rˡₕ}
+  elem::Vector{Vector{Int64}}
+end
+"""
+mutable struct MultiScale <: FiniteElementSpace
+  trian::MeshType
+  l::Int64
+  bgSpace::L²Conforming
+  basis::Matrix{Rˡₕ}
+  nodes::AbstractVector{Float64}
+  dNodes::Vector{Int64}
+  new_elem::Matrix{Int64}
+end
+"""
+Function to build the Multiscale space
+"""
+function MultiScale(trian::T, A::Function, fespace::Tuple{Int,Int}, l::Int64, dNodes::Vector{Int64}; Nfine=100, qorder=3) where T<:MeshType
+  nel = size(trian.elems,1)
+  q,p = fespace
+  patch = (2l+1 ≥ nel) ? trian[1:nel] : trian[1:2l+1]
+  patch_mesh = 𝒯((patch.nds[1], patch.nds[end]), Nfine)
+  new_elems = _new_elem_matrices(trian.elems, p, l, MultiScaleSpace())
+  Kₐ = MatrixAssembler(H¹ConformingSpace(), q, patch_mesh.elems)
+  Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (patch_mesh.elems, patch.elems))
+  Fₐ = VectorAssembler(L²ConformingSpace(), p, patch.elems)  
+  Rₛ = Matrix{Rˡₕ}(undef,p+1,nel)
+  compute_basis_functions!(Rₛ, trian, A, fespace, [Kₐ,Lₐ], [Fₐ]; qorder=qorder, Nfine=Nfine)
+  bgSpace = L²Conforming(trian, p)
+  nodes = bgSpace.nodes
+  MultiScale(trian, l, bgSpace, Rₛ, nodes, dNodes, new_elems)
+end 
+"""
+Evaluate the multiscale function at a point
+"""
+function uₘₛ(x::Float64, sol::Vector{Float64}, U::T; num_neighbours=2) where T<:MultiScale
+  Ω = U.trian
+  elem = Ω.elems
+  new_els = U.new_elem
+  nds = Ω.nds
+  nel = size(elem,1)
+  tree = Ω.tree
+  idx, = knn(tree,[x], num_neighbours)
+  elem_indx = -1
+  for i in idx
     (i ≥ nel) && continue # Finds last point
     interval = nds[elem[i,:]]
     difference = interval .- x
     (difference[1]*difference[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
   (elem_indx == -1) && return 0
-  uh = R.Λ[new_elem[elem_indx,:]]
-  cs = nds[elem[elem_indx,:]]
-  ϕᵢ(x) = V.basis(-(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x)
-  ∇ϕᵢ(x) = ∇(ϕᵢ,x)
-  res = dot(uh, ∇ϕᵢ(x))
+  uh = sol[new_els[elem_indx,:]]
+  b_inds = new_els[elem_indx,:]
+  vecBasis = vec(U.basis)
+  ϕᵢ = map(i->Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours), b_inds)
+  res = dot(uh, ϕᵢ)
   res
-end
-"""
-∇(ϕ, x)Function to obtain the gradient of the function ϕ
-"""
-function ∇(ϕ::Function, x)
-  p = length(ϕ(x))-1
-  res = Vector{Float64}(undef,p+1)
-  fill!(res,0.0)
-  for i=1:p+1
-    ϕᵢ(y) = ϕ(y)[i]
-    res[i] = ForwardDiff.derivative(ϕᵢ,x)
-  end
-  res
-end
+end 

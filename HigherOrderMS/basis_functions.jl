@@ -38,7 +38,9 @@ function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
     VₕᵖNˡK = L²Conforming(NˡK, p); # Coarse Mesh
     H¹₀NˡK = H¹Conforming(NˡKₕ ,q, [1,(q*Nfine+1)]); # Fine Mesh
     for i=1:p+1
-      R = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[i], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=qorder)
+#      display(plot(LinRange(-1,1,800), map(x->Bₖ(x,elem,VₕᵖNˡK)[p+1], LinRange(-1,1,800)), xlims=(0,1)))
+#      sleep(0.5)
+      R = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[i], A, x->1.0, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=qorder)
       Rₛ[i,el] = R
     end
   end

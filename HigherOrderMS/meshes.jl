@@ -3,6 +3,7 @@
 #####################################################################
 using BenchmarkTools
 using NearestNeighbors
+using Plots
 
 abstract type MeshType <: Any end
 """
