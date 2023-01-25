@@ -10,19 +10,19 @@ include("basis_functions.jl")
 include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
-#ε = 2^-2
-#A(x) = @. (2 + cos(2π*x/ε))^(-1)
-#u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
+ε = 2^-6
+A(x) = @. (2 + cos(2π*x/ε))^(-1)
+u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 f(x) = @. 1.0
-A(x) = @. 0.5
-u(x) = @. x*(1-x)
+# A(x) = @. 0.5
+# u(x) = @. x*(1-x)
 
 # Problem parameters
 p = 2
 q = 1
-l = 2
-n = 2^2
-nₚ = 2^4
+l = 4
+n = 2^3
+nₚ = 2^9
 num_nei = 2
 qorder = 2
 # Discretize the domain
@@ -42,8 +42,8 @@ end
 MSₐ = MatrixAssembler(MultiScaleSpace(), p, Ω.elems, l)
 MSₗ = VectorAssembler(MultiScaleSpace(), p, Ω.elems, l)
 # Compute the full stiffness and mass matrices
-Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=nₚ)
-Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=nₚ)
+Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=40)
+Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=40)
 #--
 # Boundary conditions are applied into the basis functions
 #--
@@ -53,3 +53,14 @@ uhxvals =  [uₘₛ(x, uh, Vₕᴹˢ) for x in collect(xvals)]
 uxvals = u.(xvals)
 plt = plot(xvals, uhxvals, label="Multiscale FEM")
 plot!(plt, xvals, uxvals, label="Exact sol")
+plt3 = plot(plt2, plt, layout=(2,1))
+
+# Time the code.
+@btime MultiScale($Ω, $A, $(q,p), $l, $[1,n*p+n-p]; Nfine=$nₚ, qorder=$qorder)
+@btime assemble_matrix($Vₕᴹˢ, $MSₐ, $A, $(x->1.0); qorder=$qorder, Nfine=$40)
+@btime assemble_vector($Vₕᴹˢ, $MSₗ, $f; qorder=$qorder, Nfine=$40)
+#= 16 GB AMD Ryzen 7 (2.70 GHz)
+5.086 s (11302901 allocations: 434.58 MiB)
+1.149 s (2239538 allocations: 91.46 MiB)
+313.271 ms (834812 allocations: 31.45 MiB)
+=#
