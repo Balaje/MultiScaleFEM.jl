@@ -135,7 +135,7 @@ Function to assemble the standard Xₕ × Xₕ matrices
   a(u,v) = ∫ₖ ∇(u)⋅∇(v) dx
 where Xₕ = Multiscale
 """
-function assemble_matrix(U::T, assem::MatrixAssembler, A::Function, M::Function; qorder=10, num_neighbours=2) where T<:MultiScale
+function assemble_matrix(U::T, assem::MatrixAssembler, A::Function, M::Function; qorder=10, num_neighbours=2, Nfine=20) where T<:MultiScale
   trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems
@@ -158,12 +158,15 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function, M::Function;
     b_inds = new_els[t,:]
     hlocal = cs[2]-cs[1]
     fill!(Me,0.0); fill!(Ke,0.0)
-    for k=1:lastindex(qs)
-      x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
-      ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
-      ∇ϕᵢ = [∇Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
-      _local_matrix!(Ke, (∇ϕᵢ,∇ϕᵢ), A(x), ws[k], hlocal, (ndofs-1,ndofs-1))
-      _local_matrix!(Me, (ϕᵢ,ϕᵢ), M(x), ws[k], hlocal, (ndofs-1,ndofs-1))
+    xlocal = LinRange(cs[1],cs[2],Nfine)
+    for i=1:lastindex(xlocal)-1
+      for k=1:lastindex(qs)
+        x = (xlocal[i+1]+xlocal[i])*0.5 + 0.5*(xlocal[i+1]-xlocal[i])*qs[k]
+        ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
+        ∇ϕᵢ = [∇Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
+        _local_matrix!(Ke, (∇ϕᵢ,∇ϕᵢ), A(x), ws[k], hlocal, (ndofs-1,ndofs-1))
+        _local_matrix!(Me, (ϕᵢ,ϕᵢ), M(x), ws[k], hlocal, (ndofs-1,ndofs-1))
+      end
     end
     for tj=1:ndofs, ti=1:ndofs
       sMe[t,ti,tj] = Me[ti,tj]
@@ -180,7 +183,7 @@ Function to assemble the standard Xₕ × 1 load vector
   (f,v) = ∫ₖ f*v dx
 where f is a known function and Xₕ = MultiScale
 """
-function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10,num_neighbours=2) where T<:MultiScale
+function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10,num_neighbours=2,Nfine=20) where T<:MultiScale
   trian = get_trian(U)
   nodes = trian.nds
   els = trian.elems
@@ -202,14 +205,18 @@ function assemble_vector(U::T, assem::VectorAssembler, f::Function; qorder=10,nu
     b_inds = new_els[t,:]
     hlocal = cs[2]-cs[1]
     fill!(Fe,0.0)
-    for k=1:lastindex(qs)
-      x = (cs[2]+cs[1])*0.5 .+ 0.5*hlocal*qs[k]
-      ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
-      _local_vector!(Fe, ϕᵢ, f(x), ws[k], hlocal, ndofs-1)
+    xlocal = LinRange(cs[1],cs[2],Nfine)
+    for i=1:lastindex(xlocal)-1      
+      for k=1:lastindex(qs)
+        x = (xlocal[i+1]+xlocal[i])*0.5 + (xlocal[i+1]-xlocal[i])*0.5*qs[k]
+        ϕᵢ = [Λ̃ˡₚ(x, vecBasis[i], vecBasis[i].U; num_neighbours=num_neighbours) for i in b_inds]
+        _local_vector!(Fe, ϕᵢ, f(x), ws[k], hlocal, ndofs-1)
+      end
     end
     for ti=1:ndofs
       sFe[t,ti] = Fe[ti]
     end 
   end 
   F = collect(sparsevec(vec(k),vec(sFe)))
+  F
 end

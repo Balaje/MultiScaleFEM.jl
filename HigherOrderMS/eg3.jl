@@ -18,13 +18,13 @@ A(x) = @. 0.5
 u(x) = @. x*(1-x)
 
 # Problem parameters
-p = 3
+p = 2
 q = 1
-l = 5
+l = 2
 n = 2^2
-nₚ = 2^12
+nₚ = 2^4
 num_nei = 2
-qorder = 4
+qorder = 2
 # Discretize the domain
 Ω = 𝒯((0,1),n)
 # Build the Multiscale space. Contains the basis functions in the global sense
@@ -42,13 +42,13 @@ end
 MSₐ = MatrixAssembler(MultiScaleSpace(), p, Ω.elems, l)
 MSₗ = VectorAssembler(MultiScaleSpace(), p, Ω.elems, l)
 # Compute the full stiffness and mass matrices
-Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder)
-Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder)
+Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=nₚ)
+Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=nₚ)
 #--
 # Boundary conditions are applied into the basis functions
 #--
 uh = Kₘₛ\Fₘₛ
-xvals = Vₕᴹˢ.nodes
+xvals = Ω.nds
 uhxvals =  [uₘₛ(x, uh, Vₕᴹˢ) for x in collect(xvals)]
 uxvals = u.(xvals)
 plt = plot(xvals, uhxvals, label="Multiscale FEM")
