@@ -56,9 +56,10 @@ plot!(plt, xvals, uxvals, label="Exact sol")
 plt3 = plot(plt2, plt, layout=(2,1))
 
 # Time the code.
-@btime MultiScale($Ω, $A, $(q,p), $l, $[1,n*p+n-p]; Nfine=$nₚ, qorder=$qorder)
-@btime assemble_matrix($Vₕᴹˢ, $MSₐ, $A, $(x->1.0); qorder=$qorder, Nfine=$40)
-@btime assemble_vector($Vₕᴹˢ, $MSₗ, $f; qorder=$qorder, Nfine=$40)
+# @btime MultiScale($Ω, $A, $(q,p), $l, $[1,n*p+n-p]; Nfine=$nₚ, qorder=$qorder)
+# @btime assemble_matrix($Vₕᴹˢ, $MSₐ, $A, $(x->1.0); qorder=$qorder, Nfine=$40)
+# @btime assemble_vector($Vₕᴹˢ, $MSₗ, $f; qorder=$qorder, Nfine=$40)
+
 #= 16 GB AMD Ryzen 7 (2.70 GHz)
 5.086 s (11302901 allocations: 434.58 MiB)
 1.149 s (2239538 allocations: 91.46 MiB)

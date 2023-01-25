@@ -224,14 +224,14 @@ Function to build the Multiscale space
 function MultiScale(trian::T, A::Function, fespace::Tuple{Int,Int}, l::Int64, dNodes::Vector{Int64}; Nfine=100, qorder=3) where T<:MeshType
   nel = size(trian.elems,1)
   q,p = fespace
-  patch = (2l+1 ≥ nel) ? trian[1:nel] : trian[1:2l+1]
+  patch = ((2l+1)*(p+1) < nel*(p+1)) ? trian[1:2l+1] : trian
   patch_mesh = 𝒯((patch.nds[1], patch.nds[end]), Nfine)
   new_elems = _new_elem_matrices(trian.elems, p, l, MultiScaleSpace())
   Kₐ = MatrixAssembler(H¹ConformingSpace(), q, patch_mesh.elems)
   Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (patch_mesh.elems, patch.elems))
   Fₐ = VectorAssembler(L²ConformingSpace(), p, patch.elems)  
   Rₛ = Matrix{Rˡₕ}(undef,p+1,nel)
-  compute_basis_functions!(Rₛ, trian, A, fespace, [Kₐ,Lₐ], [Fₐ]; qorder=qorder, Nfine=Nfine)
+  compute_basis_functions!(Rₛ, trian, A, fespace, [Kₐ,Lₐ], [Fₐ], l; qorder=qorder, Nfine=Nfine)
   bgSpace = L²Conforming(trian, p)
   nodes = bgSpace.nodes
   MultiScale(trian, l, bgSpace, Rₛ, nodes, dNodes, new_elems)

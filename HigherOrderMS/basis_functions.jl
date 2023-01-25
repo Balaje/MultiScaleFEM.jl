@@ -18,7 +18,7 @@ Returns the projection of Bₖ on H¹₀(D): RˡₕBₖ
 """
 function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
   Ω::T, A::Function, fespace, MatAssems::Vector{MatrixAssembler},
-  VecAssems::Vector{VectorAssembler};
+  VecAssems::Vector{VectorAssembler}, l;
   qorder=3, Nfine=100) where T<:MeshType
 
   q,p = fespace
@@ -30,7 +30,7 @@ function compute_basis_functions!(Rₛ::Matrix{Rˡₕ},
     start = (el-l)<1 ? 1 : el-l; last = start+2l
     last = (last>n) ? n : last; start = last-2l
     start = (start ≤ 0) ? 1 : start
-    last = (last ≥ n) ? n : last
+    last = (last > n) ? n : last
     NˡK = Ω[start:last]
     Ωₚ = (NˡK.nds[1], NˡK.nds[end])
     elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]
