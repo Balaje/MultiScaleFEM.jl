@@ -169,7 +169,7 @@ The corresponding exact solution is $u(x) = \sin(\pi x)$.
 ![](./HigherOrderMS/eg4.png) | 
 --- |
 
-We observe very high convergence rates until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. This is in line with the observation made in Maier, R., 2021. 
+We observe very high convergence rates until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. This is in line with the observation made in Maier, R., 2021. The program to verify the rate of convergence can be found in `eg4.jl`
 
 *A detailed description of the routines will be provided soon.*
 
