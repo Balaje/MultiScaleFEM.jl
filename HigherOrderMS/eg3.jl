@@ -10,7 +10,7 @@ include("basis_functions.jl")
 include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
-ε = 2^-6
+ε = 2^-5
 A(x) = @. (2 + cos(2π*x/ε))^(-1)
 u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 f(x) = @. 1.0
@@ -18,10 +18,10 @@ f(x) = @. 1.0
 # u(x) = @. x*(1-x)
 
 # Problem parameters
-p = 2
+p = 1
 q = 1
-l = 4
-n = 2^3
+n = 2
+l = 3
 nₚ = 2^9
 num_nei = 2
 qorder = 2
@@ -42,17 +42,17 @@ end
 MSₐ = MatrixAssembler(MultiScaleSpace(), p, Ω.elems, l)
 MSₗ = VectorAssembler(MultiScaleSpace(), p, Ω.elems, l)
 # Compute the full stiffness and mass matrices
-Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=40)
-Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=40)
+Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=200)
+Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=200)
 #--
 # Boundary conditions are applied into the basis functions
 #--
 uh = Kₘₛ\Fₘₛ
 xvals = Ω.nds
 uhxvals =  [uₘₛ(x, uh, Vₕᴹˢ) for x in collect(xvals)]
-uxvals = u.(xvals)
+uxvals = u.(LinRange(0,1,400))
 plt = plot(xvals, uhxvals, label="Multiscale FEM")
-plot!(plt, xvals, uxvals, label="Exact sol")
+plot!(plt, LinRange(0,1,400), uxvals, label="Exact sol")
 plt3 = plot(plt2, plt, layout=(2,1))
 
 # Time the code.
