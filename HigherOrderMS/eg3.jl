@@ -20,7 +20,7 @@ f(x) = @. 1.0
 # Problem parameters
 p = 1
 q = 1
-n = 2
+n = 2^2
 l = 3
 nₚ = 2^9
 num_nei = 2
@@ -53,7 +53,7 @@ uhxvals =  [uₘₛ(x, uh, Vₕᴹˢ) for x in collect(xvals)]
 uxvals = u.(LinRange(0,1,400))
 plt = plot(xvals, uhxvals, label="Multiscale FEM")
 plot!(plt, LinRange(0,1,400), uxvals, label="Exact sol")
-plt3 = plot(plt2, plt, layout=(2,1))
+plt3 = plot(plt2, plt, layout=(1,2))
 
 # Time the code.
 # @btime MultiScale($Ω, $A, $(q,p), $l, $[1,n*p+n-p]; Nfine=$nₚ, qorder=$qorder)

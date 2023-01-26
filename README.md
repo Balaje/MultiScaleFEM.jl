@@ -5,7 +5,7 @@
 Contains the source code to implement the LOD method and the Higher order Multiscale Methods. We consider the following second order ODE
 
 $$
-    (A_{\varepsilon}(x)u'(x))' = f(x) \quad in \quad x \in \Omega = (0,1),
+    -(A_{\varepsilon}(x)u'(x))' = f(x) \quad in \quad x \in \Omega = (0,1),
 $$
 
 subject to the boundary conditions
@@ -142,10 +142,34 @@ plot!(plt, elem[1]:0.01:elem[2], 0*(elem[1]:0.01:elem[2]), label="Element 3", lc
 xlims!(plt,(0,1))
 ```
 
-OUTPUT:
-
 ![](./HigherOrderMS/eg2.png) |
 --- |
+
+### Solution using the Multiscale method.
+
+The model problem can be solved using the multiscale method and the program can be found in `eg3.jl`. We observe that the MS-method captures the microscale effects. The only requirement is that the number of points in the fine scale space should be enough to resolve the microscale effect in the diffusion coefficient. The figure below shows the basis functions of the second element along with the Multiscale-FEM nodal solution using 2 and 4 elements, respectively. 
+
+![](./HigherOrderMS/eg3_2.png) | ![](./HigherOrderMS/eg3_1.png)
+--- | --- |
+
+The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size. The example was run for a very smooth diffusion coefficient. Following is the test example:
+
+$$
+ -(A(x)u'(x))' = f(x) \quad in \quad x \in \Omega = (0,1),
+$$
+
+with 
+
+$$
+  A(x) = 1, \quad f(x) = \pi^2\,\sin(\pi x)
+$$
+
+The corresponding exact solution is $u(x) = \sin(\pi x)$. 
+
+![](./HigherOrderMS/eg4.png) | 
+--- |
+
+We observe very high convergence rates until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. This is in line with the observation made in Maier, R., 2021. 
 
 *A detailed description of the routines will be provided soon.*
 
