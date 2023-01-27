@@ -87,7 +87,7 @@ function L²Conforming(trian::T, p::Int64) where T<:MeshType
       res[1] = 1.0
       res[2] = x
       for j=2:p
-        res[j+1] = (2j+1)/(j+1)*x*res[j] - (j)/(j+1)*res[j-1]
+        res[j+1] = (2j-1)/(j)*x*res[j] - (j-1)/(j)*res[j-1]
       end
       return res
     end
@@ -130,6 +130,7 @@ function Rˡₕ(Λₖ::Function, A::Function, M::Function, Us::Tuple{T1,T2}, Mat
   _,KK = assemble_matrix(U, Kₐ, A, M; qorder=qorder)
   LL = assemble_matrix(U, V, Lₐ, x->1.0; qorder=qorder)
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
+  @show FF
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
   A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
   # b = Vector{Float64}(undef, length(fn)+length(F))
