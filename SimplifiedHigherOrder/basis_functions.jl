@@ -1,4 +1,4 @@
-function Λₖ!(res::Vector{Float64}, x::Float64, nds::Vector{Float64}, p::Int64)
+function Λₖ!(res::AbstractVector{Float64}, x::Float64, nds::AbstractArray{Float64}, p::Int64)
   a,b = nds  
   fill!(res,0.0)
   if(a ≤ x ≤ b)
@@ -16,7 +16,7 @@ function Λₖ!(res::Vector{Float64}, x::Float64, nds::Vector{Float64}, p::Int64
       end
     end
   else
-    return 
+    return
   end
 end 
 function basis_cache(p::Int64)
