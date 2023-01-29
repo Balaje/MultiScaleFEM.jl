@@ -65,3 +65,68 @@ function fillsLe!(sLe::AbstractArray{Float64}, basis_cache, nds_fine::AbstractVe
     end
   end
 end
+
+function fillsKms!(sKms::AbstractArray{Float64}, cache, 
+  nds::AbstractVector{Float64},
+  elem_ms::AbstractVecOrMat{Int64}, p::Int64, l::Int64, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}; Nfine=200)
+
+  fill!(sKms,0.0)
+  KDTrees, Basis, local_basis_vecs, basis_cache = cache
+  elem, _ = basis_cache
+  nc = size(elem_ms,1)
+  qs, ws = quad  
+  for i=1:lastindex(qs)
+    for t=1:nc
+      start = max(1,(t-l)) - (((t+l) > nc) ? abs(t+l-nc) : 0) # Start index of patch
+      last = min(nc,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
+      binds = start:last      
+      ndofs = (2l+1)*(p+1)
+      k=0
+      for pᵢ=1:lastindex(binds), qᵢ=1:p+1
+        k+=1
+        local_basis_vecs[:,k] = view(Basis,:, view(binds,pᵢ), qᵢ)
+      end      
+      cs = view(nds, view(elem, t, :))      
+      hlocal = (cs[2]-cs[1])/Nfine
+      xlocal = cs[1]:hlocal:cs[2] 
+      for j=1:lastindex(xlocal)-1, pᵢ=1:ndofs,qᵢ=1:ndofs
+        x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]        
+        # sKms[pᵢ,qᵢ,t] += ws[i]*D(x̂)*(∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[t]))*
+        #  (∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,qᵢ), @views KDTrees[t]))*((xlocal[j+1]-xlocal[j])*0.5)
+      end      
+    end
+  end
+end
+
+function fillsFms!(sFms::AbstractArray{Float64}, cache, 
+  nds::AbstractVector{Float64},
+  elem_ms::AbstractVecOrMat{Int64}, p::Int64, l::Int64, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}, f::Function; Nfine=200)
+
+  fill!(sFms,0.0)
+  KDTrees, Basis, local_basis_vecs, basis_cache = cache
+  elem, _ = basis_cache
+  nc = size(elem_ms,1)
+  qs, ws = quad  
+  for i=1:lastindex(qs)
+    for t=1:nc
+      start = max(1,(t-l)) - (((t+l) > nc) ? abs(t+l-nc) : 0) # Start index of patch
+      last = min(nc,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
+      binds = start:last      
+      ndofs = (2l+1)*(p+1)
+      k=0
+      for pᵢ=1:lastindex(binds), qᵢ=1:p+1
+        k+=1
+        local_basis_vecs[:,k] = Basis[:, binds[pᵢ], qᵢ]
+      end      
+      cs = view(nds, view(elem, t, :))      
+      hlocal = (cs[2]-cs[1])/Nfine
+      xlocal = cs[1]:hlocal:cs[2] 
+      for j=1:lastindex(xlocal)-1, pᵢ=1:ndofs
+        x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]        
+        sFms[pᵢ,t] += ws[i]*f(x̂)*(Λₖ(basis_cache, x̂, local_basis_vecs[:,pᵢ], KDTrees[t]))*((xlocal[j+1]-xlocal[j])*0.5)
+      end      
+    end
+  end
+end
