@@ -19,6 +19,10 @@ Problem data
 D(x) = @. 1.0
 f(x) = @. π^2*sin(π*x)
 u(x) = @. sin(π*x)
+# ε = 2^-5
+# D(x) = @. (2 + cos(2π*x/ε))^(-1)
+# f(x) = @. 1.0
+# u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 domain = (0,1)
 
 """
@@ -52,13 +56,14 @@ nf = 2^10
 qorder = 2
 quad = gausslegendre(qorder)
 
-𝒩 = [1,2,4,8,16,32]
+𝒩 = [2,4,8,16]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
 plt = plot()
+plt1 = plot()
 
-for l in [4]
+for l in [4,5,6,7,8]
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     #=
     Precompute all the caches. Essential for computing the solution quickly
@@ -185,7 +190,11 @@ for l in [4]
   println("Done l = "*string(l))
   plot!(plt, 1 ./𝒩, L²Error, label="L²", xaxis=:log10, yaxis=:log10, lw=2)
   plot!(plt, 1 ./𝒩, H¹Error, label="Energy", lw=2)
+  scatter!(plt, 1 ./𝒩, L²Error, label="", markersize=2)
+  scatter!(plt, 1 ./𝒩, H¹Error, label="", markersize=2)
 end
 
 plot!(plt, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black)
 plot!(plt, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black)
+
+plot!(plt1, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)
