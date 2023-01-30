@@ -26,7 +26,7 @@ FEM parameters
 =#
 nc = 2^4 # Number of elements in the coarse space
 nf = 2^8 # Number of elements in the fine space
-p = 1 # Degree of polynomials in the coarse space
+p = 2 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
 l = 10
 npatch = min(2l+1,nc) # Number of elements in patch

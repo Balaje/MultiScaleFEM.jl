@@ -176,7 +176,7 @@ function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   npatch = min(2l+1,nc)
   ndofs = npatch*(p+1)
   binds = start:last            
-  binds_1 = binds[ceil.(Int,((1:ndofs)./2))]    
+  binds_1 = binds[ceil.(Int,((1:ndofs)./(p+1)))]    
   res = 0.0  
   k = 0
   sols = uh[new_elem[t,:]]

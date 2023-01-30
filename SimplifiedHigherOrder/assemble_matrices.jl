@@ -91,7 +91,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
       local_basis_vecs[:,kk] = view(Basis,:, view(binds,ii), jj)
     end     
     for ii=1:ndofs
-      binds_1[ii] = binds[ceil(Int,(ii/2))]    
+      binds_1[ii] = binds[ceil(Int,(ii/(p+1)))]    
     end
     cs = view(nds, view(elem, t, :))      
     hlocal = (cs[2]-cs[1])/Nfine
@@ -133,7 +133,7 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
       local_basis_vecs[:,kk] = view(Basis,:, view(binds,ii), jj)
     end      
     for ii=1:ndofs
-      binds_1[ii] = binds[ceil(Int,(ii/2))]    
+      binds_1[ii] = binds[ceil(Int,(ii/(p+1)))]    
     end   
     cs = view(nds, view(elem, t, :)) 
     hlocal = (cs[2]-cs[1])/Nfine
