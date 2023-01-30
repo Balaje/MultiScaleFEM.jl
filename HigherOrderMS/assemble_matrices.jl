@@ -173,7 +173,6 @@ function assemble_matrix(U::T, assem::MatrixAssembler, A::Function, M::Function;
       sKe[t,ti,tj] = Ke[ti,tj] 
     end   
   end
-  display(sKe)
   K = sparse(vec(i),vec(j),vec(sKe))
   M = sparse(vec(i),vec(j),vec(sMe))
   droptol!(M,1e-20), droptol!(K,1e-20)

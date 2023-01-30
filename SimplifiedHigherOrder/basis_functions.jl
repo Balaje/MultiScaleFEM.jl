@@ -39,10 +39,12 @@ function basis_cache(p::Int64)
   b = Vector{Float64}(undef,p+1)
   fill!(b, 0.0)
   res = similar(b)
+  fill!(res,0.0)
   return A', b, res
 end
 function ϕᵢ!(cache, x)
   A, b, res = cache
+  fill!(res,0.0)
   q = length(res)
   for i=0:q-1
     b[i+1] = x^i
@@ -83,9 +85,10 @@ Value of the basis function at point x.
   > Λₖ(cache, x::Float64, uh::AbstractVector{Float64})
 """
 function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
-  # nds =  [x[1] for x in kdtree.data]  
   elem, new_elem, elem_indx, nds_cache, bases = cache
   elem_indx = -1
+  fill!(nds_cache,0.0)
+  fill!(bases[3],0.0)
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))  
   nel = size(elem,1)
   idx, _ = knn(kdtree, [x], 2, true)  
@@ -95,7 +98,7 @@ function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
     interval = interval .- x
     (interval[1]*interval[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
-  # (elem_indx == -1) && begin (res = 0.0); return 0.0; end
+  (elem_indx == -1) && return 0.0 
   sols = view(uh, view(new_elem, elem_indx, :))
   cs = view(nds_cache, view(elem, elem_indx, :))
   x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
@@ -103,9 +106,10 @@ function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   dot(bases[3],sols)
 end
 function ∇Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
-  # nds =  [x[1] for x in kdtree.data]
   elem, new_elem, elem_indx, nds_cache, bases = cache
   elem_indx = -1
+  fill!(nds_cache,0.0)
+  fill!(bases[3],0.0)
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))  
   nel = size(elem,1)
   idx, _ = knn(kdtree, [x], 2, true)
@@ -132,13 +136,14 @@ function basis_cache(elem::AbstractMatrix{Int64},
   elem_fine::AbstractMatrix{Int64}, p::Int64, q::Int64, l::Int64, 
   Basis::AbstractArray{Float64})  
   nc = size(elem,1)
-  ndofs = (2l+1)*(p+1)
+  npatch = min(2l+1,nc)
+  ndofs = (npatch)*(p+1)
   new_elem = [
     begin 
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-(2l*(p+1)))*(nc-2l)+j-(ndofs-1-(2l*(p+1)))
+        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+j-(ndofs-1-((npatch-1)*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end
@@ -148,11 +153,11 @@ function basis_cache(elem::AbstractMatrix{Int64},
   cache = basis_cache(elem_fine, q)
   nds_cache = Vector{Float64}(undef,nc+1)
   fill!(nds_cache,0.0)
-  elem, new_elem, elem_indx, nds_cache, cache, Basis
+  elem, new_elem, elem_indx, nds_cache, cache, Basis, l, p
 end
 function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64}, 
   kdtree::KDTree, KDTrees::Vector{KDTree})
-  elem, new_elem, elem_indx, nds_cache, bases, Basis = cache
+  elem, new_elem, elem_indx, nds_cache, bases, Basis, l, p = cache
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))
   nel = size(elem,1)  
   idx, _= knn(kdtree, [x], 2, true)
@@ -166,16 +171,19 @@ function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   t = elem_indx
   start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
   last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
+  start = ((2l+1) ≥ nc) ? 1 : start
+  last = ((2l+1) ≥ nc) ? nc : last
+  npatch = min(2l+1,nc)
+  ndofs = npatch*(p+1)
   binds = start:last            
+  binds_1 = binds[ceil.(Int,((1:ndofs)./2))]    
   res = 0.0  
   k = 0
   sols = uh[new_elem[t,:]]
-  for pᵢ=1:lastindex(binds), qᵢ=1:p+1
+  for ii=1:lastindex(binds), jj=1:p+1
     k+=1
-    b = Basis[:, binds[pᵢ], qᵢ] 
-    display(plot([x[1] for x in KDTrees[elem_indx].data], b, xlims=(0,1))) 
-    sleep(1)  
-    res += sols[k]*Λₖ(bases, x, b, KDTrees[elem_indx])
+    b = Basis[:, binds[ii], jj] 
+    res += sols[k]*Λₖ(bases, x, b, KDTrees[binds_1[k]])
   end  
   return res        
 end 
