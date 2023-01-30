@@ -76,6 +76,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
   elem, _ = basis_cache
   nc = size(elem_ms,1)
   qs, ws = quad  
+  
   for i=1:lastindex(qs)
     for t=1:nc
       start = max(1,(t-l)) - (((t+l) > nc) ? abs(t+l-nc) : 0) # Start index of patch
@@ -86,14 +87,16 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
       for pᵢ=1:lastindex(binds), qᵢ=1:p+1
         k+=1
         local_basis_vecs[:,k] = view(Basis,:, view(binds,pᵢ), qᵢ)
-      end      
+      end    
       cs = view(nds, view(elem, t, :))      
       hlocal = (cs[2]-cs[1])/Nfine
       xlocal = cs[1]:hlocal:cs[2] 
-      for j=1:lastindex(xlocal)-1, pᵢ=1:ndofs,qᵢ=1:ndofs
+      for j=1:lastindex(xlocal)-1, pᵢ=1:ndofs, qᵢ=1:ndofs
         x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]        
-        # sKms[pᵢ,qᵢ,t] += ws[i]*D(x̂)*(∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[t]))*
-        #  (∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,qᵢ), @views KDTrees[t]))*((xlocal[j+1]-xlocal[j])*0.5)
+        sKms[pᵢ,qᵢ,t] += ws[i]*D(x̂)*
+          (∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[t]))*
+          (∇Λₖ(basis_cache, x̂, view(local_basis_vecs,:,qᵢ), @views KDTrees[t]))*
+          ((xlocal[j+1]-xlocal[j])*0.5)
       end      
     end
   end
@@ -118,15 +121,17 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
       k=0
       for pᵢ=1:lastindex(binds), qᵢ=1:p+1
         k+=1
-        local_basis_vecs[:,k] = Basis[:, binds[pᵢ], qᵢ]
+        local_basis_vecs[:,k] = view(Basis,:, view(binds,pᵢ), qᵢ)
       end      
       cs = view(nds, view(elem, t, :))      
       hlocal = (cs[2]-cs[1])/Nfine
       xlocal = cs[1]:hlocal:cs[2] 
       for j=1:lastindex(xlocal)-1, pᵢ=1:ndofs
-        x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]        
-        sFms[pᵢ,t] += ws[i]*f(x̂)*(Λₖ(basis_cache, x̂, local_basis_vecs[:,pᵢ], KDTrees[t]))*((xlocal[j+1]-xlocal[j])*0.5)
+        x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]    
+        sFms[pᵢ,t] += ws[i]*f(x̂)*
+        (Λₖ(basis_cache, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[t]))*
+        ((xlocal[j+1]-xlocal[j])*0.5)
       end      
-    end
+    end  
   end
 end

@@ -12,16 +12,16 @@ using FastGaussQuadrature
 include("basis_functions.jl")
 include("assemble_matrices.jl")
 
-nc = 2^6 # Number of elements in the coarse space
+nc = 2^5 # Number of elements in the coarse space
 nf = 2^10 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
-q = 2 # Degree of polynomials in the fine space
-l = 2 # Size of patch
+q = 1 # Degree of polynomials in the fine space
+l = 3 # Size of patch
 qorder = 2
 quad = gausslegendre(qorder)
 
 # Problem data
-D(x) = @. 1.0
+D(x) = @. 0.5
 f(x) = @. 1.0
 
 # Construct the coarse mesh
@@ -101,6 +101,14 @@ for i=1:nc
   end
 end
 
+## Plot one basis function
+el = 2
+bases = basis_cache(elem_fine, q)
+xvals = [x[1] for x in KDTrees[el].data]
+fxvals = [∇Λₖ(bases, x, Basis[:,el,2], KDTrees[el]) for x in xvals]
+plt = plot(xvals,fxvals);
+xlims!(plt,(0,1))
+
 #=
 Solve the MultiScale problem
 =#
@@ -116,19 +124,25 @@ elem_ms = [
       end
     end  
     for i=1:nc,j=0:ndofs-1]
-assem_MS_MS = ([elem_ms[t,ti] for _=1:ndofs, ti=1:ndofs, t=1:nc], 
-  [elem_ms[t,tj] for tj=1:ndofs, _=1:ndofs, t=1:nc], 
-  [elem_ms[t,ti] for ti=1:ndofs, t=1:nc])
+assem_MS_MS = ([elem_ms[t,ti] for  t=1:nc, _=1:ndofs, ti=1:ndofs], 
+  [elem_ms[t,tj] for  t=1:nc, tj=1:ndofs, _=1:ndofs], 
+  [elem_ms[t,ti] for t=1:nc, ti=1:ndofs])
+tree = KDTree(nds')
 sKms = zeros(Float64,ndofs,ndofs,nc)
 sFms = zeros(Float64,ndofs,nc)
 
+# Compute the local and global stiffness matrices
 bases = basis_cache(elem_fine, q)
 local_basis_vecs = zeros(Float64, q*nf+1, (2l+1)*(p+1))
 cache = KDTrees, Basis, local_basis_vecs, bases
-fillsKms!(sKms, cache, nds, elem_ms, p, l, quad; Nfine=nf)
-#= fillsFms!(sFms, cache, nds, elem_ms, p, l, quad, f; Nfine=nf)
+fillsKms!(sKms, cache, nds, elem_ms, p, l, quad; Nfine=2)
+fillsFms!(sFms, cache, nds, elem_ms, p, l, quad, f; Nfine=2)
 
+# Assemble and the global system
 Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
 Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
+sol = (Kₘₛ\Fₘₛ)
 
-sol = (Kₘₛ\Fₘₛ) =#
+bases = basis_cache(elem_coarse, elem_fine, p, q, l, Basis)
+# solnds = [uₘₛ(bases, x, sol, tree, KDTrees) for x in nds];
+uₘₛ(bases, 0.1, sol, tree, KDTrees)

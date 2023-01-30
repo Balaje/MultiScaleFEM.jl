@@ -10,19 +10,19 @@ include("basis_functions.jl")
 include("local_matrix_vector.jl")
 include("assemble_matrices.jl")
 
-ε = 2^-5
-A(x) = @. (2 + cos(2π*x/ε))^(-1)
-u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
+# ε = 2^-5
+# A(x) = @. (2 + cos(2π*x/ε))^(-1)
+# u(x) = @. (x - x^2 + ε*(1/(4π)*sin(2π*x/ε) - 1/(2π)*x*sin(2π*x/ε) - ε/(4π^2)*cos(2π*x/ε) + ε/(4π^2)))
 f(x) = @. 1.0
-# A(x) = @. 0.5
-# u(x) = @. x*(1-x)
+A(x) = @. 0.5
+u(x) = @. x*(1-x)
 
 # Problem parameters
 p = 1
 q = 1
 n = 2^2
-l = 3
-nₚ = 2^9
+l = 1
+nₚ = 2^5
 num_nei = 2
 qorder = 2
 # Discretize the domain
@@ -42,8 +42,8 @@ end
 MSₐ = MatrixAssembler(MultiScaleSpace(), p, Ω.elems, l)
 MSₗ = VectorAssembler(MultiScaleSpace(), p, Ω.elems, l)
 # Compute the full stiffness and mass matrices
-Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=200)
-Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=200)
+Mₘₛ,Kₘₛ = assemble_matrix(Vₕᴹˢ, MSₐ, A, x->1.0; qorder=qorder, Nfine=20)
+Fₘₛ = assemble_vector(Vₕᴹˢ, MSₗ, f; qorder=qorder, Nfine=20)
 #--
 # Boundary conditions are applied into the basis functions
 #--

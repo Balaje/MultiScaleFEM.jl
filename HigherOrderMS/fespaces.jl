@@ -130,7 +130,6 @@ function Rˡₕ(Λₖ::Function, A::Function, M::Function, Us::Tuple{T1,T2}, Mat
   _,KK = assemble_matrix(U, Kₐ, A, M; qorder=qorder)
   LL = assemble_matrix(U, V, Lₐ, x->1.0; qorder=qorder)
   FF = assemble_vector(V, Fₐ, Λₖ; qorder=qorder)
-  @show FF
   K = KK[fn,fn]; L = LL[fn,:]; Lᵀ = L'; F = FF
   A = [K L; Lᵀ spzeros(size(L,2), size(L,2))]
   # b = Vector{Float64}(undef, length(fn)+length(F))

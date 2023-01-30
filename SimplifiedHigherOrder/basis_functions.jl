@@ -73,7 +73,7 @@ function basis_cache(elem::AbstractMatrix{Int64}, p::Int64)
   new_elem = [p*i+j-(p-1) for i=1:nf, j=0:p]  
   elem_indx = -1
   cache = basis_cache(p)
-  nds_cache = Vector{Float64}(undef,nf+1)
+  nds_cache = Vector{Float64}(undef,p*nf+1)
   fill!(nds_cache,0.0)
   elem, new_elem, elem_indx, nds_cache, cache
 end
@@ -85,6 +85,7 @@ Value of the basis function at point x.
 function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   # nds =  [x[1] for x in kdtree.data]  
   elem, new_elem, elem_indx, nds_cache, bases = cache
+  elem_indx = -1
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))  
   nel = size(elem,1)
   idx, _ = knn(kdtree, [x], 2, true)  
@@ -99,11 +100,12 @@ function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   cs = view(nds_cache, view(elem, elem_indx, :))
   x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
   ϕᵢ!(bases, x̂)
-  res = dot(bases[3],sols)
+  dot(bases[3],sols)
 end
 function ∇Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   # nds =  [x[1] for x in kdtree.data]
   elem, new_elem, elem_indx, nds_cache, bases = cache
+  elem_indx = -1
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))  
   nel = size(elem,1)
   idx, _ = knn(kdtree, [x], 2, true)
@@ -113,17 +115,67 @@ function ∇Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
     interval = interval .- x
     (interval[1]*interval[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
-  (elem_indx == -1) && begin (res = 0.0); return 0.0; end
+  (elem_indx == -1) && return 0.0 
   sols = view(uh, view(new_elem, elem_indx, :))
   cs = view(nds_cache, view(elem, elem_indx, :))
   x̂ = -(cs[1]+cs[2])/(cs[2]-cs[1]) + 2/(cs[2]-cs[1])*x
   ∇ϕᵢ!(bases, x̂)
-  res = dot(bases[3],sols)*(2/(cs[2]-cs[1]))
-  return res
+  dot(bases[3],sols)*(2/(cs[2]-cs[1]))
 end
 
-#= function basis_cache(kdtree::KDTree, nds::AbstractVector{Float64},
-  elem::AbstractMatrix{Int64}, p::Int64, l::Int64)
 
-  
-end =#
+"""
+Function to compute the multiscale finite element solution 
+at the nodal points
+"""
+function basis_cache(elem::AbstractMatrix{Int64}, 
+  elem_fine::AbstractMatrix{Int64}, p::Int64, q::Int64, l::Int64, 
+  Basis::AbstractArray{Float64})  
+  nc = size(elem,1)
+  ndofs = (2l+1)*(p+1)
+  new_elem = [
+    begin 
+      if(i < l+1)
+        j+1
+      elseif(i > nc-l)
+        (ndofs-(2l*(p+1)))*(nc-2l)+j-(ndofs-1-(2l*(p+1)))
+      else
+        (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
+      end
+    end  
+    for i=1:nc,j=0:ndofs-1] 
+  elem_indx = -1
+  cache = basis_cache(elem_fine, q)
+  nds_cache = Vector{Float64}(undef,nc+1)
+  fill!(nds_cache,0.0)
+  elem, new_elem, elem_indx, nds_cache, cache, Basis
+end
+function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64}, 
+  kdtree::KDTree, KDTrees::Vector{KDTree})
+  elem, new_elem, elem_indx, nds_cache, bases, Basis = cache
+  copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))
+  nel = size(elem,1)  
+  idx, _= knn(kdtree, [x], 2, true)
+  for i in idx
+    (i ≥ nel) && (i=nel) # Finds last point
+    interval = nds_cache[elem[i,:]]
+    interval = interval .- x
+    (interval[1]*interval[2] ≤ 0) ? begin elem_indx = i; break; end : continue
+  end
+  (elem_indx == -1) && return 0.0
+  t = elem_indx
+  start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
+  last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
+  binds = start:last            
+  res = 0.0  
+  k = 0
+  sols = uh[new_elem[t,:]]
+  for pᵢ=1:lastindex(binds), qᵢ=1:p+1
+    k+=1
+    b = Basis[:, binds[pᵢ], qᵢ] 
+    display(plot([x[1] for x in KDTrees[elem_indx].data], b, xlims=(0,1))) 
+    sleep(1)  
+    res += sols[k]*Λₖ(bases, x, b, KDTrees[elem_indx])
+  end  
+  return res        
+end 
