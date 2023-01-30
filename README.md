@@ -166,10 +166,10 @@ $$
 
 The corresponding exact solution is $u(x) = \sin(\pi x)$. 
 
-![](./HigherOrderMS/eg4.png) | 
+![](./SimplifiedHigherOrder/ooc_1.png) | 
 --- |
 
-We observe very high convergence rates until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. This is in line with the observation made in Maier, R., 2021. The program to verify the rate of convergence can be found in `eg4.jl`
+We observe optimal convergence rates (forgot to take the square root in the earlier version!) discussed in Maier, R., 2021 until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. This is in line with the observation made in Maier, R., 2021. The program to verify the rate of convergence can be found in `eg4.jl` and also in `SimplifiedHigherOrder/rate_of_convergence_1d.jl`. The new folder contains the same code but optimized a little more. The two folders `SimplifiedHigherOrder/` and `HigherOrderMS/` will be merged into a single implementation in the future version.
 
 *A detailed description of the routines will be provided soon.*
 
