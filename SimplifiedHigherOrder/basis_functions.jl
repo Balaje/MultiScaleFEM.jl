@@ -68,7 +68,7 @@ function ∇ϕᵢ!(cache, x)
 end
 
 """
-Function to evaluate the multiscale basis and gradient using trees
+Cache function for the multiscale basis and gradient. 
 """
 function basis_cache(elem::AbstractMatrix{Int64}, p::Int64)  
   nf = size(elem,1)
@@ -105,6 +105,11 @@ function Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   ϕᵢ!(bases, x̂)
   dot(bases[3],sols)
 end
+"""
+Value of the derivative of the basis function at point x. 
+  > cache = basis_cache(kdtree, elem::AbstractMatrix, p)
+  > ∇Λₖ(cache, x::Float64, uh::AbstractVector{Float64})
+"""
 function ∇Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   elem, new_elem, elem_indx, nds_cache, bases = cache
   elem_indx = -1
@@ -127,10 +132,8 @@ function ∇Λₖ(cache, x::Float64, uh::AbstractArray{Float64}, kdtree::KDTree)
   dot(bases[3],sols)*(2/(cs[2]-cs[1]))
 end
 
-
 """
-Function to compute the multiscale finite element solution 
-at the nodal points
+Cache Function for the multiscale finite element solution at the nodal points.
 """
 function basis_cache(elem::AbstractMatrix{Int64}, 
   elem_fine::AbstractMatrix{Int64}, p::Int64, q::Int64, l::Int64, 
@@ -153,17 +156,23 @@ function basis_cache(elem::AbstractMatrix{Int64},
   cache = basis_cache(elem_fine, q)
   nds_cache = Vector{Float64}(undef,nc+1)
   fill!(nds_cache,0.0)
-  elem, new_elem, elem_indx, nds_cache, cache, Basis, l, p
+  binds_1 = zeros(Int64, ndofs)
+  elem, new_elem, elem_indx, nds_cache, cache, Basis, l, p, binds_1
 end
+"""
+Function to evaluate the multiscale function at some point x
+  > This function requires two sets of trees: 
+    One for the global mesh and for the microscale meshes.
+"""
 function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64}, 
   kdtree::KDTree, KDTrees::Vector{KDTree})
-  elem, new_elem, elem_indx, nds_cache, bases, Basis, l, p = cache
+  elem, new_elem, elem_indx, nds_cache, bases, Basis, l, p, binds_1 = cache
   copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))
   nel = size(elem,1)  
   idx, _= knn(kdtree, [x], 2, true)
   for i in idx
     (i ≥ nel) && (i=nel) # Finds last point
-    interval = nds_cache[elem[i,:]]
+    interval = view(nds_cache,view(elem,i,:))
     interval = interval .- x
     (interval[1]*interval[2] ≤ 0) ? begin elem_indx = i; break; end : continue
   end
@@ -171,19 +180,60 @@ function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   t = elem_indx
   start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
   last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
-  start = ((2l+1) ≥ nc) ? 1 : start
-  last = ((2l+1) ≥ nc) ? nc : last
-  npatch = min(2l+1,nc)
+  start = ((2l+1) ≥ nel) ? 1 : start
+  last = ((2l+1) ≥ nel) ? nel : last
+  npatch = min(2l+1,nel)
   ndofs = npatch*(p+1)
   binds = start:last            
-  binds_1 = binds[ceil.(Int,((1:ndofs)./(p+1)))]    
+  for i=1:ndofs
+    binds_1[i] = @views binds[ceil(Int,i/(p+1))]
+  end
   res = 0.0  
   k = 0
-  sols = uh[new_elem[t,:]]
+  sols = view(uh,view(new_elem,t,:))
   for ii=1:lastindex(binds), jj=1:p+1
-    k+=1
-    b = Basis[:, binds[ii], jj] 
-    res += sols[k]*Λₖ(bases, x, b, KDTrees[binds_1[k]])
+    k+=1    
+    b = view(Basis, :, view(binds,ii), jj)
+    res += sols[k]*Λₖ(bases, x, b, @views KDTrees[binds_1[k]])
+  end  
+  return res        
+end 
+"""
+Function to evaluate the derivative of the multiscale function at some point x
+  > This function requires two sets of trees: 
+    One for the global mesh and for the microscale meshes.
+"""
+function ∇uₘₛ(cache, x::Float64, uh::AbstractArray{Float64}, 
+  kdtree::KDTree, KDTrees::Vector{KDTree})
+  elem, new_elem, elem_indx, nds_cache, bases, Basis, l, p, binds_1 = cache
+  copyto!(nds_cache, @views reinterpret(reshape, Float64, kdtree.data))
+  nel = size(elem,1)  
+  idx, _= knn(kdtree, [x], 2, true)
+  for i in idx
+    (i ≥ nel) && (i=nel) # Finds last point
+    interval = view(nds_cache,view(elem,i,:))
+    interval = interval .- x
+    (interval[1]*interval[2] ≤ 0) ? begin elem_indx = i; break; end : continue
+  end
+  (elem_indx == -1) && return 0.0
+  t = elem_indx
+  start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
+  last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
+  start = ((2l+1) ≥ nel) ? 1 : start
+  last = ((2l+1) ≥ nel) ? nel : last
+  npatch = min(2l+1,nel)
+  ndofs = npatch*(p+1)
+  binds = start:last            
+  for i=1:ndofs
+    binds_1[i] = @views binds[ceil(Int,i/(p+1))]
+  end
+  res = 0.0  
+  k = 0
+  sols = view(uh,view(new_elem,t,:))
+  for ii=1:lastindex(binds), jj=1:p+1
+    k+=1    
+    b = view(Basis, :, view(binds,ii), jj)
+    res += sols[k]*∇Λₖ(bases, x, b, @views KDTrees[binds_1[k]])
   end  
   return res        
 end 
