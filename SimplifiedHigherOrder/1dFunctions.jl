@@ -24,12 +24,12 @@ domain = (0,1)
 #=
 FEM parameters
 =#
-nc = 2^4 # Number of elements in the coarse space
-nf = 2^8 # Number of elements in the fine space
-p = 2 # Degree of polynomials in the coarse space
+nc = 2^3 # Number of elements in the coarse space
+nf = 2^9 # Number of elements in the fine space
+p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 10
-npatch = min(2l+1,nc) # Number of elements in patch
+l = 2
+npatch = 2l+1 # Number of elements in patch
 @show l
 qorder = 2
 quad = gausslegendre(qorder)
@@ -64,10 +64,12 @@ sFe = zeros(Float64,p+1,npatch)
 KDTrees = Vector{KDTree}(undef,nc)
 Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
 for i=1:nc
-  start = max(1,(i-l)) - (((i+l) > nc) ? abs(i+l-nc) : 0) # Start index of patch
-  last = min(nc,(i+l)) + (((i-l) < 1) ? abs(i-l-1) : 0) # Last index of patch
-  start = ((2l+1) ≥ nc) ? 1 : start
-  last = ((2l+1) ≥ nc) ? nc : last
+  # start = max(1,(i-l)) - (((i+l) > nc) ? abs(i+l-nc) : 0) # Start index of patch
+  # last = min(nc,(i+l)) + (((i-l) < 1) ? abs(i-l-1) : 0) # Last index of patch
+  # start = ((2l+1) ≥ nc) ? 1 : start
+  # last = ((2l+1) ≥ nc) ? nc : last
+  start = max(1,i-l)
+  last = min(nc,i+l)
   # Get the patch domain and connectivity
   patch_elem = elem_coarse[start:last,:] 
   patch = (nds[minimum(patch_elem)], nds[maximum(patch_elem)])  
@@ -105,8 +107,12 @@ for i=1:nc
     K = KK[fn,fn]; L = LL[fn,:]; F = FF
     # Solve the problem
     LHS = [K L; L' spzeros(Float64,size(L,2),size(L,2))]
+    zcols = size(LHS,1)-rank(LHS)
+    LHS = LHS[1:end-zcols,1:end-zcols]    
+    # display(LHS[264,:])
     dropzeros!(LHS)
     RHS = vcat(zeros(Float64,size(K,1)),F);
+    RHS = RHS[1:end-zcols]
     RHS = LHS\RHS
     Λ = vcat(0, RHS[1:size(K,1)], 0)
     copyto!(view(Basis,:,i,j), Λ)  
@@ -115,11 +121,10 @@ end
 
 plt1 = plot()
 bc = basis_cache(elem_fine, q)
-for el=[1]
-  for ii=1:p+1
-    #xvals1 = [x[1] for x in KDTrees[el].data]
+for el=[1,nc]
+  for ii=1:1
     xvals1 = 0:(1/1000):1
-    fxvals1 = [∇Λₖ(bc, x, Basis[:,el,ii], KDTrees[el]) for x in xvals1]
+    fxvals1 = [Λₖ(bc, x, Basis[:,el,ii], KDTrees[el]) for x in xvals1]
     plot!(plt1, xvals1, fxvals1, xlims=(0,1))
   end
 end
@@ -134,7 +139,7 @@ elem_ms = [
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+j-(ndofs-1-((npatch-1)*(p+1)))
+        (ndofs-(2l*(p+1)))*(nc-2l)+(j)-(ndofs-1-(2l*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end
@@ -157,6 +162,7 @@ fillsFms!(sFms, cache, elem_coarse, nds, p, l, quad, f; Nfine=nf)
 
 # Assemble and the global system
 Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
+dropzeros!(Kₘₛ)
 Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
 sol = (Kₘₛ\Fₘₛ)
 

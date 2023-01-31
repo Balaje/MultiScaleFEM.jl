@@ -75,33 +75,30 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
   KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
   nc = size(elem,1)
   qs, ws = quad  
-  npatch = min(2l+1,nc)
-  ndofs = npatch*(p+1)
   
   for t=1:nc
-    start = max(1,(t-l)) - (((t+l) > nc) ? abs(t+l-nc) : 0) # Start index of patch
-    last = min(nc,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
-    start = ((2l+1) ≥ nc) ? 1 : start
-    last = ((2l+1) ≥ nc) ? nc : last
-    binds = start:last   
+    start = max(1,t-l)
+    last = min(nc,t+l)
+    binds = start:last 
+    mid = (start+last)*0.5
+    nd = (last-start+1)*(p+1) 
     kk=0
     fill!(local_basis_vecs,0.0)
+    offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)         
     for ii=1:lastindex(binds), jj=1:p+1
-      kk+=1          
-      local_basis_vecs[:,kk] = view(Basis,:, view(binds,ii), jj)
-    end     
-    for ii=1:ndofs
-      binds_1[ii] = binds[ceil(Int,(ii/(p+1)))]    
-    end
+      kk+=1  
+      local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
+    end   
+    # display(local_basis_vecs)
     cs = view(nds, view(elem, t, :))      
     hlocal = (cs[2]-cs[1])/Nfine
     xlocal = cs[1]:hlocal:cs[2] 
     for i=1:lastindex(qs), j=1:lastindex(xlocal)-1
       x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]      
-      for pᵢ=1:ndofs, qᵢ=1:ndofs              
-        sKms[t,pᵢ,qᵢ] += ws[i]*D(x̂)*
-        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[binds_1[pᵢ]]))*
-        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,qᵢ), @views KDTrees[binds_1[qᵢ]]))*
+      for pᵢ=1:nd, qᵢ=1:nd        
+        sKms[t,pᵢ+offset_val,qᵢ+offset_val] += ws[i]*D(x̂)*
+        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ+offset_val), @views KDTrees[binds[ceil(Int,pᵢ/(p+1))]]))*
+        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,qᵢ+offset_val), @views KDTrees[binds[ceil(Int,qᵢ/(p+1))]]))*
         ((xlocal[j+1]-xlocal[j])*0.5)
       end      
     end  
@@ -117,32 +114,28 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
   KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
   nc = size(elem,1)
   qs, ws = quad 
-  npatch = min(2l+1,nc) 
-  ndofs = npatch*(p+1)
 
   for t=1:nc
-    start = max(1,(t-l)) - (((t+l) > nc) ? abs(t+l-nc) : 0) # Start index of patch
-    last = min(nc,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
-    start = ((2l+1) ≥ nc) ? 1 : start
-    last = ((2l+1) ≥ nc) ? nc : last
-    binds = start:last      
+    start = max(1,t-l)
+    last = min(nc,t+l)
+    mid = (start+last)*0.5
+    binds = start:last     
+    nd = (last-start+1)*(p+1) 
     kk=0
     fill!(local_basis_vecs,0.0)
+    offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)
     for ii=1:lastindex(binds), jj=1:p+1
       kk+=1
-      local_basis_vecs[:,kk] = view(Basis,:, view(binds,ii), jj)
+      local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
     end      
-    for ii=1:ndofs
-      binds_1[ii] = binds[ceil(Int,(ii/(p+1)))]    
-    end   
     cs = view(nds, view(elem, t, :)) 
     hlocal = (cs[2]-cs[1])/Nfine
     xlocal = cs[1]:hlocal:cs[2] 
     for i=1:lastindex(qs), j=1:lastindex(xlocal)-1
       x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]    
-      for pᵢ=1:ndofs
-        sFms[t,pᵢ] += ws[i]*f(x̂)*
-        (Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ), @views KDTrees[binds_1[pᵢ]]))*
+      for pᵢ=1:nd
+        sFms[t,pᵢ+offset_val] += ws[i]*f(x̂)*
+        (Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ+offset_val), @views KDTrees[binds[ceil(Int,pᵢ/(p+1))]]))*
         ((xlocal[j+1]-xlocal[j])*0.5)
       end
     end      

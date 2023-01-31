@@ -139,14 +139,14 @@ function basis_cache(elem::AbstractMatrix{Int64},
   elem_fine::AbstractMatrix{Int64}, p::Int64, q::Int64, l::Int64, 
   Basis::AbstractArray{Float64})  
   nc = size(elem,1)
-  npatch = min(2l+1,nc)
+  npatch = 2l+1
   ndofs = (npatch)*(p+1)
   new_elem = [
     begin 
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+j-(ndofs-1-((npatch-1)*(p+1)))
+        (ndofs-(2l*(p+1)))*(nc-2l)+j-(ndofs-1-(2l*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end
@@ -178,23 +178,18 @@ function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   end
   (elem_indx == -1) && return 0.0
   t = elem_indx
-  start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
-  last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
-  start = ((2l+1) ≥ nel) ? 1 : start
-  last = ((2l+1) ≥ nel) ? nel : last
-  npatch = min(2l+1,nel)
-  ndofs = npatch*(p+1)
-  binds = start:last            
-  for i=1:ndofs
-    binds_1[i] = @views binds[ceil(Int,i/(p+1))]
-  end
+  start = max(1,t-l)
+  last = min(nel,t+l)
+  mid = (start+last)*0.5
+  binds = start:last 
+  offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)           
   res = 0.0  
   k = 0
   sols = view(uh,view(new_elem,t,:))
   for ii=1:lastindex(binds), jj=1:p+1
     k+=1    
     b = view(Basis, :, view(binds,ii), jj)
-    res += sols[k]*Λₖ(bases, x, b, @views KDTrees[binds_1[k]])
+    res += sols[k+offset_val]*Λₖ(bases, x, b, @views KDTrees[binds[ceil(Int,k/(p+1))]])
   end  
   return res        
 end 
@@ -217,23 +212,18 @@ function ∇uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   end
   (elem_indx == -1) && return 0.0
   t = elem_indx
-  start = max(1,(t-l)) - (((t+l) > nel) ? abs(t+l-nel) : 0) # Start index of patch
-  last = min(nel,(t+l)) + (((t-l) < 1) ? abs(t-l-1) : 0) # Last index of patch
-  start = ((2l+1) ≥ nel) ? 1 : start
-  last = ((2l+1) ≥ nel) ? nel : last
-  npatch = min(2l+1,nel)
-  ndofs = npatch*(p+1)
-  binds = start:last            
-  for i=1:ndofs
-    binds_1[i] = @views binds[ceil(Int,i/(p+1))]
-  end
+  start = max(1,t-l)
+  last = min(nel,t+l)
+  mid = (start+last)*0.5
+  binds = start:last 
+  offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)                      
   res = 0.0  
   k = 0
   sols = view(uh,view(new_elem,t,:))
   for ii=1:lastindex(binds), jj=1:p+1
     k+=1    
     b = view(Basis, :, view(binds,ii), jj)
-    res += sols[k]*∇Λₖ(bases, x, b, @views KDTrees[binds_1[k]])
+    res += sols[k+offset_val]*∇Λₖ(bases, x, b, @views KDTrees[binds[binds[ceil(Int,k/(p+1))]]])
   end  
   return res        
 end 
