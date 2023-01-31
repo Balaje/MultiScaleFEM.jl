@@ -56,7 +56,7 @@ nf = 2^10
 qorder = 2
 quad = gausslegendre(qorder)
 
-𝒩 = 2:16
+𝒩 = [2,4,8,16,32,64,128]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
@@ -190,13 +190,13 @@ for l in [4,5,6]
   end
 
   println("Done l = "*string(l))
-  plot!(plt, 1 ./𝒩, L²Error, label="L² (l="*string(l)*")", xaxis=:log10, yaxis=:log10, lw=2)
+  plot!(plt, 1 ./𝒩, L²Error, label="L² (l="*string(l)*")", lw=2)
   plot!(plt1, 1 ./𝒩, H¹Error, label="Energy (l="*string(l)*")", lw=2)
   scatter!(plt, 1 ./𝒩, L²Error, label="", markersize=2)
   scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:outertopright)
 end
 
-plot!(plt1, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black)
-plot!(plt, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black)
+plot!(plt1, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10,)
+plot!(plt, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
 
 plot!(plt2, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)
