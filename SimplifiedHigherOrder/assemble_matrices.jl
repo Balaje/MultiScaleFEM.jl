@@ -85,8 +85,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
     nd = (last-start+1)*(p+1) 
     kk=0
     fill!(local_basis_vecs,0.0)
-    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)         
-    @show offset_val, binds
+    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)             
     for ii=1:lastindex(binds), jj=1:p+1
       kk+=1  
       local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)

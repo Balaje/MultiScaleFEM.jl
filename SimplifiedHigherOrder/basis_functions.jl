@@ -146,7 +146,7 @@ function basis_cache(elem::AbstractMatrix{Int64},
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-(2l*(p+1)))*(nc-2l)+j-(ndofs-1-(2l*(p+1)))
+        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+(j)-(ndofs-1-((npatch-1)*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end

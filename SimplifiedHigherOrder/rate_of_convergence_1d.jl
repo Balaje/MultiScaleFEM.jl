@@ -56,14 +56,15 @@ nf = 2^10
 qorder = 2
 quad = gausslegendre(qorder)
 
-𝒩 = [2,4,8,16]
+𝒩 = 2:16
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
 plt = plot()
 plt1 = plot()
+plt2 = plot()
 
-for l in [4,5,6,7,8]
+for l in [4,5,6]
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     #=
     Precompute all the caches. Essential for computing the solution quickly
@@ -99,7 +100,7 @@ for l in [4,5,6,7,8]
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+j-(ndofs-1-((npatch-1)*(p+1)))
+        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+(j)-(ndofs-1-((npatch-1)*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end
@@ -120,10 +121,8 @@ for l in [4,5,6,7,8]
     Efficiently compute the solution to the saddle point problems.
     =#
     for i=1:nc
-      start = max(1,(i-l)) - (((i+l) > nc) ? abs(i+l-nc) : 0) # Start index of patch
-      last = min(nc,(i+l)) + (((i-l) < 1) ? abs(i-l-1) : 0) # Last index of patch
-      start = ((2l+1) ≥ nc) ? 1 : start
-      last = ((2l+1) ≥ nc) ? nc : last
+      start = max(1,i-l)
+      last = min(nc,i+l)
       # Get the patch domain and connectivity
       patch_elem = elem_coarse[start:last,:] 
       patch = (nds[minimum(patch_elem)], nds[maximum(patch_elem)])  
@@ -161,8 +160,11 @@ for l in [4,5,6,7,8]
         K = KK[fn,fn]; L = LL[fn,:]; F = FF
         # Solve the problem
         LHS = [K L; L' spzeros(Float64,size(L,2),size(L,2))]
+        zcols = size(LHS,1)-rank(LHS)
+        LHS = LHS[1:end-zcols,1:end-zcols]   
         dropzeros!(LHS)
         RHS = vcat(zeros(Float64,size(K,1)),F);
+        RHS = RHS[1:end-zcols]
         RHS = LHS\RHS
         Λ = vcat(0, RHS[1:size(K,1)], 0)
         copyto!(view(MS_Basis,:,i,j), Λ)  
@@ -188,13 +190,13 @@ for l in [4,5,6,7,8]
   end
 
   println("Done l = "*string(l))
-  plot!(plt, 1 ./𝒩, L²Error, label="L²", xaxis=:log10, yaxis=:log10, lw=2)
-  plot!(plt, 1 ./𝒩, H¹Error, label="Energy", lw=2)
+  plot!(plt, 1 ./𝒩, L²Error, label="L² (l="*string(l)*")", xaxis=:log10, yaxis=:log10, lw=2)
+  plot!(plt1, 1 ./𝒩, H¹Error, label="Energy (l="*string(l)*")", lw=2)
   scatter!(plt, 1 ./𝒩, L²Error, label="", markersize=2)
-  scatter!(plt, 1 ./𝒩, H¹Error, label="", markersize=2)
+  scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:outertopright)
 end
 
-plot!(plt, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black)
+plot!(plt1, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black)
 plot!(plt, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black)
 
-plot!(plt1, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)
+plot!(plt2, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)

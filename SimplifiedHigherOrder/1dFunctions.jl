@@ -28,7 +28,7 @@ nc = 2^3 # Number of elements in the coarse space
 nf = 2^9 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 3
+l = 6
 npatch = min(2l+1,nc) # Number of elements in patch
 @show l
 qorder = 2
@@ -64,10 +64,6 @@ sFe = zeros(Float64,p+1,npatch)
 KDTrees = Vector{KDTree}(undef,nc)
 Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
 for i=1:nc
-  # start = max(1,(i-l)) - (((i+l) > nc) ? abs(i+l-nc) : 0) # Start index of patch
-  # last = min(nc,(i+l)) + (((i-l) < 1) ? abs(i-l-1) : 0) # Last index of patch
-  # start = ((2l+1) ≥ nc) ? 1 : start
-  # last = ((2l+1) ≥ nc) ? nc : last
   start = max(1,i-l)
   last = min(nc,i+l)
   # Get the patch domain and connectivity
@@ -139,7 +135,7 @@ elem_ms = [
       if(i < l+1)
         j+1
       elseif(i > nc-l)
-        (ndofs-(2l*(p+1)))*(nc-2l)+(j)-(ndofs-1-(2l*(p+1)))
+        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+(j)-(ndofs-1-((npatch-1)*(p+1)))
       else
         (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
       end
