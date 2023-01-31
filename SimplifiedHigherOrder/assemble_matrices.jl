@@ -75,6 +75,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
   KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
   nc = size(elem,1)
   qs, ws = quad  
+  npatch = min(2l+1,nc)
   
   for t=1:nc
     start = max(1,t-l)
@@ -84,7 +85,8 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
     nd = (last-start+1)*(p+1) 
     kk=0
     fill!(local_basis_vecs,0.0)
-    offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)         
+    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)         
+    @show offset_val, binds
     for ii=1:lastindex(binds), jj=1:p+1
       kk+=1  
       local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
@@ -114,6 +116,7 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
   KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
   nc = size(elem,1)
   qs, ws = quad 
+  npatch = min(2l+1,nc)
 
   for t=1:nc
     start = max(1,t-l)
@@ -123,7 +126,7 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
     nd = (last-start+1)*(p+1) 
     kk=0
     fill!(local_basis_vecs,0.0)
-    offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)
+    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)
     for ii=1:lastindex(binds), jj=1:p+1
       kk+=1
       local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)

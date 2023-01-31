@@ -139,7 +139,7 @@ function basis_cache(elem::AbstractMatrix{Int64},
   elem_fine::AbstractMatrix{Int64}, p::Int64, q::Int64, l::Int64, 
   Basis::AbstractArray{Float64})  
   nc = size(elem,1)
-  npatch = 2l+1
+  npatch = min(2l+1,nc)
   ndofs = (npatch)*(p+1)
   new_elem = [
     begin 
@@ -180,9 +180,10 @@ function uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   t = elem_indx
   start = max(1,t-l)
   last = min(nel,t+l)
+  npatch = min(2l+1,nel)
   mid = (start+last)*0.5
   binds = start:last 
-  offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)           
+  offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)           
   res = 0.0  
   k = 0
   sols = view(uh,view(new_elem,t,:))
@@ -212,11 +213,12 @@ function ∇uₘₛ(cache, x::Float64, uh::AbstractArray{Float64},
   end
   (elem_indx == -1) && return 0.0
   t = elem_indx
+  npatch = min(2l+1,nel)
   start = max(1,t-l)
   last = min(nel,t+l)
   mid = (start+last)*0.5
   binds = start:last 
-  offset_val = ((t-mid > 0) ? (2l+1-length(binds))*(p+1) : 0)                      
+  offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)                      
   res = 0.0  
   k = 0
   sols = view(uh,view(new_elem,t,:))

@@ -28,8 +28,8 @@ nc = 2^3 # Number of elements in the coarse space
 nf = 2^9 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 2
-npatch = 2l+1 # Number of elements in patch
+l = 3
+npatch = min(2l+1,nc) # Number of elements in patch
 @show l
 qorder = 2
 quad = gausslegendre(qorder)
