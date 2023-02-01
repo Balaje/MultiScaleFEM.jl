@@ -8,7 +8,7 @@ Basis function for the discontinuous space. Returns the legendre polynomials upt
 function Λₖ!(res::AbstractVector{Float64}, x::Float64, nds::AbstractVector{Float64}, p::Int64)
   a,b = nds  
   fill!(res,0.0)
-  if(a ≤ x ≤ b)
+  if(((x-a) ≥ 1e-10) && ((x-b) ≤ 1e-10))
     x̂ = -(b+a)/(b-a) + 2.0*x/(b-a)  
     if(p==0)
       res[1] = 1.0

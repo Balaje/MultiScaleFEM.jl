@@ -24,11 +24,11 @@ domain = (0,1)
 #=
 FEM parameters
 =#
-nc = 2^3 # Number of elements in the coarse space
-nf = 2^9 # Number of elements in the fine space
+nc = 2^6 # Number of elements in the coarse space
+nf = 2^10 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 6
+l = 7
 npatch = min(2l+1,nc) # Number of elements in patch
 @show l
 qorder = 2
@@ -46,10 +46,6 @@ assem_L²L² = ([(p+1)*t+ti-p for _=0:p, ti=0:p, t=1:nc],
 assem_H¹H¹ = ([(q)*t+ti-(q-1) for _=0:q, ti=0:q, t=1:nf], 
   [(q)*t+tj-(q-1) for tj=0:q, _=0:q, t=1:nf], 
   [(q)*t+ti-(q-1) for ti=0:q, t=1:nf])          
-assem_H¹L² = ([(q)*Q+qᵢ-(q-1) for qᵢ=0:q, _=0:p, P=1:npatch, Q=1:nf], 
-  [(p+1)*P+pᵢ-p for _=0:q, pᵢ=0:p, P=1:npatch, Q=1:nf], 
-  [(p+1)*P+pᵢ-p for pᵢ=0:p, P=1:npatch])    
-# Connectivity of the fine elements
 elem_coarse = [i+j for i=1:nc, j=0:1]
 elem_fine = [i+j for i=1:nf, j=0:1]
     
@@ -58,8 +54,6 @@ Solve the saddle point problems to obtain the new basis functions
 =#
 # Store only the non-zero entries of the matrices of the saddle point problems
 sKe = zeros(Float64,q+1,q+1,nf)
-sLe = zeros(Float64,q+1,p+1,npatch,nf)
-sFe = zeros(Float64,p+1,npatch)
 # Store the data for solving the multiscale problems
 KDTrees = Vector{KDTree}(undef,nc)
 Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
@@ -70,6 +64,14 @@ for i=1:nc
   patch_elem = elem_coarse[start:last,:] 
   patch = (nds[minimum(patch_elem)], nds[maximum(patch_elem)])  
   patch_elem = patch_elem .- (minimum(patch_elem) - 1)
+  # Allocate the assemblers
+  local npatch = size(patch_elem,1)
+  assem_H¹L² = ([(q)*Q+qᵢ-(q-1) for qᵢ=0:q, _=0:p, P=1:npatch, Q=1:nf], 
+  [(p+1)*P+pᵢ-p for _=0:q, pᵢ=0:p, P=1:npatch, Q=1:nf], 
+  [(p+1)*P+pᵢ-p for pᵢ=0:p, P=1:npatch])    
+  sLe = zeros(Float64,q+1,p+1,npatch,nf)
+  sFe = zeros(Float64,p+1,npatch)
+  # Connectivity of the fine elements
   # Build the FEM nodes
   local h = (patch[2]-patch[1])/nf
   nds_fine = patch[1]:h:patch[2]
@@ -103,12 +105,8 @@ for i=1:nc
     K = KK[fn,fn]; L = LL[fn,:]; F = FF
     # Solve the problem
     LHS = [K L; L' spzeros(Float64,size(L,2),size(L,2))]
-    zcols = size(LHS,1)-rank(LHS)
-    LHS = LHS[1:end-zcols,1:end-zcols]    
-    # display(LHS[264,:])
     dropzeros!(LHS)
     RHS = vcat(zeros(Float64,size(K,1)),F);
-    RHS = RHS[1:end-zcols]
     RHS = LHS\RHS
     Λ = vcat(0, RHS[1:size(K,1)], 0)
     copyto!(view(Basis,:,i,j), Λ)  
@@ -117,7 +115,7 @@ end
 
 plt1 = plot()
 bc = basis_cache(elem_fine, q)
-for el=[1,nc]
+for el=1:nc
   for ii=1:1
     xvals1 = 0:(1/1000):1
     fxvals1 = [Λₖ(bc, x, Basis[:,el,ii], KDTrees[el]) for x in xvals1]

@@ -56,7 +56,7 @@ nf = 2^10
 qorder = 2
 quad = gausslegendre(qorder)
 
-𝒩 = 1:1:15
+𝒩 = [2,4,8,16,32,64]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
@@ -79,17 +79,12 @@ for l in [4,5,6]
     [(p+1)*t+ti-p for ti=0:p, t=1:nc])
     assem_H¹H¹ = ([(q)*t+ti-(q-1) for _=0:q, ti=0:q, t=1:nf], 
     [(q)*t+tj-(q-1) for tj=0:q, _=0:q, t=1:nf], 
-    [(q)*t+ti-(q-1) for ti=0:q, t=1:nf])          
-    assem_H¹L² = ([(q)*Q+qᵢ-(q-1) for qᵢ=0:q, _=0:p, P=1:npatch, Q=1:nf], 
-    [(p+1)*P+pᵢ-p for _=0:q, pᵢ=0:p, P=1:npatch, Q=1:nf], 
-    [(p+1)*P+pᵢ-p for pᵢ=0:p, P=1:npatch])    
+    [(q)*t+ti-(q-1) for ti=0:q, t=1:nf])           
     # Connectivity of the coarse and fine domains
     elem_coarse = [i+j for i=1:nc, j=0:1]
     elem_fine = [i+j for i=1:nf, j=0:1]
     # Store only the non-zero entries of the matrices of the saddle point problems
     sKe = zeros(Float64,q+1,q+1,nf)
-    sLe = zeros(Float64,q+1,p+1,npatch,nf)
-    sFe = zeros(Float64,p+1,npatch)
     # Store the data for solving the multiscale problems
     KDTrees = Vector{KDTree}(undef,nc)
     MS_Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
@@ -115,8 +110,7 @@ for l in [4,5,6]
     local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
     binds_1 = zeros(Int64, ndofs)
     cache = KDTrees, MS_Basis, local_basis_vecs, bc, binds_1
-    
-    
+        
     #=
     Efficiently compute the solution to the saddle point problems.
     =#
@@ -134,7 +128,14 @@ for l in [4,5,6]
       # Build some data structures
       KDTrees[i] = KDTree(nds_fine') # KDTree for searching the points
       cache_q = basis_cache(q)
-      cache_p = Vector{Float64}(undef,p+1)  
+      cache_p = Vector{Float64}(undef,p+1) 
+      # Preallocate matrices based on the size 
+      local npatch = size(patch_elem,1)
+      assem_H¹L² = ([(q)*Q+qᵢ-(q-1) for qᵢ=0:q, _=0:p, P=1:npatch, Q=1:nf], 
+      [(p+1)*P+pᵢ-p for _=0:q, pᵢ=0:p, P=1:npatch, Q=1:nf], 
+      [(p+1)*P+pᵢ-p for pᵢ=0:p, P=1:npatch])   
+      sLe = zeros(Float64,q+1,p+1,npatch,nf)
+      sFe = zeros(Float64,p+1,npatch)
       # Fill up the matrices
       fillsKe!(sKe, cache_q, nds_fine, elem_fine, q, quad)
       fillsLe!(sLe, (cache_q,cache_p), nds_fine, nds_coarse, elem_fine, patch_elem, (q,p), quad)
@@ -160,11 +161,8 @@ for l in [4,5,6]
         K = KK[fn,fn]; L = LL[fn,:]; F = FF
         # Solve the problem
         LHS = [K L; L' spzeros(Float64,size(L,2),size(L,2))]
-        zcols = size(LHS,1)-rank(LHS)
-        LHS = LHS[1:end-zcols,1:end-zcols]   
         dropzeros!(LHS)
         RHS = vcat(zeros(Float64,size(K,1)),F);
-        RHS = RHS[1:end-zcols]
         RHS = LHS\RHS
         Λ = vcat(0, RHS[1:size(K,1)], 0)
         copyto!(view(MS_Basis,:,i,j), Λ)  
@@ -193,7 +191,7 @@ for l in [4,5,6]
   plot!(plt, 1 ./𝒩, L²Error, label="L² (l="*string(l)*")", lw=2)
   plot!(plt1, 1 ./𝒩, H¹Error, label="Energy (l="*string(l)*")", lw=2)
   scatter!(plt, 1 ./𝒩, L²Error, label="", markersize=2)
-  scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:outertopright)
+  scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:best)
 end
 
 plot!(plt1, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
