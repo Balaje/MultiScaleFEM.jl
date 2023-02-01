@@ -56,7 +56,8 @@ nf = 2^10
 qorder = 2
 quad = gausslegendre(qorder)
 
-𝒩 = [2,4,8,16,32,64]
+# 𝒩 = [2,4,8,16,32,64]
+𝒩 = 1:1:15
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
@@ -194,7 +195,7 @@ for l in [4,5,6]
   scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:best)
 end
 
-plot!(plt1, 1 ./𝒩, (1 ./𝒩).^2, label="Order 2", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-plot!(plt, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt1, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt, 1 ./𝒩, (1 ./𝒩).^4, label="Order 4", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
 
 plot!(plt2, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)
