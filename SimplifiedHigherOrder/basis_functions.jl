@@ -93,7 +93,7 @@ function compute_ms_basis!(cache, domain::Tuple{Float64,Float64},
   nds::AbstractVector{Float64}, elem_coarse::Matrix{Int64}, 
   elem_fine::Matrix{Int64}, D::Function, l::Int64)
 
-  sKe, Basis, cache_q, cache_p, KDTrees, q, p = cache  
+  sKe, assem_H¹H¹, Basis, cache_q, cache_p, KDTrees, q, p = cache  
   nc = size(elem_coarse,1)
   nf = size(elem_fine,1)
   H = (domain[2]-domain[1])/nc
@@ -114,8 +114,9 @@ function compute_ms_basis!(cache, domain::Tuple{Float64,Float64},
     sFe = zeros(Float64,p+1,npatch)
     # Connectivity of the fine elements
     # Build the FEM nodes
-    h = (patch[2]-patch[1])/nf
-    nds_fine = patch[1]:h:patch[2]
+    #h = (patch[2]-patch[1])/nf
+    nds_fine = LinRange(patch[1],patch[2],nf+1)
+    h = nds_fine[2]-nds_fine[1]
     nds_coarse = patch[1]:H:patch[2]
     # Build some data structures
     KDTrees[i] = KDTree(nds_fine') # KDTree for searching the points 

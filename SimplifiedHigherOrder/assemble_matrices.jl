@@ -66,15 +66,9 @@ function fillsLe!(sLe::AbstractArray{Float64}, basis_cache, nds_fine::AbstractVe
   end
 end
 
-function fillsKms!(sKms::AbstractArray{Float64}, cache, 
-  elem::AbstractMatrix{Int64}, nds::AbstractVector{Float64}, 
-  p::Int64, l::Int64, quad::Tuple{Vector{Float64}, Vector{Float64}}; 
-  Nfine=200)
-  
+function fillsKms!(sKms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::Int64)  
   fill!(sKms,0.0)
-  KDTrees, Basis, local_basis_vecs, bc = cache
-  nc = size(elem,1)
-  qs, ws = quad  
+  K, Basis, local_basis_vecs, tmp, local_sKms  = cache
   npatch = min(2l+1,nc)
   
   for t=1:nc
@@ -90,31 +84,18 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
       kk+=1  
       local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
     end   
-    # display(local_basis_vecs)
-    cs = view(nds, view(elem, t, :))      
-    hlocal = (cs[2]-cs[1])/Nfine
-    xlocal = cs[1]:hlocal:cs[2] 
-    for i=1:lastindex(qs), j=1:lastindex(xlocal)-1
-      x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]      
-      for pᵢ=1:nd, qᵢ=1:nd        
-        sKms[t,pᵢ+offset_val,qᵢ+offset_val] += ws[i]*D(x̂)*
-        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ+offset_val), @views KDTrees[binds[ceil(Int,pᵢ/(p+1))]]))*
-        (∇Λₖ(bc, x̂, view(local_basis_vecs,:,qᵢ+offset_val), @views KDTrees[binds[ceil(Int,qᵢ/(p+1))]]))*
-        ((xlocal[j+1]-xlocal[j])*0.5)
-      end      
-    end  
+    mul!(tmp, K, local_basis_vecs)
+    mul!(local_sKms, local_basis_vecs', tmp)  
+    for jj=1:nd, kk=1:nd
+      sKms[t,jj+offset_val,kk+offset_val] = local_sKms[jj,kk]
+    end    
   end
 end
 
-function fillsFms!(sFms::AbstractArray{Float64}, cache, 
-  elem::AbstractMatrix{Int64}, nds::AbstractVector{Float64}, 
-  p::Int64, l::Int64, quad::Tuple{Vector{Float64}, Vector{Float64}}, 
-  f::Function; Nfine=200)
+function fillsFms!(sFms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::Int64)
   
   fill!(sFms,0.0)
-  KDTrees, Basis, local_basis_vecs, bc = cache
-  nc = size(elem,1)
-  qs, ws = quad 
+  F, Basis, local_basis_vecs, local_sFms  = cache
   npatch = min(2l+1,nc)
 
   for t=1:nc
@@ -129,18 +110,11 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
     for ii=1:lastindex(binds), jj=1:p+1
       kk+=1
       local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
-    end      
-    cs = view(nds, view(elem, t, :)) 
-    hlocal = (cs[2]-cs[1])/Nfine
-    xlocal = cs[1]:hlocal:cs[2] 
-    for i=1:lastindex(qs), j=1:lastindex(xlocal)-1
-      x̂ = (xlocal[j+1]+xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]    
-      for pᵢ=1:nd
-        sFms[t,pᵢ+offset_val] += ws[i]*f(x̂)*
-        (Λₖ(bc, x̂, view(local_basis_vecs,:,pᵢ+offset_val), @views KDTrees[binds[ceil(Int,pᵢ/(p+1))]]))*
-        ((xlocal[j+1]-xlocal[j])*0.5)
-      end
-    end      
+    end    
+    mul!(local_sFms, local_basis_vecs', F) 
+    for jj=1:nd
+      sFms[t,jj+offset_val] = local_sFms[jj]
+    end
   end
 end
 

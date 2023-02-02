@@ -24,11 +24,11 @@ domain = (0.0,1.0)
 #=
 FEM parameters
 =#
-nc = 2^2 # Number of elements in the coarse space
-nf = 2^10 # Number of elements in the fine space
+nc = 2^3 # Number of elements in the coarse space
+nf = 2^11 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 3
+l = 10
 npatch = min(2l+1,nc) # Number of elements in patch
 @show l
 qorder = 2
@@ -98,12 +98,20 @@ sKms = zeros(Float64,nc,ndofs,ndofs)
 sFms = zeros(Float64,nc,ndofs)
 bc = basis_cache(elem_fine, q)
 local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
-binds_1 = zeros(Int64, ndofs)
-cache = KDTrees, Basis, local_basis_vecs, bc, binds_1
 
 # Compute the local and global stiffness matrices
-fillsKms!(sKms, cache, elem_coarse, nds, p, l, quad; Nfine=nf)
-fillsFms!(sFms, cache, elem_coarse, nds, p, l, quad, f; Nfine=nf)
+nds_fine = LinRange(domain[1], domain[2], nf+1)
+sFeϵ = zeros(Float64,q+1,nf)
+fillLoadVec!(sFeϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
+sKeϵ = zeros(Float64,q+1,q+1,nf)
+fillsKe!(sKeϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
+Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKeϵ))
+Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFeϵ)))
+
+cache1 = Kϵ, Basis, local_basis_vecs, deepcopy(local_basis_vecs), similar(sKms[1,:,:])
+fillsKms!(sKms, cache1, nc, p, l)
+cache2 = Fϵ, Basis, local_basis_vecs, similar(sFms[1,:])
+fillsFms!(sFms, cache2, nc, p, l)
 
 # Assemble and the global system
 Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))

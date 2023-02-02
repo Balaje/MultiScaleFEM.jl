@@ -19,7 +19,7 @@ include("assemble_matrices.jl")
 Problem data
 =#
 f(x) = sin(5π*x)
-ϵ = 2^-6
+ϵ = 2^-8
 domain = (0.0,1.0)
 nds_microscale = domain[1]:ϵ:domain[2]
 tree_microscale = KDTree(nds_microscale')
@@ -107,7 +107,7 @@ function error(bc, ue::Function, ∇ue::Function, uh::AbstractVector{Float64}, n
 end
 
 q=1
-nf=2^12
+nf=2^11
 qorder=2
 quad=gausslegendre(qorder)
 ## Solve the problem directly with h=2^-16
@@ -136,7 +136,7 @@ uₕ(x) = Λₖ(sol_cache, x, solϵ, tree_fine) # This serves as the exact solut
 ∇uₕ(x) = ∇Λₖ(sol_cache, x, solϵ, tree_fine) # This serves as the exact solution for the rate of convergence
 
 # Now solve the problem using the MS method
-𝒩 = 1:10
+𝒩 = [4,8,16,32,64]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 p = 1
@@ -145,7 +145,7 @@ plt = plot()
 plt1 = plot()
 plt2 = plot()
 
-for l in [4,5,6]
+for l in [4,5,6,7,8]
   for (nc,itr) in zip(𝒩,1:length(𝒩))
     #=
     Precompute all the caches. Essential for computing the solution quickly
@@ -182,7 +182,6 @@ for l in [4,5,6]
     [elem_ms[t,ti] for t=1:nc, ti=1:ndofs])
     sKms = zeros(Float64,nc,ndofs,ndofs)
     sFms = zeros(Float64,nc,ndofs)
-    bc = basis_cache(elem_fine, q)
     local_basis_vecs = zeros(Float64, q*nf+1, ndofs)    
     
     #=
@@ -190,7 +189,7 @@ for l in [4,5,6]
     =#
     cache_q = basis_cache(q)
     cache_p = Vector{Float64}(undef,p+1)
-    cache = sKe, MS_Basis, cache_q, cache_p, KDTrees, q, p
+    cache = sKe, ssem_H¹H¹, MS_Basis, cache_q, cache_p, KDTrees, q, p
     compute_ms_basis!(cache, domain, nds_coarse, elem_coarse, elem_fine, D, l)
     
     #=
@@ -198,16 +197,17 @@ for l in [4,5,6]
         The multiscale basis are stored in the variable MS_Basis
     =#
     # Compute the local and global stiffness matrices
-    cache = KDTrees, MS_Basis, local_basis_vecs, bc
-    fillsKms!(sKms, cache, elem_coarse, nds_coarse, p, l, quad; Nfine=nf)
-    fillsFms!(sFms, cache, elem_coarse, nds_coarse, p, l, quad, f; Nfine=nf)
+    cache1 = Kϵ, MS_Basis, local_basis_vecs, deepcopy(local_basis_vecs), similar(sKms[1,:,:])
+    fillsKms!(sKms, cache1, nc, p, l)
+    cache2 = Fϵ, MS_Basis, local_basis_vecs, similar(sFms[1,:])
+    fillsFms!(sFms, cache2, nc, p, l)
     # Assemble and the global system
     Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
     Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
     sol = (Kₘₛ\Fₘₛ)
 
     cache = basis_cache(elem_coarse, elem_fine, p, q, l, MS_Basis)
-    L²Error[itr], H¹Error[itr] = error(cache, uₕ, ∇uₕ, sol, nds_coarse, elem_coarse, tree, KDTrees, quad; Nfine=nf)
+    L²Error[itr], H¹Error[itr] = error(cache, uₕ, ∇uₕ, sol, nds_coarse, elem_coarse, tree, KDTrees, quad; Nfine=20)
 
     println("Done nc = "*string(nc))    
   end
