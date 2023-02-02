@@ -72,7 +72,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache,
   Nfine=200)
   
   fill!(sKms,0.0)
-  KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
+  KDTrees, Basis, local_basis_vecs, bc = cache
   nc = size(elem,1)
   qs, ws = quad  
   npatch = min(2l+1,nc)
@@ -112,7 +112,7 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
   f::Function; Nfine=200)
   
   fill!(sFms,0.0)
-  KDTrees, Basis, local_basis_vecs, bc, binds_1 = cache
+  KDTrees, Basis, local_basis_vecs, bc = cache
   nc = size(elem,1)
   qs, ws = quad 
   npatch = min(2l+1,nc)
@@ -141,5 +141,25 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache,
         ((xlocal[j+1]-xlocal[j])*0.5)
       end
     end      
+  end
+end
+
+function fillLoadVec!(sFe::AbstractArray{Float64}, cache, nds::AbstractVector{Float64}, 
+  elem::AbstractVecOrMat{Int64}, 
+  q::Int64, quad::Tuple{Vector{Float64}, Vector{Float64}}, f::Function)
+  fill!(sFe,0.0)
+  nf = size(elem,1)
+  for t=1:nf
+    cs = view(nds, view(elem, t, :))
+    hlocal = cs[2]-cs[1]
+    qs,ws = quad
+    for i=1:lastindex(qs)
+      x̂ = (cs[2]+cs[1])*0.5 + (cs[2]-cs[1])*0.5*qs[i]
+      ϕᵢ!(cache, qs[i])
+      basis = cache[3]
+      for j=1:q+1
+        sFe[j,t] += ws[i]*f(x̂)*basis[j]*(hlocal*0.5)
+      end 
+    end 
   end
 end

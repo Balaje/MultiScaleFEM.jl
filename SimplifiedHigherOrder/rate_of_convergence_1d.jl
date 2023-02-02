@@ -109,8 +109,7 @@ for l in [4,5,6]
     sFms = zeros(Float64,nc,ndofs)
     bc = basis_cache(elem_fine, q)
     local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
-    binds_1 = zeros(Int64, ndofs)
-    cache = KDTrees, MS_Basis, local_basis_vecs, bc, binds_1
+    cache = KDTrees, MS_Basis, local_basis_vecs, bc
         
     #=
     Efficiently compute the solution to the saddle point problems.
