@@ -19,7 +19,7 @@ include("assemble_matrices.jl")
 Problem data
 =#
 f(x) = sin(5π*x)
-ϵ = 2^-12
+ϵ = 2^-6
 domain = (0.0,1.0)
 nds_microscale = domain[1]:ϵ:domain[2]
 tree_microscale = KDTree(nds_microscale')
@@ -84,8 +84,30 @@ Memory allocations are due to Random.seed!() + knn().
 =#
 
 ### - Let us use D() with KDTree ###
+"""
+Function to compute the l2 and energy errors
+"""
+function error(bc, ue::Function, ∇ue::Function, uh::AbstractVector{Float64}, nds::AbstractVector{Float64},
+  elem::AbstractMatrix{Int64}, tree::KDTree, KDTrees::Vector{KDTree}, 
+  quad::Tuple{Vector{Float64},Vector{Float64}}; Nfine=200)
+  qs, ws = quad
+  l2err = 0.0; h1err = 0.0
+  nc = size(elem,1)
+  for t=1:nc, i=1:lastindex(qs)
+    cs = view(nds,view(elem,t,:))
+    hlocal = (cs[2]-cs[1])/Nfine
+    xlocal = cs[1]:hlocal:cs[2]
+    for j=1:lastindex(xlocal)-1
+      x̂ = (xlocal[j+1]-xlocal[j])*0.5 + (xlocal[j+1]-xlocal[j])*0.5*qs[i]
+      l2err += ws[i]*(ue(x̂) - uₘₛ(bc, x̂, uh, tree, KDTrees))^2*(hlocal)*0.5
+      h1err += ws[i]*D(x̂)*(∇ue(x̂) - ∇uₘₛ(bc, x̂, uh, tree, KDTrees))^2*(hlocal)*0.5
+    end
+  end
+  sqrt(l2err), sqrt(h1err)
+end
+
 q=1
-nf=2^16
+nf=2^12
 qorder=2
 quad=gausslegendre(qorder)
 ## Solve the problem directly with h=2^-16
@@ -111,15 +133,19 @@ solϵ = vcat(0.0,solϵ,0.0)
 p1 = plot(nds_fine, solϵ, label="Fine scale solution")
 sol_cache = basis_cache(elem_fine, q)
 uₕ(x) = Λₖ(sol_cache, x, solϵ, tree_fine) # This serves as the exact solution for the rate of convergence
+∇uₕ(x) = ∇Λₖ(sol_cache, x, solϵ, tree_fine) # This serves as the exact solution for the rate of convergence
 
 # Now solve the problem using the MS method
-𝒩 = [2]
+𝒩 = 1:10
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
-l = [4]
 p = 1
 
-for l in [4]
+plt = plot()
+plt1 = plot()
+plt2 = plot()
+
+for l in [4,5,6]
   for (nc,itr) in zip(𝒩,1:length(𝒩))
     #=
     Precompute all the caches. Essential for computing the solution quickly
@@ -137,7 +163,7 @@ for l in [4]
     sKe = zeros(Float64,q+1,q+1,nf)
     # Store the data for solving the multiscale problems
     KDTrees = Vector{KDTree}(undef,nc)
-    MS_Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
+    MS_Basis = Array{Float64}(undef,q*nf+1,nc,p+1)    
     # Some precomputed/preallocated data for the multiscale problem
     ndofs = npatch*(p+1)
     elem_ms = [
@@ -173,13 +199,24 @@ for l in [4]
     =#
     # Compute the local and global stiffness matrices
     cache = KDTrees, MS_Basis, local_basis_vecs, bc
-    fillsKms!(sKms, cache, elem_coarse, nds_coarse, p, l, quad; Nfine=256)
-    fillsFms!(sFms, cache, elem_coarse, nds_coarse, p, l, quad, f; Nfine=256)
+    fillsKms!(sKms, cache, elem_coarse, nds_coarse, p, l, quad; Nfine=nf)
+    fillsFms!(sFms, cache, elem_coarse, nds_coarse, p, l, quad, f; Nfine=nf)
     # Assemble and the global system
     Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
     Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
     sol = (Kₘₛ\Fₘₛ)
 
-    println("Done nc = "*string(nc))
+    cache = basis_cache(elem_coarse, elem_fine, p, q, l, MS_Basis)
+    L²Error[itr], H¹Error[itr] = error(cache, uₕ, ∇uₕ, sol, nds_coarse, elem_coarse, tree, KDTrees, quad; Nfine=nf)
+
+    println("Done nc = "*string(nc))    
   end
+
+  plot!(plt, 1 ./𝒩, L²Error, label="L² (l="*string(l)*")", lw=2)
+  plot!(plt1, 1 ./𝒩, H¹Error, label="Energy (l="*string(l)*")", lw=2)
+  scatter!(plt, 1 ./𝒩, L²Error, label="", markersize=2)
+  scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:best)
 end
+
+plot!(plt1, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt, 1 ./𝒩, (1 ./𝒩).^4, label="Order 4", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)

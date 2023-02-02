@@ -97,6 +97,7 @@ function compute_ms_basis!(cache, domain::Tuple{Float64,Float64},
   nc = size(elem_coarse,1)
   nf = size(elem_fine,1)
   H = (domain[2]-domain[1])/nc
+  fill!(Basis,0.0)
   for i=1:nc
     start = max(1,i-l)
     last = min(nc,i+l)
