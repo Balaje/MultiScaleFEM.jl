@@ -120,7 +120,7 @@ l = [4]
 p = 1
 
 for l in [4]
-  for (nc,i) in zip(𝒩,1:length(𝒩))
+  for (nc,itr) in zip(𝒩,1:length(𝒩))
     #=
     Precompute all the caches. Essential for computing the solution quickly
     =#
@@ -157,8 +157,7 @@ for l in [4]
     sKms = zeros(Float64,nc,ndofs,ndofs)
     sFms = zeros(Float64,nc,ndofs)
     bc = basis_cache(elem_fine, q)
-    local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
-    cache = KDTrees, MS_Basis, local_basis_vecs, bc
+    local_basis_vecs = zeros(Float64, q*nf+1, ndofs)    
     
     #=
     Efficiently compute the solution to the saddle point problems.
@@ -168,6 +167,19 @@ for l in [4]
     cache = sKe, MS_Basis, cache_q, cache_p, KDTrees, q, p
     compute_ms_basis!(cache, domain, nds_coarse, elem_coarse, elem_fine, D, l)
     
-    
+    #=
+      Now solve the multiscale problems.
+        The multiscale basis are stored in the variable MS_Basis
+    =#
+    # Compute the local and global stiffness matrices
+    cache = KDTrees, MS_Basis, local_basis_vecs, bc
+    fillsKms!(sKms, cache, elem_coarse, nds_coarse, p, l, quad; Nfine=256)
+    fillsFms!(sFms, cache, elem_coarse, nds_coarse, p, l, quad, f; Nfine=256)
+    # Assemble and the global system
+    Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
+    Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
+    sol = (Kₘₛ\Fₘₛ)
+
+    println("Done nc = "*string(nc))
   end
 end
