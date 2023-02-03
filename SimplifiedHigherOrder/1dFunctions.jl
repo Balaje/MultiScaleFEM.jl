@@ -11,6 +11,7 @@ using FastGaussQuadrature
 
 include("basis_functions.jl")
 include("assemble_matrices.jl")
+include("preallocate_matrices.jl")
 
 #=
 Problem parameters
@@ -25,106 +26,63 @@ domain = (0.0,1.0)
 #=
 FEM parameters
 =#
-nc = 2^6 # Number of elements in the coarse space
-nf = 2^12 # Number of elements in the fine space
+nc = 2^2 # Number of elements in the coarse space
+nf = 2^13 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = nc
-npatch = min(2l+1,nc) # Number of elements in patch
-@show l
-qorder = 2
-quad = gausslegendre(qorder)
-# Construct the coarse mesh
-H = (domain[2]-domain[1])/nc
-nds = domain[1]:H:domain[2]
-
-#=
-Pre-compute the assemblers and the connectivity matrices
-=#
-assem_L²L² = ([(p+1)*t+ti-p for _=0:p, ti=0:p, t=1:nc], 
-  [(p+1)*t+tj-p for tj=0:p, _=0:p, t=1:nc], 
-  [(p+1)*t+ti-p for ti=0:p, t=1:nc])
-assem_H¹H¹ = ([(q)*t+ti-(q-1) for _=0:q, ti=0:q, t=1:nf], 
-  [(q)*t+tj-(q-1) for tj=0:q, _=0:q, t=1:nf], 
-  [(q)*t+ti-(q-1) for ti=0:q, t=1:nf])          
-elem_coarse = [i+j for i=1:nc, j=0:1]
+l = 3
+quad = gausslegendre(2)
     
 #=
 Solve the saddle point problems to obtain the new basis functions
 =#
-# Store only the non-zero entries of the matrices of the saddle point problems
-sKe = zeros(Float64,q+1,q+1,nf)
-# Store the data for solving the multiscale problems
-KDTrees = Vector{KDTree}(undef,nc)
-Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
-fill!(Basis,0.0)
-cache_q = basis_cache(q)
-cache_p = Vector{Float64}(undef,p+1)
-cache = sKe, assem_H¹H¹, Basis, cache_q, cache_p, KDTrees, q, p
 
-compute_ms_basis!(cache, domain, nds, elem_coarse, elem_fine, D, l)
+preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p));
+cache = basis_cache(q), zeros(Float64,p+1), quad, preallocated_data
+compute_ms_basis!(cache, nc, q, p)
 
-plt1 = plot()
-bc = basis_cache(elem_fine, q)
-for el=1:nc
-  for ii=1:1
-    xvals1 = 0:(1/1000):1
-    fxvals1 = [Λₖ(bc, x, Basis[:,el,ii], KDTrees[el]) for x in xvals1]
-    plot!(plt1, xvals1, fxvals1, xlims=(0,1))
-  end
+fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
+nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
+nds_fineₛ, elem_fineₛ = fine
+nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, ipcache = patch
+sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
+assem_H¹H¹ₛ, assem_H¹L²ₛ = assems
+sKms, sFms = multiscale
+
+# Compute the full stiffness matrix on the fine scale
+sKe_ϵ = zeros(Float64, q+1, q+1, nf)
+sFe_ϵ = zeros(Float64, q+1, nf)
+fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
+fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
+Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
+Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+cache = local_basis_vecs, Kϵ, patch_indices_to_global_indices, ipcache
+fillsKms!(sKms, cache, nc, p, l)
+cache = local_basis_vecs, Fϵ, patch_indices_to_global_indices, ipcache
+fillsFms!(sFms, cache, nc, p, l)
+
+Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
+Fₘₛ = zeros(Float64,nc*(p+1))
+ms_elem = Vector{Vector{Int64}}(undef,nc)
+for t=1:nc
+  start = max(1,t-l)*(p+1)-1
+  last = min(nc,t+l)*(p+1)
+  ms_elem[t] = start:last
+  Kₘₛ[ms_elem[t], ms_elem[t]] += sKms[t]
+  Fₘₛ[ms_elem[t]] += sFms[t]
 end
-
-#=
-Solve the MultiScale problem
-=#
-# Some precomputed/preallocated data
-ndofs = npatch*(p+1)
-elem_ms = [
-    begin 
-      if(i < l+1)
-        j+1
-      elseif(i > nc-l)
-        (ndofs-((npatch-1)*(p+1)))*(nc-(npatch-1))+(j)-(ndofs-1-((npatch-1)*(p+1)))
-      else
-        (ndofs-(2l*(p+1)))*(i-l)+j-(ndofs-1-(2l*(p+1)))
-      end
-    end  
-    for i=1:nc,j=0:ndofs-1]
-assem_MS_MS = ([elem_ms[t,ti] for  t=1:nc, ti=1:ndofs, _=1:ndofs], 
-  [elem_ms[t,tj] for  t=1:nc, _=1:ndofs, tj=1:ndofs], 
-  [elem_ms[t,ti] for t=1:nc, ti=1:ndofs])
-tree = KDTree(nds')
-sKms = zeros(Float64,nc,ndofs,ndofs)
-sFms = zeros(Float64,nc,ndofs)
-bc = basis_cache(elem_fine, q)
-local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
-
-# Compute the local and global stiffness matrices
-nds_fine = LinRange(domain[1], domain[2], nf+1)
-elem_fine = [i+j for i=1:nf, j=0:1]
-sFeϵ = zeros(Float64,q+1,nf)
-fillLoadVec!(sFeϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
-sKeϵ = zeros(Float64,q+1,q+1,nf)
-fillsKe!(sKeϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
-Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKeϵ))
-Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFeϵ)))
-
-cache1 = Kϵ, Basis, local_basis_vecs, deepcopy(local_basis_vecs), similar(sKms[1,:,:])
-fillsKms!(sKms, cache1, nc, p, l)
-cache2 = Fϵ, Basis, local_basis_vecs, similar(sFms[1,:])
-fillsFms!(sFms, cache2, nc, p, l)
-
-# Assemble and the global system
-Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
-dropzeros!(Kₘₛ)
-Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
-sol = (Kₘₛ\Fₘₛ)
-
-## Compute the errors
+sol = Kₘₛ\Fₘₛ
+uhsolₛ = similar(nds_fineₛ)
 uhsol = zeros(Float64,nf+1)
 for j=1:nc, i=0:p
-  uhsol[:] += sol[(p+1)*j+i-p]*view(Basis,:,j,i+1)
+  uhsolₛ[j] = zeros(Float64,size(nds_fineₛ[j]))
+  uhsol[patch_indices_to_global_indices[j]] += sol[(p+1)*j+i-p]*local_basis_vecs[j][:,i+1]
 end
+
+plt = plot(nds_fine, uhsol, label="Approximate solution")
+plot!(plt, nds_fine, u.(nds_fine), label="Exact solution")
+
+## Compute the errors
 usol = u.(nds_fine)
 l2error = 0.0
 energy_error = 0.0
@@ -139,12 +97,3 @@ for j=1:nf, jj=1:lastindex(qs)
 end
 
 @show l2error, energy_error
-
-# Compute the solution
-bc = basis_cache(elem_coarse, elem_fine, p, q, l, Basis)
-xvals = nds
-uhxvals = [uₘₛ(bc, x, sol, tree, KDTrees) for x in xvals];
-uxvals = u.(xvals)
-plt = plot(xvals, uhxvals, lw=2, color=:red, label="Approx. Solution")
-plot!(plt, xvals, uxvals, color=:black, label="Exact solution")
-

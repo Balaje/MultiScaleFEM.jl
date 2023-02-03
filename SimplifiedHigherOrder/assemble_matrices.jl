@@ -66,59 +66,50 @@ function fillsLe!(sLe::AbstractArray{Float64}, basis_cache, nds_fine::AbstractVe
   end
 end
 
-function fillsKms!(sKms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::Int64)  
-  fill!(sKms,0.0)
-  K, Basis, local_basis_vecs, tmp, local_sKms  = cache
-  npatch = min(2l+1,nc)
-  
+function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l::Int64)  
+  local_basis_vecs, K, patch_indices_to_global_indices, ipcache = cache  
   for t=1:nc
     start = max(1,t-l)
     last = min(nc,t+l)
     binds = start:last 
-    mid = (start+last)*0.5
-    nd = (last-start+1)*(p+1) 
-    kk=0
-    fill!(local_basis_vecs,0.0)
-    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)             
-    for ii=1:lastindex(binds), jj=1:p+1
-      kk+=1  
-      local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
-    end   
-    mul!(tmp, K, local_basis_vecs)
-    mul!(local_sKms, local_basis_vecs', tmp)  
-    for jj=1:nd, kk=1:nd
-      sKms[t,jj+offset_val,kk+offset_val] = local_sKms[jj+offset_val,kk+offset_val]
+    nd = (last-start+1)*(p+1)    
+    for ii=1:nd, jj=1:nd
+      ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
+      ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1
+      ipcache1 = ipcache[binds[ii2]]
+      L = local_basis_vecs[binds[ii2]][:, ll2]
+      Kₛ = K[patch_indices_to_global_indices[binds[ii2]], 
+            patch_indices_to_global_indices[binds[ii1]]]
+      Lᵀ = local_basis_vecs[binds[ii1]][:, ll1]     
+      mul!(ipcache1, Kₛ, Lᵀ)
+      for tt=1:lastindex(ipcache1)
+        sKms[t][ii,jj] += L[tt]*ipcache1[tt]
+      end    
     end    
   end
 end
 
-function fillsFms!(sFms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::Int64)
-  
-  fill!(sFms,0.0)
-  F, Basis, local_basis_vecs, local_sFms  = cache
-  npatch = min(2l+1,nc)
-
+function fillsFms!(sFms::Vector{Vector{Float64}}, cache, nc::Int64, p::Int64, l::Int64)
+  local_basis_vecs, Fϵₛ, patch_indices_to_global_indices, _ = cache  
   for t=1:nc
     start = max(1,t-l)
     last = min(nc,t+l)
     mid = (start+last)*0.5
     binds = start:last     
-    nd = (last-start+1)*(p+1) 
-    kk=0
-    fill!(local_basis_vecs,0.0)
-    offset_val = ((t-mid > 0) ? (npatch-length(binds))*(p+1) : 0)
-    for ii=1:lastindex(binds), jj=1:p+1
-      kk+=1
-      local_basis_vecs[:,kk+offset_val] = view(Basis,:, view(binds,ii), jj)
-    end    
-    mul!(local_sFms, local_basis_vecs', F) 
-    for jj=1:nd
-      sFms[t,jj+offset_val] = local_sFms[jj+offset_val]
+    nd = (last-start+1)*(p+1)     
+    for ii=1:nd
+      ii1 = ceil(Int,ii/(p+1));
+      ll1 = ceil(Int,(ii-1)%(p+1)) + 1;
+      F = Fϵₛ[patch_indices_to_global_indices[binds[ii1]]]
+      Lᵀ = local_basis_vecs[binds[ii1]][:,ll1]        
+      for tt=1:lastindex(F)
+        sFms[t][ii] += F[tt]*Lᵀ[tt]
+      end
     end
   end
 end
 
-function fillLoadVec!(sFe::AbstractArray{Float64}, cache, nds::AbstractVector{Float64}, 
+function fillLoadVec!(sFe::AbstractMatrix{Float64}, cache, nds::AbstractVector{Float64}, 
   elem::AbstractVecOrMat{Int64}, 
   q::Int64, quad::Tuple{Vector{Float64}, Vector{Float64}}, f::Function)
   fill!(sFe,0.0)

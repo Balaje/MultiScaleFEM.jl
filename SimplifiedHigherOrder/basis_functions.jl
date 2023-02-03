@@ -89,57 +89,32 @@ end
 """
 Function to compute the multiscale basis
 """
-function compute_ms_basis!(cache, domain::Tuple{Float64,Float64},
-  nds::AbstractVector{Float64}, elem_coarse::Matrix{Int64}, 
-  elem_fine::Matrix{Int64}, D::Function, l::Int64)
+function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64)
+  cache_q, cache_p, quad, preallocated_mats = cache
+  FULL, FINE, PATCH, BASIS, MATS, ASSEMS, _ = preallocated_mats
+  nds_coarse, elem_coarse, _, _, _ = FULL
+  nds_fineₛ, elem_fineₛ = FINE
+  nds_patchₛ, elem_patchₛ, _ = PATCH
+  basis_vec_patch = BASIS
+  sKeₛ, sLeₛ, sFeₛ, _ = MATS
+  assem_H¹H¹ₛ, assem_H¹L²ₛ = ASSEMS
 
-  sKe, assem_H¹H¹, Basis, cache_q, cache_p, KDTrees, q, p = cache  
-  nc = size(elem_coarse,1)
-  nf = size(elem_fine,1)
-  H = (domain[2]-domain[1])/nc
-  fill!(Basis,0.0)
   for i=1:nc
-    start = max(1,i-l)
-    last = min(nc,i+l)
-    # Get the patch domain and connectivity
-    patch_elem = view(elem_coarse, start:last, :)
-    patch = (first(view(nds, minimum(patch_elem))), first(view(nds,maximum(patch_elem))))
-    # Allocate the assemblers (Have to avoid this somehow)
-    patch_elem = patch_elem .- (minimum(patch_elem) - 1)
-    npatch = size(patch_elem,1)
-    assem_H¹L² = ([(q)*Q+qᵢ-(q-1) for qᵢ=0:q, _=0:p, P=1:npatch, Q=1:nf], 
-    [(p+1)*P+pᵢ-p for _=0:q, pᵢ=0:p, P=1:npatch, Q=1:nf], 
-    [(p+1)*P+pᵢ-p for pᵢ=0:p, P=1:npatch])    
-    sLe = zeros(Float64,q+1,p+1,npatch,nf)
-    sFe = zeros(Float64,p+1,npatch)
-    # Connectivity of the fine elements
-    # Build the FEM nodes
-    #h = (patch[2]-patch[1])/nf
-    nds_fine = LinRange(patch[1],patch[2],nf+1)
-    h = nds_fine[2]-nds_fine[1]
-    nds_coarse = patch[1]:H:patch[2]
-    # Build some data structures
-    KDTrees[i] = KDTree(nds_fine') # KDTree for searching the points 
-    # Fill up the matrices
-    fillsKe!(sKe, cache_q, nds_fine, elem_fine, q, quad)
-    fillsLe!(sLe, (cache_q,cache_p), nds_fine, nds_coarse, elem_fine, patch_elem, (q,p), quad)       
-    # Compute new the basis functions
+    fillsKe!(sKeₛ[i], cache_q, nds_fineₛ[i], elem_fineₛ[i], q, quad)
+    fillsLe!(sLeₛ[i],(cache_q, cache_p), nds_fineₛ[i], nds_patchₛ[i], elem_fineₛ[i], elem_patchₛ[i], (q,p), quad)    
     for j=1:p+1
-      # Fill up the vector
-      fillsFe!(sFe, cache_p, nds_coarse, patch_elem, p, quad, y->fₖ!(cache_p,y,j,nds,elem_coarse,i))
-      # Assemble the matrices
-      KK = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe))
-      LL = sparse(vec(assem_H¹L²[1]), vec(assem_H¹L²[2]), vec(sLe))
-      FF = collect(sparsevec(vec(assem_H¹L²[3]), vec(sFe)))
-      # # Apply the boundary conditions
-      fn = 2:q*nf
-      K = KK[fn,fn]; L = LL[fn,:]; F = FF
-      # Solve the problem
+      fillsFe!(sFeₛ[i], cache_p, nds_patchₛ[i], elem_patchₛ[i], p, quad, y->fₖ!(cache_p, y, j, nds_coarse, elem_coarse, i))
+      KK = sparse(vec(assem_H¹H¹ₛ[i][1]), vec(assem_H¹H¹ₛ[i][2]), vec(sKeₛ[i]))
+      LL = sparse(vec(assem_H¹L²ₛ[i][1]), vec(assem_H¹L²ₛ[i][2]), vec(sLeₛ[i]))
+      FF = collect(sparsevec(vec(assem_H¹L²ₛ[i][3]), vec(sFeₛ[i])))
+      nfᵢ = size(KK,1)
+      fn = 2:nfᵢ-1
+      K = KK[fn,fn]; L = LL[fn,:]; F = FF;
       LHS = [K L; L' spzeros(Float64,size(L,2),size(L,2))]
       dropzeros!(LHS)
-      RHS = vcat(zeros(Float64,size(K,1)),F);
-      RHS = LHS\RHS        
-      Basis[fn,i,j] = RHS[1:size(K,1)]
+      RHS = vcat(zeros(Float64,size(K,1)), F)
+      RHS = LHS\RHS      
+      basis_vec_patch[i][fn,j] = RHS[1:size(K,1)]      
     end
   end
 end
