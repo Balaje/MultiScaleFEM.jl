@@ -87,7 +87,7 @@ function fillsKms!(sKms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::
     mul!(tmp, K, local_basis_vecs)
     mul!(local_sKms, local_basis_vecs', tmp)  
     for jj=1:nd, kk=1:nd
-      sKms[t,jj+offset_val,kk+offset_val] = local_sKms[jj,kk]
+      sKms[t,jj+offset_val,kk+offset_val] = local_sKms[jj+offset_val,kk+offset_val]
     end    
   end
 end
@@ -113,7 +113,7 @@ function fillsFms!(sFms::AbstractArray{Float64}, cache, nc::Int64, p::Int64, l::
     end    
     mul!(local_sFms, local_basis_vecs', F) 
     for jj=1:nd
-      sFms[t,jj+offset_val] = local_sFms[jj]
+      sFms[t,jj+offset_val] = local_sFms[jj+offset_val]
     end
   end
 end

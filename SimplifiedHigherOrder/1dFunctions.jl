@@ -19,16 +19,17 @@ Problem parameters
 D(x) = @. 0.5
 f(x) = @. 1.0
 u(x) = @. x*(1-x)
+∇u(x) = ForwardDiff.derivative(u,x)
 domain = (0.0,1.0)
 
 #=
 FEM parameters
 =#
-nc = 2^3 # Number of elements in the coarse space
-nf = 2^11 # Number of elements in the fine space
+nc = 2^6 # Number of elements in the coarse space
+nf = 2^12 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 10
+l = nc
 npatch = min(2l+1,nc) # Number of elements in patch
 @show l
 qorder = 2
@@ -47,7 +48,6 @@ assem_H¹H¹ = ([(q)*t+ti-(q-1) for _=0:q, ti=0:q, t=1:nf],
   [(q)*t+tj-(q-1) for tj=0:q, _=0:q, t=1:nf], 
   [(q)*t+ti-(q-1) for ti=0:q, t=1:nf])          
 elem_coarse = [i+j for i=1:nc, j=0:1]
-elem_fine = [i+j for i=1:nf, j=0:1]
     
 #=
 Solve the saddle point problems to obtain the new basis functions
@@ -60,7 +60,7 @@ Basis = Array{Float64}(undef,q*nf+1,nc,p+1)
 fill!(Basis,0.0)
 cache_q = basis_cache(q)
 cache_p = Vector{Float64}(undef,p+1)
-cache = sKe, Basis, cache_q, cache_p, KDTrees, q, p
+cache = sKe, assem_H¹H¹, Basis, cache_q, cache_p, KDTrees, q, p
 
 compute_ms_basis!(cache, domain, nds, elem_coarse, elem_fine, D, l)
 
@@ -101,6 +101,7 @@ local_basis_vecs = zeros(Float64, q*nf+1, ndofs)
 
 # Compute the local and global stiffness matrices
 nds_fine = LinRange(domain[1], domain[2], nf+1)
+elem_fine = [i+j for i=1:nf, j=0:1]
 sFeϵ = zeros(Float64,q+1,nf)
 fillLoadVec!(sFeϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
 sKeϵ = zeros(Float64,q+1,q+1,nf)
@@ -118,6 +119,26 @@ Kₘₛ = sparse(vec(assem_MS_MS[1]), vec(assem_MS_MS[2]), vec(sKms))
 dropzeros!(Kₘₛ)
 Fₘₛ = collect(sparsevec(vec(assem_MS_MS[3]), vec(sFms)))
 sol = (Kₘₛ\Fₘₛ)
+
+## Compute the errors
+uhsol = zeros(Float64,nf+1)
+for j=1:nc, i=0:p
+  uhsol[:] += sol[(p+1)*j+i-p]*view(Basis,:,j,i+1)
+end
+usol = u.(nds_fine)
+l2error = 0.0
+energy_error = 0.0
+bc = basis_cache(q)
+qs,ws=quad
+for j=1:nf, jj=1:lastindex(qs)
+  x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,1]])*0.5 + (0.5*nf^-1)*qs[jj]
+  ϕᵢ!(bc,qs[jj])
+  global l2error += ws[jj]*(u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+  ∇ϕᵢ!(bc,qs[jj])
+  global energy_error += ws[jj]*D(x̂)*(∇u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+end
+
+@show l2error, energy_error
 
 # Compute the solution
 bc = basis_cache(elem_coarse, elem_fine, p, q, l, Basis)
