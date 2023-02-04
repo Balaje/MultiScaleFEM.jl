@@ -94,10 +94,10 @@ function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64)
   FULL, FINE, PATCH, BASIS, MATS, ASSEMS, _ = preallocated_mats
   nds_coarse, elem_coarse, _, _, _ = FULL
   nds_fineₛ, elem_fineₛ = FINE
-  nds_patchₛ, elem_patchₛ, _ = PATCH
+  nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, _, _ = PATCH
   basis_vec_patch = BASIS
   sKeₛ, sLeₛ, sFeₛ, _ = MATS
-  assem_H¹H¹ₛ, assem_H¹L²ₛ = ASSEMS
+  assem_H¹H¹ₛ, assem_H¹L²ₛ, _ = ASSEMS
 
   for i=1:nc
     fillsKe!(sKeₛ[i], cache_q, nds_fineₛ[i], elem_fineₛ[i], q, quad)
@@ -114,7 +114,7 @@ function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64)
       dropzeros!(LHS)
       RHS = vcat(zeros(Float64,size(K,1)), F)
       RHS = LHS\RHS      
-      basis_vec_patch[i][fn,j] = RHS[1:size(K,1)]      
+      basis_vec_patch[i][patch_indices_to_global_indices[i][fn],j] = RHS[1:size(K,1)]      
     end
   end
 end

@@ -67,7 +67,7 @@ function fillsLe!(sLe::AbstractArray{Float64}, basis_cache, nds_fine::AbstractVe
 end
 
 function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l::Int64)  
-  local_basis_vecs, K, patch_indices_to_global_indices, ipcache = cache  
+  local_basis_vecs, K, global_to_patch_indices, ipcache = cache  
   for t=1:nc
     start = max(1,t-l)
     last = min(nc,t+l)
@@ -76,35 +76,31 @@ function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l:
     for ii=1:nd, jj=1:nd
       ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
       ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1
-      ipcache1 = ipcache[binds[ii2]]
-      L = local_basis_vecs[binds[ii2]][:, ll2]
-      Kₛ = K[patch_indices_to_global_indices[binds[ii2]], 
-            patch_indices_to_global_indices[binds[ii1]]]
-      Lᵀ = local_basis_vecs[binds[ii1]][:, ll1]     
-      mul!(ipcache1, Kₛ, Lᵀ)
-      for tt=1:lastindex(ipcache1)
-        sKms[t][ii,jj] += L[tt]*ipcache1[tt]
-      end    
+      L = local_basis_vecs[binds[ii2]][global_to_patch_indices[t], ll2]     
+      Lᵀ = local_basis_vecs[binds[ii1]][global_to_patch_indices[t], ll1]
+      Kₛ = K[global_to_patch_indices[t], global_to_patch_indices[t]]
+      (t!=1) && (Kₛ[1,1] /=2.0)
+      (t!=nc) && (Kₛ[end,end] /=2.0)
+      sKms[t][ii,jj] = L⋅(Kₛ*Lᵀ)
     end    
   end
 end
 
 function fillsFms!(sFms::Vector{Vector{Float64}}, cache, nc::Int64, p::Int64, l::Int64)
-  local_basis_vecs, Fϵₛ, patch_indices_to_global_indices, _ = cache  
+  local_basis_vecs, Fϵₛ, global_to_patch_indices, _ = cache  
   for t=1:nc
     start = max(1,t-l)
     last = min(nc,t+l)
-    mid = (start+last)*0.5
     binds = start:last     
     nd = (last-start+1)*(p+1)     
     for ii=1:nd
       ii1 = ceil(Int,ii/(p+1));
       ll1 = ceil(Int,(ii-1)%(p+1)) + 1;
-      F = Fϵₛ[patch_indices_to_global_indices[binds[ii1]]]
-      Lᵀ = local_basis_vecs[binds[ii1]][:,ll1]        
-      for tt=1:lastindex(F)
-        sFms[t][ii] += F[tt]*Lᵀ[tt]
-      end
+      F = Fϵₛ[global_to_patch_indices[t]]
+      (t!=1) && (F[1]/=2.0)
+      (t!=nc) && (F[end] /=2.0)
+      Lᵀ = local_basis_vecs[binds[ii1]][global_to_patch_indices[t],ll1]        
+      sFms[t][ii] = dot(F,Lᵀ)
     end
   end
 end
