@@ -29,7 +29,7 @@ Function to compute the l2 and energy errors
 #=
 Constant paramters
 =#
-p = 2
+p = 1
 q = 1
 nf = 2^16 # Size of the background mesh
 qorder = 3
@@ -59,7 +59,7 @@ Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
 solϵ = Kϵ[2:nf,2:nf]\Fϵ[2:nf]
 solϵ = vcat(0,solϵ,0)
 
-for l in [4,5,6,7,8]
+for l in [8,9,10]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
