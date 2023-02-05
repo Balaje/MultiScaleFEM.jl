@@ -82,6 +82,8 @@ function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l:
       (t!=1) && (Kₛ[1,1] /=2.0)
       (t!=nc) && (Kₛ[end,end] /=2.0)
       sKms[t][ii,jj] = L⋅(Kₛ*Lᵀ)
+      (t!=1) && (Kₛ[1,1] *=2.0)
+      (t!=nc) && (Kₛ[end,end] *=2.0)
     end    
   end
 end
@@ -101,6 +103,8 @@ function fillsFms!(sFms::Vector{Vector{Float64}}, cache, nc::Int64, p::Int64, l:
       (t!=nc) && (F[end] /=2.0)
       Lᵀ = local_basis_vecs[binds[ii1]][global_to_patch_indices[t],ll1]        
       sFms[t][ii] = dot(F,Lᵀ)
+      (t!=1) && (F[1]*=2.0)
+      (t!=nc) && (F[end] *=2.0)
     end
   end
 end

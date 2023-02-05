@@ -32,11 +32,10 @@ Constant paramters
 p = 2
 q = 1
 nf = 2^16 # Size of the background mesh
-qorder = 6
+qorder = 3
 quad = gausslegendre(qorder)
 
 𝒩 = [1,2,4,8,16,32,64,128,256]
-#𝒩 = [2,4,8,16,32]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
@@ -50,8 +49,17 @@ elem_fine = [elem_conn(i,j) for i=1:nf, j=0:1]
 assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
 [H¹Conn(q,i,j) for j=0:q, _=0:q, i=1:nf], 
 [H¹Conn(q,i,j) for j=0:q, i=1:nf])
+# Fill the final-scale matrix vector system
+sKe_ϵ = zeros(Float64, q+1, q+1, nf)
+sFe_ϵ = zeros(Float64, q+1, nf)
+fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
+fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
+Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
+Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+solϵ = Kϵ[2:nf,2:nf]\Fϵ[2:nf]
+solϵ = vcat(0,solϵ,0)
 
-for l in [4,5,6,7,8,9]
+for l in [4,5,6,7,8]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
@@ -66,14 +74,6 @@ for l in [4,5,6,7,8,9]
     local sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
     local assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
     local sKms, sFms = multiscale
-
-    # Fill the final-scale matrix vector system
-    local sKe_ϵ = zeros(Float64, q+1, q+1, nf)
-    local sFe_ϵ = zeros(Float64, q+1, nf)
-    fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
-    fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
-    local Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
-    local Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
     
     # Compute the full stiffness matrix on the fine scale    
     local cache = local_basis_vecs, Kϵ, global_to_patch_indices, ipcache
@@ -100,9 +100,9 @@ for l in [4,5,6,7,8,9]
     for j=1:nf, jj=1:lastindex(qs)
       x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,1]])*0.5 + (0.5*nf^-1)*qs[jj]
       ϕᵢ!(bc,qs[jj])
-      L²Error[itr] += ws[jj]*(u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+      L²Error[itr] += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
       ∇ϕᵢ!(bc,qs[jj])
-      H¹Error[itr] += ws[jj]*D(x̂)*(∇u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+      H¹Error[itr] += ws[jj]*D(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
     end    
 
     L²Error[itr] = sqrt(L²Error[itr])

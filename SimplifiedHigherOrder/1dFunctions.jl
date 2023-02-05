@@ -26,11 +26,11 @@ domain = (0.0,1.0)
 #=
 FEM parameters
 =#
-nc = 2^2 # Number of elements in the coarse space
+nc = 2^8 # Number of elements in the coarse space
 nf = 2^15 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
-l = 2
+l = 10
 quad = gausslegendre(2)
     
 #=
@@ -56,6 +56,8 @@ fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
 fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
 Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
+solϵ = vcat(0,solϵ,0)
 cache = local_basis_vecs, Kϵ, global_to_patch_indices, ipcache
 fillsKms!(sKms, cache, nc, p, l)
 cache = local_basis_vecs, Fϵ, global_to_patch_indices, ipcache
@@ -85,9 +87,9 @@ qs,ws=quad
 for j=1:nf, jj=1:lastindex(qs)
   x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,1]])*0.5 + (0.5*nf^-1)*qs[jj]
   ϕᵢ!(bc,qs[jj])
-  global l2error += ws[jj]*(u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+  global l2error += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
   ∇ϕᵢ!(bc,qs[jj])
-  global energy_error += ws[jj]*D(x̂)*(∇u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+  global energy_error += ws[jj]*D(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
 end
 
 @show l2error, energy_error
