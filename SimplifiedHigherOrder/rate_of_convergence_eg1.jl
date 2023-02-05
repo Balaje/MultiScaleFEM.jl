@@ -51,13 +51,6 @@ assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
 [H¹Conn(q,i,j) for j=0:q, _=0:q, i=1:nf], 
 [H¹Conn(q,i,j) for j=0:q, i=1:nf])
 
-sKe_ϵ = zeros(Float64, q+1, q+1, nf)
-sFe_ϵ = zeros(Float64, q+1, nf)
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
-fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
-Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
-Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
-
 for l in [4,5,6,7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
@@ -73,6 +66,14 @@ for l in [4,5,6,7,8,9]
     local sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
     local assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
     local sKms, sFms = multiscale
+
+    # Fill the final-scale matrix vector system
+    local sKe_ϵ = zeros(Float64, q+1, q+1, nf)
+    local sFe_ϵ = zeros(Float64, q+1, nf)
+    fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad)
+    fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
+    local Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
+    local Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
     
     # Compute the full stiffness matrix on the fine scale    
     local cache = local_basis_vecs, Kϵ, global_to_patch_indices, ipcache
@@ -103,6 +104,9 @@ for l in [4,5,6,7,8,9]
       ∇ϕᵢ!(bc,qs[jj])
       H¹Error[itr] += ws[jj]*D(x̂)*(∇u(x̂) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
     end    
+
+    L²Error[itr] = sqrt(L²Error[itr])
+    H¹Error[itr] = sqrt(H¹Error[itr])
         
     println("Done nc = "*string(nc))
   end
