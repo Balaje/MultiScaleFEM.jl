@@ -29,7 +29,7 @@ Function to compute the l2 and energy errors
 #=
 Constant paramters
 =#
-p = 1
+p = 2
 q = 1
 nf = 2^16 # Size of the background mesh
 qorder = 3
@@ -59,7 +59,7 @@ Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
 solϵ = Kϵ[2:nf,2:nf]\Fϵ[2:nf]
 solϵ = vcat(0,solϵ,0)
 
-for l in [8,9,10]
+for l in [4,5,6,7,8,9,10]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
@@ -118,7 +118,56 @@ for l in [8,9,10]
   scatter!(plt1, 1 ./𝒩, H¹Error, label="", markersize=2, legend=:best)
 end
 
-plot!(plt1, 1 ./𝒩, (1 ./𝒩).^3, label="Order 3", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-plot!(plt, 1 ./𝒩, (1 ./𝒩).^4, label="Order 4", ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt1, 1 ./𝒩, (1 ./𝒩).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt, 1 ./𝒩, (1 ./𝒩).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
 
 plot!(plt2, 0:0.01:1, u.(0:0.01:1), label="Exact", lw=1, lc=:black)
+
+#=
+Sample Error and Rate: (p=2, l=10)
+julia> L²Error
+9-element Vector{Float64}:
+ 0.0005725950183078252
+ 0.00014407512704031465
+ 3.6711256956560554e-6
+ 1.0788626238677463e-7
+ 3.3162425566359246e-9
+ 2.1691680711022863e-10
+ 2.3197636023288994e-10
+ 2.401925445565128e-10
+ 2.3613047517807476e-10
+
+julia> H¹Error
+9-element Vector{Float64}:
+ 0.008713475989892316
+ 0.0031616953858213323
+ 0.00017571582397748589
+ 1.060883432940712e-5
+ 6.56667777486306e-7
+ 1.0111154545588088e-7
+ 2.449145579205192e-7
+ 5.308265132299848e-7
+ 1.086597557970863e-6
+
+julia> log.(L²Error[2:end]./L²Error[1:end-1])./log.(𝒩[1:end-1]./𝒩[2:end])
+8-element Vector{Float64}:
+  1.9906938268117103
+  5.294454969904888
+  5.0886394345283925
+  5.0238178295422795
+  3.9343357872042715
+ -0.0968359536745811
+ -0.050213577622697125
+  0.024607122385724253
+
+julia> log.(H¹Error[2:end]./H¹Error[1:end-1])./log.(𝒩[1:end-1]./𝒩[2:end])
+8-element Vector{Float64}:
+  1.462549977570873
+  4.1693823543479756
+  4.049906067619909
+  4.01395867091521
+  2.699215923047742
+ -1.276330790151233
+ -1.1159618994832707
+ -1.0335053737865008
+=#
