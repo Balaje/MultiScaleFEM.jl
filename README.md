@@ -152,6 +152,9 @@ The model problem can be solved using the multiscale method and the program can 
 ![](./HigherOrderMS/eg3_2.png) | ![](./HigherOrderMS/eg3_1.png)
 --- | --- |
 
+
+### Test example for smooth coefficients
+
 The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size. The example was run for a very smooth diffusion coefficient. Following is the test example:
 
 $$
