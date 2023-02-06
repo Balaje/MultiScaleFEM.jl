@@ -29,13 +29,13 @@ Function to compute the l2 and energy errors
 #=
 Constant paramters
 =#
-p = 0
+p = 1
 q = 1
 nf = 2^16 # Size of the background mesh
 qorder = 3
 quad = gausslegendre(qorder)
 
-𝒩 = [1,2,4,8,16,32,64,128,256]
+𝒩 = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
