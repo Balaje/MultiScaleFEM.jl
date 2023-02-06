@@ -76,18 +76,47 @@ function preallocate_matrices(domain::Tuple{Float64,Float64},
   end
   L = zeros(Float64,length(global_to_patch_nds[1]))
   Lᵀ = similar(L)
-  fill(Lᵀ)
+  ipcache = similar(L)
+  fill!(Lᵀ,0.0)
+  fill!(ipcache,0.0)
   (nds_coarse, elem_coarse, nds_fine, elem_fine, assem_H¹H¹), 
-  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, global_to_patch_nds, L, Lᵀ), 
+  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, global_to_patch_nds, L, Lᵀ, ipcache), 
   basis_vec_patch, 
   (sKeₛ, sLeₛ, sFeₛ, sLVeₛ), (assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem), (sKms, sFms)
 end
 
 function get_local_basis!(cache, local_basis_vecs::Vector{Matrix{Float64}}, 
   el::Int64, fn::AbstractVector{Int64}, localInd::Int64)
+  @assert length(cache) == length(fn)
   lbv = local_basis_vecs[el]
   lbv_loc = view(lbv,:,localInd)
   for i=1:lastindex(fn)
     cache[i] = lbv_loc[fn[i]]
   end
+end
+
+function split_stiffness_matrix(Kϵ::SparseMatrixCSC, 
+  global_to_patch_indices::Vector{AbstractVector{Int64}})
+  nc = length(global_to_patch_indices)
+  coarse_to_fine_stima = Vector{SparseMatrixCSC{Float64,Int64}}(undef,nc)
+  for t=1:nc
+    fine_stima = Kϵ[global_to_patch_indices[t], global_to_patch_indices[t]]
+    (t!=1) && (fine_stima[1,1] /=2.0)
+    (t!=nc) && (fine_stima[end,end] /=2.0)
+    coarse_to_fine_stima[t] = fine_stima
+  end
+  coarse_to_fine_stima
+end
+
+function split_load_vector(Fϵ::AbstractVector{Float64},
+  global_to_patch_indices::Vector{AbstractVector{Int64}})
+  nc = length(global_to_patch_indices)
+  coarse_to_fine_load_vec = Vector{Vector{Float64}}(undef,nc)
+  for t=1:nc
+    F = Fϵ[global_to_patch_indices[t]]
+    (t!=1) && (F[1]/=2.0)
+    (t!=nc) && (F[end] /=2.0)
+    coarse_to_fine_load_vec[t] = F
+  end
+  coarse_to_fine_load_vec
 end

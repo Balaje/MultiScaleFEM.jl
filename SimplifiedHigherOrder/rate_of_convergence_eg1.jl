@@ -29,7 +29,7 @@ Function to compute the l2 and energy errors
 #=
 Constant paramters
 =#
-p = 2
+p = 0
 q = 1
 nf = 2^16 # Size of the background mesh
 qorder = 3
@@ -70,15 +70,17 @@ for l in [4,5,6,7,8,9,10]
     local fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
     local nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
     local nds_fineₛ, elem_fineₛ = fine
-    local nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, ipcache = patch
+    local nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, L, Lᵀ, ipcache = patch
     local sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
     local assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
     local sKms, sFms = multiscale
     
     # Compute the full stiffness matrix on the fine scale    
-    local cache = local_basis_vecs, Kϵ, global_to_patch_indices, ipcache
+    local matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
+    local vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
+    local cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
     fillsKms!(sKms, cache, nc, p, l)
-    local cache = local_basis_vecs, Fϵ, global_to_patch_indices, ipcache
+    local cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
     fillsFms!(sFms, cache, nc, p, l)
     
     local Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
