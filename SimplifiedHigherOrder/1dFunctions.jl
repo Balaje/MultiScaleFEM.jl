@@ -44,7 +44,7 @@ compute_ms_basis!(cache, nc, q, p)
 fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
 nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
 nds_fineₛ, elem_fineₛ = fine
-nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, ipcache = patch
+nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, L, Lᵀ = patch
 sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
 assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
 sKms, sFms = multiscale
@@ -58,7 +58,7 @@ Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
 solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 solϵ = vcat(0,solϵ,0)
-cache = local_basis_vecs, Kϵ, global_to_patch_indices, ipcache
+cache = local_basis_vecs, Kϵ, global_to_patch_indices, L, Lᵀ
 fillsKms!(sKms, cache, nc, p, l)
 cache = local_basis_vecs, Fϵ, global_to_patch_indices, ipcache
 fillsFms!(sFms, cache, nc, p, l)

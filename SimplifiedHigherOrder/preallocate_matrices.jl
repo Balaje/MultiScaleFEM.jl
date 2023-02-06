@@ -74,18 +74,20 @@ function preallocate_matrices(domain::Tuple{Float64,Float64},
 
     global_to_patch_nds[i] = i*(aspect_ratio) - aspect_ratio + 1 : i*(aspect_ratio)+1
   end
-  ipcache = zeros.(Float64,length.(global_to_patch_nds))
-  # gtpn = repeat(global_to_patch_nds,inner=2)
-  # global_to_patch_indices = Vector{Vector{AbstractVector{Int64}}}(undef,nc)
-  # for t=1:nc
-  #   global_to_patch_indices[t] = gtpn[ms_elem[t]]    
-  #   # minval = (minimum(minimum(global_to_patch_indices[t]))-1)      
-  #   # for tt=1:length(global_to_patch_indices[t])      
-  #   #   global_to_patch_indices[t][tt] = global_to_patch_indices[t][tt] .- minval
-  #   # end
-  # end
+  L = zeros(Float64,length(global_to_patch_nds[1]))
+  Lᵀ = similar(L)
+  fill(Lᵀ)
   (nds_coarse, elem_coarse, nds_fine, elem_fine, assem_H¹H¹), 
-  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, global_to_patch_nds, ipcache), 
+  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, global_to_patch_nds, L, Lᵀ), 
   basis_vec_patch, 
   (sKeₛ, sLeₛ, sFeₛ, sLVeₛ), (assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem), (sKms, sFms)
+end
+
+function get_local_basis!(cache, local_basis_vecs::Vector{Matrix{Float64}}, 
+  el::Int64, fn::AbstractVector{Int64}, localInd::Int64)
+  lbv = local_basis_vecs[el]
+  lbv_loc = view(lbv,:,localInd)
+  for i=1:lastindex(fn)
+    cache[i] = lbv_loc[fn[i]]
+  end
 end

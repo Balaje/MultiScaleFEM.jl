@@ -67,7 +67,7 @@ function fillsLe!(sLe::AbstractArray{Float64}, basis_cache, nds_fine::AbstractVe
 end
 
 function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l::Int64)  
-  local_basis_vecs, K, global_to_patch_indices, ipcache = cache  
+  local_basis_vecs, K, global_to_patch_indices, L, Lᵀ = cache  
   for t=1:nc
     start = max(1,t-l)
     last = min(nc,t+l)
@@ -75,10 +75,10 @@ function fillsKms!(sKms::Vector{Matrix{Float64}}, cache, nc::Int64, p::Int64, l:
     nd = (last-start+1)*(p+1)    
     for ii=1:nd, jj=1:nd
       ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
-      ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1
-      L = local_basis_vecs[binds[ii2]][global_to_patch_indices[t], ll2]     
-      Lᵀ = local_basis_vecs[binds[ii1]][global_to_patch_indices[t], ll1]
-      Kₛ = K[global_to_patch_indices[t], global_to_patch_indices[t]]
+      ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1      
+      get_local_basis!(L, local_basis_vecs, binds[ii2], global_to_patch_indices[t], ll2)     
+      get_local_basis!(Lᵀ, local_basis_vecs, binds[ii1], global_to_patch_indices[t], ll1) 
+      Kₛ = K[global_to_patch_indices[t], global_to_patch_indices[t]]      
       (t!=1) && (Kₛ[1,1] /=2.0)
       (t!=nc) && (Kₛ[end,end] /=2.0)
       sKms[t][ii,jj] = L⋅(Kₛ*Lᵀ)
