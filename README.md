@@ -26,26 +26,6 @@ $$
     u(x) = x - x^2 + \varepsilon\left( \frac{1}{4\pi} \sin{\left(\frac{2\pi x}{\varepsilon}\right)} - \frac{1}{2\pi}x\sin{\left(\frac{2\pi x}{\varepsilon}\right)} - \frac{\varepsilon}{4\pi^2}\cos{\left(\frac{2\pi x}{\varepsilon}\right)} + \frac{\varepsilon}{4\pi^2}\right).
 $$
 
-## Localized Orthogonal Decomposition Method
-
-The localized orthogonal decomposition method implementation can be found inside the `LOD/` folder. The program `LOD/main.jl` contains the code to check the rate of convergence of the LOD method. The file `LOD/1dFunctions.jl` contains the routines to compute the standard finite element basis along with the functions assemble the global matrices. The file `LOD/1dFunctionsMultiScale` contains the code to compute the multi-scale basis along with the function to compute the $L^2$ error of the multiscale-FEM solution. Running the code `LOD/main.jl` 
-
-```
-julia> include("main.jl")
-Done N=2, Discrete l∞ error = 1.1102230246251565e-16
-Done N=4, Discrete l∞ error = 1.3877787807814457e-16
-Done N=8, Discrete l∞ error = 2.7755575615628914e-16
-Done N=16, Discrete l∞ error = 2.220446049250313e-16
-```
-
-We can observe that the point-wise error in the Multiscale solution and the exact solution is close to $10^{-16}$. This is because of the condition imposed during the construction of the Multi-scale finite element space, i.e., the error must vanish at the nodal points. The multiscale basis corresponding to $(H=0.25)$ and $\varepsilon=2^{-5}$ along with the finite element solution and the rate of convergence for various mesh-size is shown below:
-
-
-![](./LOD/basis.png) | ![](./LOD/solutions.png) | ![](./LOD/ooc_lod.png) | 
---- | --- | --- |
-
-For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
-
 ## Higher order multiscale method
 -------
 
@@ -58,93 +38,93 @@ We can observe the oscillations in the fine scale for the highly oscillatory coe
 
 - `𝒯 <:MeshType ` is a structure that stores the connectivity of the mesh. It can be initialized by passing the domain and the number of elements. `𝒯(domain::Tuple, N::Int64)`. The "sub-mesh" of the mesh can be obtained by passing the indices of the elements in the `𝒯` structure. The sub-mesh information is stored as the `Nˡ <:MeshType`. Eg.
 
-``` julia
-julia> mesh = 𝒯((0,1), 10) # Creates a mesh of 10 elements in (0,1)
-𝒯(0.05, 0.0:0.05:1.0, [1 2; 2 3; … ; 19 20; 20 21])
+  ``` julia
+  julia> mesh = 𝒯((0,1), 10) # Creates a mesh of 10 elements in (0,1)
+  𝒯(0.05, 0.0:0.05:1.0, [1 2; 2 3; … ; 19 20; 20 21])
 
-julia> sub_mesh = mesh[1:3] # Extracts the submesh from elements 1-3. Useful in defining a patch providing the start and end indices.
-Nˡ(0.05, 0.0:0.05:0.15, [1 2; 2 3; 3 4])
-```
+  julia> sub_mesh = mesh[1:3] # Extracts the submesh from elements 1-3. Useful in defining a patch providing the start and end indices.
+  Nˡ(0.05, 0.0:0.05:0.15, [1 2; 2 3; 3 4])
+  ```
 
 - `MatrixAssembler <: Assembler` is a structure that contains the assembly information of the global matrix. It depends on the kind of space you input along with the order of polynomial approximation. Eg. 
 
-```julia
-julia> Ω = 𝒯((0,1), 10);
-julia> K = MatrixAssembler(H¹ConformingSpace(), 1, Ω.elems); # Creates an assembler for the innerproduct ∫(u*v)dΩ where u,v ∈ H¹(Ω). u and v are the corresponding Lagrange finite element (C⁰) basis functions.
-julia> L = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (1,1), (Ω.elems, Ω.elems); # Creates an assembler for the innerproduct ∫(u*v)dΩ where u ∈ H¹(Ω) and v ∈ L²(Ω). u and v are the Lagrange finite element (C⁰) functions and the Legendre polynomial (L²) basis functions, respectively.
-```
+  ```julia
+  julia> Ω = 𝒯((0,1), 10);
+  julia> K = MatrixAssembler(H¹ConformingSpace(), 1, Ω.elems); # Creates an assembler for the innerproduct ∫(u*v)dΩ where u,v ∈ H¹(Ω). u and v are the corresponding Lagrange finite element (C⁰) basis functions.
+  julia> L = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (1,1), (Ω.elems, Ω.elems); # Creates an assembler for the innerproduct ∫(u*v)dΩ where u ∈ H¹(Ω) and v ∈ L²(Ω). u and v are the Lagrange finite element (C⁰) functions and the Legendre polynomial (L²) basis functions, respectively.
+  ```
     
 - Similarly the `VectorAssembler <: Assembler` is a structure that contains the assembly information of the vectors. Can be called similarly to the `MatrixAssembler`, eg.,
-``` julia
-julia> F = VectorAssembler(L²ConformingSpace(), 1, Ω.elems);
-```
+  ``` julia
+  julia> F = VectorAssembler(L²ConformingSpace(), 1, Ω.elems);
+  ```
 
 - `H¹Conforming <: FiniteElementSpaces` is a structure that builds the $H^1$-conforming Lagrange polynomial space. It can be called by `H¹Conforming(mesh<:MeshType, p::Int64, DirichletNodes::Vector{Int64})`. The structure contains the basis functions on the reference element `(-1,1)`. The gradient of the basis function `ϕ(x::Real)` can be computed using `∇(ϕ,x::Real)`.
 
 - `L²Conforming <: FiniteElementSpaces` is a structure that builds the $HL^2$-conforming Legendre polynomial space. It can be called by `L²Conforming(mesh<:MeshType, p::Int64)`. The structure contains the Legendre basis functions on the reference element `(-1,1)`. The gradient of the basis function `ϕ(x::Real)` can be computed using `∇(ϕ,x::Real)` **NOT WORKING, but not required in this problem**.
 
-- `Rˡₕ` is a structure that contains the projection of an $L^2$ function. This can be done by calling the method `Rˡₕ()`. The following short program illustrates the use of `Rˡₕ`.
+- `Rˡₕ` is a structure that contains the projection of an $L^2$ function. This can be done by calling the method `Rˡₕ()`. The following short program illustrates the use of `Rˡₕ` and the computation of the multiscale bases.
 
-```julia
-###################
-### File eg2.jl ###
-###################
+  ```julia
+  ###################
+  ### File eg2.jl ###
+  ###################
 
-# Include all the files.
-include("meshes.jl");
-include("assemblers.jl");
-include("fespaces.jl");
-include("basis_functions.jl")
-include("local_matrix_vector.jl")
-include("assemble_matrices.jl")
+  # Include all the files.
+  include("meshes.jl");
+  include("assemblers.jl");
+  include("fespaces.jl");
+  include("basis_functions.jl")
+  include("local_matrix_vector.jl")
+  include("assemble_matrices.jl")
 
-A(x) = @. 1; # Diffusion coefficient
-n = 10; Nfine = 100; # Coarse and fine mesh size.
-p = 1 # Polynomial orders for  L²
-q = 2 # Polynomial orders for H¹
+  A(x) = @. 1; # Diffusion coefficient
+  n = 10; Nfine = 100; # Coarse and fine mesh size.
+  p = 1 # Polynomial orders for  L²
+  q = 2 # Polynomial orders for H¹
 
-Ω = 𝒯((0,1),n); # The full coarse mesh.
+  Ω = 𝒯((0,1),n); # The full coarse mesh.
 
-start=1; last=5;
-NˡK = Ω[start:last];# The submesh from element=start to element=last
-VₕᵖNˡK = L²Conforming(NˡK, p); # The L²Conforming space on the coarse mesh
+  start=1; last=5;
+  NˡK = Ω[start:last];# The submesh from element=start to element=last
+  VₕᵖNˡK = L²Conforming(NˡK, p); # The L²Conforming space on the coarse mesh
 
-Ωₚ = (NˡK.nds[1], NˡK.nds[end]); # The submesh end points (defines the domain).
-NˡKₕ = 𝒯(Ωₚ, Nfine); # Construct the mesh on the patch.
-H¹₀NˡK = H¹Conforming(NˡKₕ ,q, [1,(q*Nfine+1)]); # The H¹Conforming space on the fine mesh with Dirichlet boundary conditions
+  Ωₚ = (NˡK.nds[1], NˡK.nds[end]); # The submesh end points (defines the domain).
+  NˡKₕ = 𝒯(Ωₚ, Nfine); # Construct the mesh on the patch.
+  H¹₀NˡK = H¹Conforming(NˡKₕ ,q, [1,(q*Nfine+1)]); # The H¹Conforming space on the fine mesh with Dirichlet boundary conditions
 
-Kₐ = MatrixAssembler(H¹ConformingSpace(), q, NˡKₕ.elems) # Construct the assembler for a(RˡₕΛₖ,v)
-Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (NˡKₕ.elems, NˡK.elems)) # Construct the assembler for (v,λ)
-Fₐ = VectorAssembler(L²ConformingSpace(), p, NˡK.elems) # Construct the vector assembler for (Λₖ,μ)
+  Kₐ = MatrixAssembler(H¹ConformingSpace(), q, NˡKₕ.elems) # Construct the assembler for a(RˡₕΛₖ,v)
+  Lₐ = MatrixAssembler(H¹ConformingSpace(), L²ConformingSpace(), (q,p), (NˡKₕ.elems, NˡK.elems)) # Construct the assembler for (v,λ)
+  Fₐ = VectorAssembler(L²ConformingSpace(), p, NˡK.elems) # Construct the vector assembler for (Λₖ,μ)
 
-# Bₖ is the Legendre polynomial with support K=(a,b)
-function Bₖ(x,nds,V)        
-  a,b=nds
-  x̂ = -(a+b)/(b-a) + 2/(b-a)*x
-  (a ≤ x ≤ b) ? V.basis(x̂) : zeros(Float64,V.p+1)
-end
+  # Bₖ is the Legendre polynomial with support K=(a,b)
+  function Bₖ(x,nds,V)        
+    a,b=nds
+    x̂ = -(a+b)/(b-a) + 2/(b-a)*x
+    (a ≤ x ≤ b) ? V.basis(x̂) : zeros(Float64,V.p+1)
+  end
 
-el = 3 # Element Index
-local_basis = 2 # Local Basis Index 1:p+1
-elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]; # Get the nodes of element 3.
+  el = 3 # Element Index
+  local_basis = 2 # Local Basis Index 1:p+1
+  elem = Ω.nds[Ω.elems[el,1]:Ω.elems[el,2]]; # Get the nodes of element 3.
 
-# Solve the saddle point problem. (Found in fespaces.jl, line 100)
-RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4); 
+  # Solve the saddle point problem. (Found in fespaces.jl, line 100)
+  RˡₕΛₖ = Rˡₕ(x->Bₖ(x,elem,VₕᵖNˡK)[local_basis], A, (H¹₀NˡK, VₕᵖNˡK), [Kₐ,Lₐ], [Fₐ]; qorder=4); 
 
 
-using Plots
-plt = plot(RˡₕΛₖ.nds, RˡₕΛₖ.Λ, label="Basis 2 on element 3", lc=:blue, lw=2)
+  using Plots
+  plt = plot(RˡₕΛₖ.nds, RˡₕΛₖ.Λ, label="Basis 2 on element 3", lc=:blue, lw=2)
 
-# Legendre Polynomials basis at the FE nodes
-LP = map(y->Bₖ(y,elem,VₕᵖNˡK)[local_basis], RˡₕΛₖ.nds); 
+  # Legendre Polynomials basis at the FE nodes
+  LP = map(y->Bₖ(y,elem,VₕᵖNˡK)[local_basis], RˡₕΛₖ.nds); 
 
-plot!(plt, RˡₕΛₖ.nds, LP, label="Legendre Polynomial", lc=:red, lw=2)
-plot!(plt, elem[1]:0.01:elem[2], 0*(elem[1]:0.01:elem[2]), label="Element 3", lc=:black, lw=4)
-xlims!(plt,(0,1))
-```
+  plot!(plt, RˡₕΛₖ.nds, LP, label="Legendre Polynomial", lc=:red, lw=2)
+  plot!(plt, elem[1]:0.01:elem[2], 0*(elem[1]:0.01:elem[2]), label="Element 3", lc=:black, lw=4)
+  xlims!(plt,(0,1))
+  ```
 
-![](./HigherOrderMS/eg2.png) |
---- |
+  ![](./HigherOrderMS/eg2.png) |
+  --- |
 
 ### Solution using the Multiscale method
 -------
@@ -166,7 +146,7 @@ where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusi
 | --- | --- | --- |
 | ![Smooth Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_6_oscillatory.png) | ![Random Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_7_random.png) | 
 
-The advantage here is that I fix the fine scale mesh size \textit{a priori} and choose the patch domain from the fine scale. This ensures that the mesh points in the patch elements coincide with the fine scale and hence eliminates the need for searching any non-coinciding points. This makes the method a lot faster as well. We can then compute the rate of convergence of the method.
+The advantage here is that I fix the fine scale mesh size *a priori* and choose the patch domain from the fine scale. This ensures that the mesh points in the patch elements coincide with the fine scale and hence eliminates the need for searching for any non-coinciding points. This makes the method a lot faster as well. We can then compute the rate of convergence of the method.
 
 
 ### Rate of convergence of the multiscale method
@@ -174,7 +154,9 @@ The advantage here is that I fix the fine scale mesh size \textit{a priori} and 
 
 All the rate of convergence examples can be found inside the folder `SimplifiedHigherOrder/`. The script `SimplifiedHigherOrder/rate_of_convergence_eg1.jl` contains the code to perform convergence analysis for the smooth diffusion case, whereas `SimplifiedHigherOrder/rate_of_convergence_eg2.jl` and `SimplifiedHigherOrder/rate_of_convergence_eg3.jl` contains the code to solve the problem with oscillatory and random diffusion coefficients, respectively.
 
-The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size. The example was run for a very smooth diffusion coefficient. Following is the test example:
+#### Smooth Diffusion Coefficients
+-------
+The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size, $l$. The example was run for a very smooth diffusion coefficient. Following is the test example:
 
 $$
  -(A(x)u'(x))' = f(x) \quad in \quad x \in \Omega = (0,1),
@@ -188,10 +170,10 @@ $$
 
 The corresponding exact solution is $u(x) = \sin(\pi x)$. 
 
-![](./SimplifiedHigherOrder/images/ooc_1.png) | 
+![](./SimplifiedHigherOrder/Images/ooc_1.png) | 
 --- |
 
-We observe optimal convergence rates (forgot to take the square root in the earlier version!) discussed in Maier, R., 2021 until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. 
+We observe optimal convergence rates discussed in Maier, R., 2021 until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. 
 
 ![](./SimplifiedHigherOrder/Images/ooc_3.png) | 
 --- |
@@ -201,11 +183,40 @@ This is in line with the observation made in Maier, R., 2021. Similar observatio
 ![](./SimplifiedHigherOrder/Images/ooc_2.png) |
 --- |
 
+After eliminating the KDTree search, we can solve the problem upto the coarse-mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-12}$ with the fine scale at $h=2^{-16}$. However, the method does not show convergence for very fine coarse-meshes unless the localization parameter is chosen high enough.
+
+![](./SimplifiedHigherOrder/Images/ooc_5.png) |
+--- |
+
+#### Oscillatory and Random Diffusion Coefficients
+-------
+
 Finally we can observe the same behaviour for the other choices of diffusion coefficients. The diffusion coefficients were chose identical to the ones discussed in the previous section. The right hand side data $f(x) = \frac{\pi^2}{2}\sin{\pi x}$ for the oscillatory case and $f(x) = \sin{5\pi x}$ for the random diffusion case.
 
 Oscillatory coefficient | Random coefficients |
 --- | --- |
 ![](./SimplifiedHigherOrder/Images/ooc_6_oscillatory.png) | ![](./SimplifiedHigherOrder/Images/ooc_7_random_coeff.png) | 
+
+## Localized Orthogonal Decomposition Method
+-------
+
+The localized orthogonal decomposition method implementation can be found inside the `LOD/` folder. The program `LOD/main.jl` contains the code to check the rate of convergence of the LOD method. The file `LOD/1dFunctions.jl` contains the routines to compute the standard finite element basis along with the functions assemble the global matrices. The file `LOD/1dFunctionsMultiScale` contains the code to compute the multi-scale basis along with the function to compute the $L^2$ error of the multiscale-FEM solution. Running the code `LOD/main.jl` 
+
+```
+julia> include("main.jl")
+Done N=2, Discrete l∞ error = 1.1102230246251565e-16
+Done N=4, Discrete l∞ error = 1.3877787807814457e-16
+Done N=8, Discrete l∞ error = 2.7755575615628914e-16
+Done N=16, Discrete l∞ error = 2.220446049250313e-16
+```
+
+We can observe that the point-wise error in the Multiscale solution and the exact solution is close to $10^{-16}$. This is because of the condition imposed during the construction of the Multi-scale finite element space, i.e., the error must vanish at the nodal points. The multiscale basis corresponding to $(H=0.25)$ and $\varepsilon=2^{-5}$ along with the finite element solution and the rate of convergence for various mesh-size is shown below:
+
+
+![](./LOD/basis.png) | ![](./LOD/solutions.png) | ![](./LOD/ooc_lod.png) | 
+--- | --- | --- |
+
+For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
 
 
 ## References
