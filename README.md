@@ -152,8 +152,24 @@ The model problem can be solved using the multiscale method and the program can 
 ![](./HigherOrderMS/eg3_2.png) | ![](./HigherOrderMS/eg3_1.png)
 --- | --- |
 
+I solve this problem by invoking a nearest neighbour search to evaluate the basis function at arbitrary points. This is required as the mesh points in the coarse mesh may not coincide with the mesh points in the patch mesh. 
 
-### Test example for smooth coefficients
+The script `SimplifiedHigherOrder/1dFunctions.jl` solves the one-dimensional Poisson problem using the HIgher-Order Multiscale method. The script contains three different diffusion coefficients:
+
+$$
+D_1(x) = 0.5, \quad D_2(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1}, \quad D_3(x) = \text{rand}\left(0.5, 5.0;\, \epsilon = 2^{-12} \right).
+$$
+
+where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusion coefficient is constant at an interval of size $\epsilon$. We can observe that the multiscale method captures the exact solution accurately at small scales using relatively small elements (N=8).
+
+| $ D(x) = 0.5, \quad f(x) = \pi^2\sin{\pi x} $ | $ D(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1}, \quad f(x) = \pi^2\sin{(\pi x)}$ | $ D(x) = \text{rand}\left(0.5, 5.0;\, \epsilon = 2^{-12} \right), \quad f(x) = \sin{(5\pi x)}$ | 
+| --- | --- | --- |
+| ![Smooth Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_6_oscillatory.png) | ![Random Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_7_random.png) | 
+
+
+### Rate of convergence of the multiscale method
+
+All the rate of convergence examples can be found inside the folder `SimplifiedHigherOrder/`. 
 
 The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size. The example was run for a very smooth diffusion coefficient. Following is the test example:
 
@@ -169,22 +185,20 @@ $$
 
 The corresponding exact solution is $u(x) = \sin(\pi x)$. 
 
-![](./SimplifiedHigherOrder/ooc_1.png) | 
+![](./SimplifiedHigherOrder/images/ooc_1.png) | 
 --- |
 
 We observe optimal convergence rates (forgot to take the square root in the earlier version!) discussed in Maier, R., 2021 until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. 
 
-![](./SimplifiedHigherOrder/ooc_3.png) | 
+![](./SimplifiedHigherOrder/Images/ooc_3.png) | 
 --- |
 
 This is in line with the observation made in Maier, R., 2021. Similar observations can be made for the higher-order case as well `(p=2)`. 
 
-![](./SimplifiedHigherOrder/ooc_2.png) |
+![](./SimplifiedHigherOrder/Images/ooc_2.png) |
 --- |
 
-The program to verify the rate of convergence can be found in `eg4.jl` and also in `SimplifiedHigherOrder/rate_of_convergence_eg1.jl`. The `SimplifiedHigherOrder/` folder contains the same code but optimized a little more. The two folders `SimplifiedHigherOrder/` and `HigherOrderMS/` will be merged into a single implementation in the future version.
 
-*A detailed description of the routines will be provided soon.*
 
 
 ## References

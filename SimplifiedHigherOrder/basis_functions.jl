@@ -89,7 +89,7 @@ end
 """
 Function to compute the multiscale basis
 """
-function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64)
+function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64, D::Function)
   cache_q, cache_p, quad, preallocated_mats = cache
   FULL, FINE, PATCH, BASIS, MATS, ASSEMS, _ = preallocated_mats
   nds_coarse, elem_coarse, _, _, _ = FULL
@@ -100,7 +100,7 @@ function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64)
   assem_H¹H¹ₛ, assem_H¹L²ₛ, _ = ASSEMS
 
   for i=1:nc
-    fillsKe!(sKeₛ[i], cache_q, nds_fineₛ[i], elem_fineₛ[i], q, quad)
+    fillsKe!(sKeₛ[i], cache_q, nds_fineₛ[i], elem_fineₛ[i], q, quad, D)
     fillsLe!(sLeₛ[i],(cache_q, cache_p), nds_fineₛ[i], nds_patchₛ[i], elem_fineₛ[i], elem_patchₛ[i], (q,p), quad)    
     for j=1:p+1
       fillsFe!(sFeₛ[i], cache_p, nds_patchₛ[i], elem_patchₛ[i], p, quad, y->fₖ!(cache_p, y, j, nds_coarse, elem_coarse, i))

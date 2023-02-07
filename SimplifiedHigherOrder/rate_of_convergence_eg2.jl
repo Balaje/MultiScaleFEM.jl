@@ -1,5 +1,8 @@
 ######### ############ ############ ############ ###########
 # Compute the rate of convergence of the multiscale method
+# With Oscillatory Diffusion Coefficient 
+# (-) D(x) = (2 + cos(2π*x/(2^-6)))^-1
+#     f(x) = 0.5*π^2*sin(π*x)  
 ######### ############ ############ ############ ###########
 using Plots
 using BenchmarkTools
@@ -14,42 +17,11 @@ include("assemble_matrices.jl")
 include("preallocate_matrices.jl")
 
 #=
-Problem data
-=#
-# D(x) = @. 1.0
-# f(x) = @. (π)^2*sin(π*x)
-# u(x) = @. sin(π*x)
-# ∇u(x) = @. π*cos(π*x)
-# domain = (0.0,1.0)
-
-#=
 Problem data 2: Oscillatory diffusion coefficient
 =#
-# domain = (0.0,1.0)
-# D(x) = (2 + cos(2π*x/(2^-6)))^-1
-# f(x) = 0.5*π^2*sin(π*x)
-
-#=
-Problem data 3: Random diffusion coefficient
-=#
 domain = (0.0,1.0)
-f(x) = sin(5π*x)
-Nₑ = 2^7
-nds_micro = LinRange(domain[1], domain[2], Nₑ+1)
-diffusion_micro = 0.5 .+ 4.5*rand(Nₑ+1)
-function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
-  nₑ = size(nds_micro,1)
-  for i=1:nₑ
-    if(nds_micro[i] ≤ x ≤ nds_micro[i+1])      
-      return diffusion_micro[i+1]
-    else
-      continue
-    end 
-  end
-end
-function D(x::Float64; nds_micro = nds_micro, diffusion_micro = diffusion_micro)
-  _D(x, nds_micro, diffusion_micro)
-end
+D₂(x) = (2 + cos(2π*x/(2^-6)))^-1
+f(x) = 0.5*π^2*sin(π*x)
 
 #=
 Constant paramters
@@ -60,7 +32,6 @@ nf = 2^16 # Size of the background mesh
 qorder = 3
 quad = gausslegendre(qorder)
 
-# 𝒩 = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096]
 𝒩 = [1,2,4,8,16,32,64,128]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
@@ -77,7 +48,7 @@ assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
 # Fill the final-scale matrix vector system
 sKe_ϵ = zeros(Float64, q+1, q+1, nf)
 sFe_ϵ = zeros(Float64, q+1, nf)
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₁)
+fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₂)
 fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
 Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
@@ -91,7 +62,7 @@ for l in [4,5,6,7,8,9]
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     local preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
     local cache = basis_cache(q), zeros(Float64,p+1), quad, preallocated_data
-    compute_ms_basis!(cache, nc, q, p, D₁)
+    compute_ms_basis!(cache, nc, q, p, D₂)
     
     local fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
     local nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
@@ -130,7 +101,7 @@ for l in [4,5,6,7,8,9]
       ϕᵢ!(bc,qs[jj])
       L²Error[itr] += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
       ∇ϕᵢ!(bc,qs[jj])
-      H¹Error[itr] += ws[jj]*D₁(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+      H¹Error[itr] += ws[jj]*D₂(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
     end    
 
     L²Error[itr] = sqrt(L²Error[itr])

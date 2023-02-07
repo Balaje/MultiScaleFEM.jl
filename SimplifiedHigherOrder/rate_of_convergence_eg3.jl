@@ -1,5 +1,8 @@
 ######### ############ ############ ############ ###########
 # Compute the rate of convergence of the multiscale method
+# With Random Diffusion Coefficient 
+# (-) D(x) = 0.5 + 4.5*rand()
+#     f(x) = sin(5π*x)  
 ######### ############ ############ ############ ###########
 using Plots
 using BenchmarkTools
@@ -12,22 +15,6 @@ using FastGaussQuadrature
 include("basis_functions.jl")
 include("assemble_matrices.jl")
 include("preallocate_matrices.jl")
-
-#=
-Problem data
-=#
-# D(x) = @. 1.0
-# f(x) = @. (π)^2*sin(π*x)
-# u(x) = @. sin(π*x)
-# ∇u(x) = @. π*cos(π*x)
-# domain = (0.0,1.0)
-
-#=
-Problem data 2: Oscillatory diffusion coefficient
-=#
-# domain = (0.0,1.0)
-# D(x) = (2 + cos(2π*x/(2^-6)))^-1
-# f(x) = 0.5*π^2*sin(π*x)
 
 #=
 Problem data 3: Random diffusion coefficient
@@ -47,7 +34,7 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-function D(x::Float64; nds_micro = nds_micro, diffusion_micro = diffusion_micro)
+function D₃(x::Float64; nds_micro = nds_micro, diffusion_micro = diffusion_micro)
   _D(x, nds_micro, diffusion_micro)
 end
 
@@ -77,7 +64,7 @@ assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
 # Fill the final-scale matrix vector system
 sKe_ϵ = zeros(Float64, q+1, q+1, nf)
 sFe_ϵ = zeros(Float64, q+1, nf)
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₁)
+fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₃)
 fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
 Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
@@ -91,7 +78,7 @@ for l in [4,5,6,7,8,9]
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     local preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
     local cache = basis_cache(q), zeros(Float64,p+1), quad, preallocated_data
-    compute_ms_basis!(cache, nc, q, p, D₁)
+    compute_ms_basis!(cache, nc, q, p, D₃)
     
     local fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
     local nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
@@ -122,7 +109,6 @@ for l in [4,5,6,7,8,9]
     end
     
     ## Compute the errors
-    # local usol = u.(nds_fine)
     local bc = basis_cache(q)
     local qs,ws=quad    
     for j=1:nf, jj=1:lastindex(qs)
@@ -130,7 +116,7 @@ for l in [4,5,6,7,8,9]
       ϕᵢ!(bc,qs[jj])
       L²Error[itr] += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
       ∇ϕᵢ!(bc,qs[jj])
-      H¹Error[itr] += ws[jj]*D₁(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+      H¹Error[itr] += ws[jj]*D₃(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
     end    
 
     L²Error[itr] = sqrt(L²Error[itr])
