@@ -47,6 +47,7 @@ We can observe that the point-wise error in the Multiscale solution and the exac
 For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
 
 ## Higher order multiscale method
+-------
 
 The higher order multiscale method is similar to the localized orthogonal decomposition method, but can be extended to the higher order setting. At the time of this writing, we have implemented only the construction of the modified basis. The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. We then use the standard finite element on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to sufficiently small to resolve the oscillations. This works since the problem is solved locally and often the oscillations could be captured on a reasonably small mesh. The code is given in `./HigherOrderMS/eg1.jl`. Sample multi-scale basis functions for $A_\varepsilon(x) = \left(2 + \cos{\frac{2\pi x}{\varepsilon}}\right)^{-1}$ (left) and $A_\varepsilon(x) = 1$ (right) is shown below:
 
@@ -145,31 +146,33 @@ xlims!(plt,(0,1))
 ![](./HigherOrderMS/eg2.png) |
 --- |
 
-### Solution using the Multiscale method.
+### Solution using the Multiscale method
+-------
 
 The model problem can be solved using the multiscale method and the program can be found in `eg3.jl`. We observe that the MS-method captures the microscale effects. The only requirement is that the number of points in the fine scale space should be enough to resolve the microscale effect in the diffusion coefficient. The figure below shows the basis functions of the second element along with the Multiscale-FEM nodal solution using 2 and 4 elements, respectively. 
 
 ![](./HigherOrderMS/eg3_2.png) | ![](./HigherOrderMS/eg3_1.png)
 --- | --- |
 
-I solve this problem by invoking a nearest neighbour search to evaluate the basis function at arbitrary points. This is required as the mesh points in the coarse mesh may not coincide with the mesh points in the patch mesh. 
-
-The script `SimplifiedHigherOrder/1dFunctions.jl` solves the one-dimensional Poisson problem using the HIgher-Order Multiscale method. The script contains three different diffusion coefficients:
+I solve this problem by invoking a nearest neighbour search to evaluate the basis function at arbitrary points. This is required as the mesh points in the coarse mesh may not coincide with the mesh points in the patch mesh. Instead, run the script `SimplifiedHigherOrder/1dFunctions.jl` that solves the one-dimensional Poisson problem using the Higher-Order Multiscale method. The script contains three different diffusion coefficients:
 
 $$
 D_1(x) = 0.5, \quad D_2(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1}, \quad D_3(x) = \text{rand}\left(0.5, 5.0;\, \epsilon = 2^{-12} \right).
 $$
 
-where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusion coefficient is constant at an interval of size $\epsilon$. We can observe that the multiscale method captures the exact solution accurately at small scales using relatively small elements (N=8).
+where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusion coefficient is constant at an interval of size $\epsilon$. We can observe that the multiscale method captures the exact solution accurately at small scales using relatively small elements `(N=8)` in the coarse space. The fine-scale mesh size was taken to be equal to $h = 2^{-15}$.
 
-| $ D(x) = 0.5, \quad f(x) = \pi^2\sin{\pi x} $ | $ D(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1}, \quad f(x) = \pi^2\sin{(\pi x)}$ | $ D(x) = \text{rand}\left(0.5, 5.0;\, \epsilon = 2^{-12} \right), \quad f(x) = \sin{(5\pi x)}$ | 
+| Smooth Diffusion Term | Oscillatory Diffusion Term | Random Diffusion Term |
 | --- | --- | --- |
 | ![Smooth Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_6_oscillatory.png) | ![Random Diffusion Coefficient](./SimplifiedHigherOrder/Images/sol_7_random.png) | 
 
+The advantage here is that I fix the fine scale mesh size \textit{a priori} and choose the patch domain from the fine scale. This ensures that the mesh points in the patch elements coincide with the fine scale and hence eliminates the need for searching any non-coinciding points. This makes the method a lot faster as well. We can then compute the rate of convergence of the method.
+
 
 ### Rate of convergence of the multiscale method
+-------
 
-All the rate of convergence examples can be found inside the folder `SimplifiedHigherOrder/`. 
+All the rate of convergence examples can be found inside the folder `SimplifiedHigherOrder/`. The script `SimplifiedHigherOrder/rate_of_convergence_eg1.jl` contains the code to perform convergence analysis for the smooth diffusion case, whereas `SimplifiedHigherOrder/rate_of_convergence_eg2.jl` and `SimplifiedHigherOrder/rate_of_convergence_eg3.jl` contains the code to solve the problem with oscillatory and random diffusion coefficients, respectively.
 
 The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size. The example was run for a very smooth diffusion coefficient. Following is the test example:
 
@@ -198,7 +201,11 @@ This is in line with the observation made in Maier, R., 2021. Similar observatio
 ![](./SimplifiedHigherOrder/Images/ooc_2.png) |
 --- |
 
+Finally we can observe the same behaviour for the other choices of diffusion coefficients. The diffusion coefficients were chose identical to the ones discussed in the previous section. The right hand side data $f(x) = \frac{\pi^2}{2}\sin{\pi x}$ for the oscillatory case and $f(x) = \sin{5\pi x}$ for the random diffusion case.
 
+Oscillatory coefficient | Random coefficients |
+--- | --- |
+![](./SimplifiedHigherOrder/Images/ooc_6_oscillatory.png) | ![](./SimplifiedHigherOrder/Images/ooc_7_random_coeff.png) | 
 
 
 ## References
