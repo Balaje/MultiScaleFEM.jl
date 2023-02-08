@@ -95,6 +95,41 @@ function get_local_basis!(cache, local_basis_vecs::Vector{Matrix{Float64}},
   end
 end
 
+function set_local_basis!(local_basis_vecs::Vector{Matrix{Float64}}, 
+  el::Int64, fn::AbstractVector{Int64}, localInd::Int64, cache)
+  @assert length(cache) == length(fn)
+  lbv = local_basis_vecs[el]
+  lbv_loc = view(lbv,:,localInd)
+  for i=1:lastindex(fn)
+    lbv_loc[fn[i]] = cache[i]
+  end
+end
+
+function split_stiffness_matrix(Kϵ::Array{Float64}, assem_H¹H¹::Tuple{Array{Int64}, Array{Int64}}, global_to_patch_indices::Vector{AbstractVector{Int64}})
+  nc = length(global_to_patch_indices)
+  coarse_to_fine_stima = Vector{SparseMatrixCSC{Float64,Int64}}(undef,nc)
+  iM, jM = assem_H¹H¹
+  for t=1:nc
+    global_to_elem_indices = global_to_patch_indices[t][1]:global_to_patch_indices[t][end]-1
+    iM_elem = @views iM[:,:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
+    jM_elem = @views jM[:,:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
+    coarse_to_fine_stima[t] = @views sparse(vec(iM_elem), vec(jM_elem), vec(Kϵ[:, :, global_to_elem_indices]))
+  end
+  coarse_to_fine_stima
+end
+
+function split_load_vector(Fϵ::Matrix{Float64}, assem_H¹H¹::Matrix{Int64}, global_to_patch_indices::Vector{AbstractVector{Int64}})
+  nc = length(global_to_patch_indices)
+  coarse_to_fine_load_vec = Vector{Vector{Float64}}(undef,nc)
+  vM = assem_H¹H¹
+  for t=1:nc
+    global_to_elem_indices = global_to_patch_indices[t][1]:global_to_patch_indices[t][end]-1
+    vM_elem = @views vM[:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
+    coarse_to_fine_load_vec[t] = @views collect(sparsevec(vec(vM_elem), vec(Fϵ[:,global_to_elem_indices])))
+  end
+  coarse_to_fine_load_vec
+end
+
 function split_stiffness_matrix(Kϵ::SparseMatrixCSC, 
   global_to_patch_indices::Vector{AbstractVector{Int64}})
   nc = length(global_to_patch_indices)

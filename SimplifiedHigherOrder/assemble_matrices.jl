@@ -130,3 +130,36 @@ function fillLoadVec!(sFe::AbstractMatrix{Float64}, cache, nds::AbstractVector{F
     end 
   end
 end
+
+function assemble_MS!(cache, sKe::Vector{Matrix{Float64}}, sFe::Vector{Vector{Float64}}, ms_elem::Vector{Vector{Int64}})
+  nc = size(ms_elem,1)
+  Kₘₛ, Fₘₛ = cache
+  fill!(Kₘₛ,0.0)
+  fill!(Fₘₛ,0.0)
+  for t=1:nc
+    local_dof = size(ms_elem[t],1)
+    elem = ms_elem[t]
+    local_mat = sKe[t]
+    local_vec = sFe[t]
+    for ti=1:local_dof
+      Fₘₛ[elem[ti]] += local_vec[ti]
+      for tj=1:local_dof
+        Kₘₛ[elem[ti],elem[tj]] += local_mat[ti,tj]
+      end
+    end
+  end
+end
+
+function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{Matrix{Float64}})  
+  nc = size(local_basis_vecs, 1)
+  p = size(local_basis_vecs[1], 2)-1
+  res, sol_cache = cache
+  fill!(sol_cache,0.0)
+  fill!(res, 0.0)
+  for j=1:nc, i=0:p
+    get_local_basis!(sol_cache, local_basis_vecs, j, 1:length(sol_cache), i+1)
+    for tt=1:lastindex(res)
+      res[tt] += sol[(p+1)*j+i-p]*sol_cache[tt]
+    end
+  end
+end

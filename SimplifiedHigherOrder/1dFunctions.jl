@@ -117,15 +117,13 @@ fillsFms!(sFms, cache, nc, p, l)
 
 Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
 Fₘₛ = zeros(Float64,nc*(p+1))
-for t=1:nc
-  Kₘₛ[ms_elem[t], ms_elem[t]] += sKms[t]
-  Fₘₛ[ms_elem[t]] += sFms[t]
-end
+cache = Kₘₛ, Fₘₛ
+assemble_MS!(cache, sKms, sFms, ms_elem)
 sol = Kₘₛ\Fₘₛ
 uhsol = zeros(Float64,nf+1)
-for j=1:nc, i=0:p
-  uhsol[:] += sol[(p+1)*j+i-p]*local_basis_vecs[j][:,i+1]
-end
+sol_cache = similar(uhsol)
+cache = uhsol, sol_cache
+build_solution!(cache, sol, local_basis_vecs)
 
 plt = plot(nds_fine, uhsol, label="Approximate solution")
 plot!(plt, nds_fine, solϵ, label="Exact solution")
