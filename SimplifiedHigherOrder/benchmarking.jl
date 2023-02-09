@@ -41,21 +41,30 @@ sKms, sFms = multiscale
 bc = basis_cache(q)
 
 ## First solve the problem using the Direct method
+#=
 sKe_ϵ = zeros(Float64, q+1, q+1, nf)
 sFe_ϵ = zeros(Float64, q+1, nf)
 fillsKe!(sKe_ϵ, bc, nds_fine, elem_fine, q, quad, D₂) 
 Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 fillLoadVec!(sFe_ϵ, bc, nds_fine, elem_fine, q, quad, f)
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+=#
+cache = assembler_cache(nds_fine, elem_fine, quad, q)
+fillsKe!(cache, D₂)
+Kϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
+fillsFe!(cache,f)
+Fϵ = collect(sparsevec(cache[6][1],cache[6][2]))
 solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 
 ## Benchmark the method after running it 100 times (Eg. Simulating time-dependent problems)
+cache = assembler_cache(nds_fine, elem_fine, quad, q)
 @btime begin 
-  fillsKe!(sKe_ϵ, bc, nds_fine, elem_fine, q, quad, D₂) 
-  Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
+  fillsKe!($cache, D₂)
+  Kϵ = sparse($cache[5][1], $cache[5][2], $cache[5][3])
+  cache = assembler_cache(nds_fine, elem_fine, quad, q)
   for times=1:10^3
-    fillLoadVec!(sFe_ϵ, bc, nds_fine, elem_fine, q, quad, f)
-    Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+    fillsFe!(cache,f)
+    Fϵ = collect(sparsevec(cache[6][1],cache[6][2]))
     solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
   end
 end
@@ -78,10 +87,12 @@ Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
 Fₘₛ = zeros(Float64,nc*(p+1))
 uhsol = zeros(Float64,nf+1)
 sol_cache = similar(uhsol)
-matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
+# matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
+matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
 cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
 fillsKms!(sKms, cache, nc, p, l)
-vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
+# vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
+vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
 cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
 fillsFms!(sFms, cache, nc, p, l)
 cache3 = Kₘₛ, Fₘₛ
@@ -91,14 +102,16 @@ sol = Kₘₛ\Fₘₛ
 cache2 = uhsol, sol_cache
 build_solution!(cache2, sol, local_basis_vecs)
 
+assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
 @btime begin
-  matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
+  matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
   cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
   fillsKms!(sKms, cache, nc, p, l)
   for times=1:10^3
     ###### Bottleneck ######
-    fillLoadVec!(sFe_ϵ, bc, nds_fine, elem_fine, q, quad, f)
-    vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
+    fillsFe!(assem_cache, f)
+    #Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]))
+    #vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
     ######
     cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
     fillsFms!(sFms, cache, nc, p, l)

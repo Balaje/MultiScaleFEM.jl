@@ -102,8 +102,8 @@ for l in [4,5,6,7,8,9]
     local sKms, sFms = multiscale
     
     # Compute the full stiffness matrix on the fine scale    
-    local matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
-    local vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
+    local matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
+    local vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
     local cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
     fillsKms!(sKms, cache, nc, p, l)
     local cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache

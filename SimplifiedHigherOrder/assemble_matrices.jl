@@ -163,3 +163,78 @@ function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{M
     end
   end
 end
+
+
+#=
+New assemblers 
+=#
+function fillsKe!(cache, D::Function)
+  elemdata, bc, quad_data, J, matdata, _, q, quad, index = cache
+  ii,jj,sA = matdata
+  fill!(ii,0); fill!(jj,0); fill!(sA,0.0)
+  elem = elemdata[1]
+  qs, ws = quad
+  nc = size(elem,1)
+  xqs, Dxqs = quad_data
+  map!(D, Dxqs, xqs)
+  for p=1:lastindex(qs)
+    x̂ = qs[p]
+    w = ws[p]
+    ∇ϕᵢ!(bc, x̂)
+    index = 0
+    bases = bc[3]
+    for i=1:q+1, j=1:q+1
+      setindex!(ii, view(elem,:,i), index+1:index+nc)
+      setindex!(jj, view(elem,:,j), index+1:index+nc)
+      @views sA[index+1:index+nc] += Dxqs[:,p].*J.^(-1)*bases[i]*bases[j]*w
+      index = index+nc
+    end
+  end
+end
+
+function fillsFe!(cache, g::Function)
+  elemdata, bc, quad_data, J, _, vecdata, q, quad, index = cache
+  ii,sF = vecdata
+  fill!(ii,0); fill!(sF,0.0)
+  elem = elemdata[1]
+  qs, ws = quad
+  nc = size(elem,1)
+  xqs, gxqs = quad_data
+  map!(g, gxqs, xqs)
+  for p=1:lastindex(qs)
+    x̂ = qs[p]
+    w = ws[p]
+    ϕᵢ!(bc, x̂)
+    index = 0
+    bases = bc[3]
+    for i=1:q+1
+      setindex!(ii, view(elem,:,i), index+1:index+nc)
+      @views sF[index+1:index+nc] += w*bases[i]*(gxqs[:,p].*J)
+      index = index+nc
+    end
+  end
+end
+
+function assembler_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
+  quad::Tuple{Vector{Float64},Vector{Float64}}, q::Int64)
+  qs, _ = quad
+  nds_elem = nds[elem]
+  nc = size(elem,1)
+  iiM = Vector{Int64}(undef,(q+1)^2*nc)  
+  jjM = Vector{Int64}(undef,(q+1)^2*nc)
+  sA = Vector{Float64}(undef,(q+1)^2*nc)
+  fill!(iiM,0); fill!(jjM,0); fill!(sA,0.0)
+  iiV = Vector{Int64}(undef,(q+1)*nc)
+  sF = Vector{Float64}(undef,(q+1)*nc)
+  fill!(iiV,0); fill!(sF,0.0)
+  xqs = Matrix{Float64}(undef, nc, length(qs))
+  J = (nds_elem[:,2]-nds_elem[:,1])*0.5
+  for i=1:lastindex(qs)
+    xqs[:,i] = (nds_elem[:,2]+nds_elem[:,1])*0.5 + (nds_elem[:,2]-nds_elem[:,1])*0.5*qs[i]
+  end
+  Dxqs = similar(xqs)
+  fill!(Dxqs,0.0)
+  bc = basis_cache(q)
+  index = 0
+  (elem,nds), bc, (xqs,Dxqs), J, (iiM,jjM,sA), (iiV,sF), q, quad, index
+end
