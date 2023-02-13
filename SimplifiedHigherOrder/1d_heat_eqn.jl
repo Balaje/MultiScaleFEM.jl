@@ -117,12 +117,29 @@ let
   assemble_MS_matrix!(Mₘₛ, sKms, ms_elem)
   cache = contrib_cache, Fₘₛ
   @show fₙ_MS!(cache, Δt)
+  setup_initial_condition(U₀, nds_fine, elem_fine, elem_indices_to_global_indices, quad, p)
 end
 
 
 function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
-  elem_indices_to_global_indices::Vector{AbstractVector{Int64}}, quad::Tuple{Vector{Float64},Vector{Float64}})
+  elem_indices_to_global_indices::Vector{AbstractVector{Int64}}, quad::Tuple{Vector{Float64},Vector{Float64}}, p::Int64)
   qs,ws = quad
-  nds_elem = nds[elem]
   nc = size(elem_indices_to_global_indices,1)
+  nf = size(elem,1)
+  nds_elem = nds[elem]
+  U0 = Matrix{Float64}(undef,p+1,nc)
+  xqs = Matrix{Float64}(undef, nf, size(qs,1))
+  J = (nds_elem[:,2]-nds_elem[:,1])*0.5
+  for i=1:lastindex(qs)
+    xqs[:,i] = (nds_elem[:,2]+nds_elem[:,1])*0.5 + (nds_elem[:,2]-nds_elem[:,1])*0.5*qs[i]
+  end
+  bc = Vector{Float64}(undef,p+1)
+  for q=1:lastindex(qs)    
+   Λₖ!(bc, qs[q], [-1.0,1.0], p)   
+    for t=1:nc, j=1:p+1        
+        elem_indices = elem_indices_to_global_indices[t][1]:elem_indices_to_global_indices[t][end]-1
+        U0[j,t] = sum(ws[q] * bc[j] * (U₀.(xqs[elem_indices,j]) .* J[elem_indices]))
+    end
+  end
+  vec(U0)
 end
