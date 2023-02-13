@@ -77,7 +77,7 @@ let
     t += Δt
   end
   Uₙ₊₁ = vcat(0, Uₙ₊₁, 0)
-  plot!(plt, nds_fine, Uₙ₊₁, label="Approximate using direct method")
+  plot!(plt, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)")
   uexact = [Uₑ(x,tf) for x in nds_fine]  
   plot!(plt, nds_fine, uexact, label="Exact solution")
 end
@@ -116,13 +116,29 @@ let
   assemble_MS_matrix!(Kₘₛ, sKms, ms_elem)
   assemble_MS_matrix!(Mₘₛ, sKms, ms_elem)
   cache = contrib_cache, Fₘₛ
-  @show fₙ_MS!(cache, Δt)
-  setup_initial_condition(U₀, nds_fine, elem_fine, elem_indices_to_global_indices, quad, p)
+  # @show fₙ_MS!(cache, Δt)
+  Uₙ = setup_initial_condition(U₀, nds_fine, elem_fine, elem_indices_to_global_indices, quad, p, q)
+  Uₙ₊₁ = similar(Uₙ)
+  fill!(Uₙ₊₁,0.0)
+  t = 0
+  for i=1:ntime
+    Uₙ₊₁ = RK4!(cache, t+Δt, Uₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)  
+    Uₙ = Uₙ₊₁
+    (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
+    t += Δt
+  end
+  uhsol = zeros(Float64,q*nf+1)
+  sol_cache = similar(uhsol)
+  cache2 = uhsol, sol_cache
+  build_solution!(cache2, Uₙ₊₁, local_basis_vecs)
+  uhsol = cache2[1]
+  plot!(plt, nds_fine, uhsol, label="Approximate sol. (MS Method)")
 end
 
 
 function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
-  elem_indices_to_global_indices::Vector{AbstractVector{Int64}}, quad::Tuple{Vector{Float64},Vector{Float64}}, p::Int64)
+  elem_indices_to_global_indices::Vector{AbstractVector{Int64}}, quad::Tuple{Vector{Float64},Vector{Float64}}, 
+  p::Int64, q::Int64)
   qs,ws = quad
   nc = size(elem_indices_to_global_indices,1)
   nf = size(elem,1)
@@ -130,15 +146,19 @@ function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, e
   U0 = Matrix{Float64}(undef,p+1,nc)
   xqs = Matrix{Float64}(undef, nf, size(qs,1))
   J = (nds_elem[:,2]-nds_elem[:,1])*0.5
-  for i=1:lastindex(qs)
-    xqs[:,i] = (nds_elem[:,2]+nds_elem[:,1])*0.5 + (nds_elem[:,2]-nds_elem[:,1])*0.5*qs[i]
-  end
-  bc = Vector{Float64}(undef,p+1)
+  bc = basis_cache(q)
   for q=1:lastindex(qs)    
-   Λₖ!(bc, qs[q], [-1.0,1.0], p)   
-    for t=1:nc, j=1:p+1        
-        elem_indices = elem_indices_to_global_indices[t][1]:elem_indices_to_global_indices[t][end]-1
-        U0[j,t] = sum(ws[q] * bc[j] * (U₀.(xqs[elem_indices,j]) .* J[elem_indices]))
+    ϕᵢ!(bc,qs[q])    
+    for t=1:nc       
+      elem_indices = elem_indices_to_global_indices[t]
+      npatch = length(elem_indices)-1
+      lb = local_basis_vecs[t][elem_indices,:]
+      for j=1:p+1, i=1:npatch, k=1:lastindex(bc[3])             
+        x̂ = (nds_elem[elem_indices[i],2]+nds_elem[elem_indices[i],1])*0.5 + 
+        (nds_elem[elem_indices[i],2]-nds_elem[elem_indices[i],1])*0.5*qs[q]
+        U0[j,t] += ws[q] * bc[3][k] * U₀(x̂) * lb[i,j] * 
+        (nds_elem[elem_indices[i],2]-nds_elem[elem_indices[i],1])*0.5
+      end
     end
   end
   vec(U0)
