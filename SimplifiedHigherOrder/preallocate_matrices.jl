@@ -88,11 +88,8 @@ end
 function get_local_basis!(cache, local_basis_vecs::Vector{Matrix{Float64}}, 
   el::Int64, fn::AbstractVector{Int64}, localInd::Int64)
   @assert length(cache) == length(fn)
-  lbv = local_basis_vecs[el]
-  lbv_loc = view(lbv,:,localInd)
-  for i=1:lastindex(fn)
-    cache[i] = lbv_loc[fn[i]]
-  end
+  lbv = local_basis_vecs[el] 
+  copyto!(cache,view(lbv,fn,localInd))
 end
 
 function set_local_basis!(local_basis_vecs::Vector{Matrix{Float64}}, 
@@ -154,4 +151,96 @@ function split_load_vector(Fϵ::AbstractVector{Float64},
     coarse_to_fine_load_vec[t] = F
   end
   coarse_to_fine_load_vec
+end
+
+function mat_contribs!(cache, D::Function)
+  full_cache, assem_data, global_to_patch_indices, matcontribs, _ = cache
+  elem_cache, bc, quad_data, J_elem, matdata, vecdata, q, quad, index = assem_data
+  xqs_elem, Dxqs_elem = quad_data
+  xqs, _ = full_cache[3]
+  J = full_cache[4]
+  (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem) = matdata, vecdata
+  nc = size(global_to_patch_indices,1)
+  nf = size(xqs,1)
+  aspect_ratio = Int(nf/nc)
+  for t=1:nc
+    gtpi = global_to_patch_indices[t]
+    gtpi1 = view(gtpi,1:aspect_ratio)
+    fill!(iM_elem,0); fill!(jM_elem,0); fill!(vM_elem,0.0)
+    fill!(iV_elem,0); fill!(vV_elem,0.0)    
+    fill!(Dxqs_elem,0.0)
+    copyto!(xqs_elem, view(xqs,gtpi1,:))
+    copyto!(J_elem, view(J,gtpi1))
+    quad_data = xqs_elem, Dxqs_elem
+    elem_patch = elem_cache[2]
+    matdata = iM_elem, jM_elem, vM_elem
+    vecdata = iV_elem, vV_elem    
+    assem_elem_cache = (elem_patch, ~), bc, quad_data, J_elem, matdata, vecdata, q, quad, index
+    fillsKe!(assem_elem_cache, D)      
+    matdata = assem_elem_cache[5] 
+    matcontribs[t] = sparse(matdata[1], matdata[2], matdata[3])
+  end
+  matcontribs
+end
+
+function vec_contribs!(cache, f::Function)
+  full_cache, assem_data, global_to_patch_indices, _, veccontribs = cache
+  elem_cache, bc, quad_data, J_elem, matdata, vecdata, q, quad, index = assem_data
+  xqs_elem, Dxqs_elem = quad_data
+  xqs, _ = full_cache[3]
+  J = full_cache[4]
+  (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem) = matdata, vecdata
+  nc = size(global_to_patch_indices,1)
+  nf = size(xqs,1)
+  aspect_ratio = Int(nf/nc)
+  for t=1:nc
+    gtpi = global_to_patch_indices[t]
+    gtpi1 = view(gtpi,1:aspect_ratio)
+    fill!(iM_elem,0); fill!(jM_elem,0); fill!(vM_elem,0.0)
+    fill!(iV_elem,0); fill!(vV_elem,0.0)    
+    fill!(Dxqs_elem,0.0)
+    copyto!(xqs_elem, view(xqs,gtpi1,:))
+    copyto!(J_elem, view(J,gtpi1))
+    quad_data = xqs_elem, Dxqs_elem
+    elem_patch = elem_cache[2]
+    matdata = iM_elem, jM_elem, vM_elem
+    vecdata = iV_elem, vV_elem    
+    assem_elem_cache = (elem_patch, ~), bc, quad_data, J_elem, matdata, vecdata, q, quad, index
+    fillsFe!(assem_elem_cache, f)      
+    vecdata = assem_elem_cache[6] 
+    veccontribs[t] = sparsevec(vecdata[1], vecdata[2])
+  end
+  veccontribs
+end
+
+function mat_vec_contribs_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, q::Int64, quad::Tuple{Vector{Float64},Vector{Float64}},
+  global_to_patch_indices::Vector{AbstractVector{Int64}})
+  nc = size(global_to_patch_indices,1)
+  assem_cache = assembler_cache(nds, elem, quad, q)
+  _, _, quad_data, J, _, _, q, _, index = assem_cache
+  xqs, _ = quad_data
+  gtpi = global_to_patch_indices[1]
+  npatch = size(gtpi,1)-1 # No of elems in patch
+  elem_patch = elem[1:npatch,:]
+  nds_patch = nds[1:npatch+1]
+  xqs_elem = similar(xqs[1:npatch,:])
+  fill!(xqs_elem,0.0)
+  Dxqs_elem = similar(xqs_elem)
+  fill!(Dxqs_elem,0.0)
+  J_elem = J[1:npatch]
+  iM_elem = Vector{Int64}(undef, (q+1)^2*npatch)
+  jM_elem = Vector{Int64}(undef, (q+1)^2*npatch)
+  vM_elem = Vector{Float64}(undef, (q+1)^2*npatch)
+  iV_elem = Vector{Int64}(undef, (q+1)*npatch)
+  vV_elem = Vector{Float64}(undef, (q+1)*npatch)
+  fill!(iM_elem,0); fill!(jM_elem,0); fill!(vM_elem,0.0)
+  fill!(iV_elem,0); fill!(vV_elem,0.0)  
+  matcontribs = Vector{AbstractMatrix{Float64}}(undef,nc)
+  veccontribs = Vector{Vector{Float64}}(undef,nc)
+  for t=1:nc
+    matcontribs[t] = spzeros(Float64,npatch+1,npatch+1)
+    veccontribs[t] = zeros(Float64,npatch+1)
+  end
+
+  assem_cache, ((nds_patch, elem_patch), bc, (xqs_elem, Dxqs_elem), J_elem, (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem), q, quad, index), global_to_patch_indices, matcontribs, veccontribs
 end

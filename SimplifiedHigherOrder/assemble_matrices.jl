@@ -185,7 +185,7 @@ function fillsKe!(cache, D::Function)
     bases = bc[3]
     for i=1:q+1, j=1:q+1
       setindex!(ii, view(elem,:,i), index+1:index+nc)
-      setindex!(jj, view(elem,:,j), index+1:index+nc)
+      setindex!(jj, view(elem,:,j), index+1:index+nc)      
       @views sA[index+1:index+nc] += Dxqs[:,p].*J.^(-1)*bases[i]*bases[j]*w
       index = index+nc
     end

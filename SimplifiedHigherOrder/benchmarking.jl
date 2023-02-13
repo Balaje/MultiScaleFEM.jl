@@ -47,18 +47,22 @@ sFe_ϵ = zeros(Float64, q+1, nf)
 fillsKe!(sKe_ϵ, bc, nds_fine, elem_fine, q, quad, D₂) 
 Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
 fillLoadVec!(sFe_ϵ, bc, nds_fine, elem_fine, q, quad, f)
+# ---- @btime fillLoadVec!($sFe_ϵ, $bc, $nds_fine, $elem_fine, $q, $quad, $f)
+# 7.774 ms (0 allocations: 0 bytes)
 Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
 =#
 cache = assembler_cache(nds_fine, elem_fine, quad, q)
 fillsKe!(cache, D₂)
 Kϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
 fillsFe!(cache,f)
+# ---- @btime fillsFe!($cache,$f)
+# 1.360 ms (24 allocations: 6.00 MiB)
 Fϵ = collect(sparsevec(cache[6][1],cache[6][2]))
 solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 
 ## Benchmark the method after running it 100 times (Eg. Simulating time-dependent problems)
 cache = assembler_cache(nds_fine, elem_fine, quad, q)
-@btime begin 
+Td = @belapsed begin 
   fillsKe!($cache, D₂)
   Kϵ = sparse($cache[5][1], $cache[5][2], $cache[5][3])
   cache = assembler_cache(nds_fine, elem_fine, quad, q)
@@ -69,30 +73,31 @@ cache = assembler_cache(nds_fine, elem_fine, quad, q)
   end
 end
 #=
-27.276 s (109001 allocations: 34.68 GiB)
+###### 31.712 s (122144 allocations: 40.58 GiB) ######
 =#
 
+
+#=
+MULTISCALE METHOD
+=#
 ## Now compute the multiscale basis. 
 cache = bc, zeros(Float64,p+1), quad, preallocated_data
 compute_ms_basis!(cache, nc, q, p, D₂) 
-
-# This has to be done once, so benchmarking it once
-@btime compute_ms_basis!(cache, nc, q, p, D₂) 
+# This has to be done only once, so benchmarking it once
+Tbasis = @belapsed compute_ms_basis!(cache, nc, q, p, D₂) 
 #=
-686.264 ms (2190 allocations: 1.31 GiB)
+###### 684.982 ms (2194 allocations: 1.31 GiB) ######
 =#
-
-# Now time solving the problem using the MS-Method
 Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
 Fₘₛ = zeros(Float64,nc*(p+1))
 uhsol = zeros(Float64,nf+1)
 sol_cache = similar(uhsol)
-# matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
-matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
+# Get the patch-wise stiffness and load contribution
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices)
+matrix_cache = mat_contribs!(contrib_cache, D₂)
+vector_cache = vec_contribs!(contrib_cache, f)
 cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
 fillsKms!(sKms, cache, nc, p, l)
-# vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
-vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
 cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
 fillsFms!(sFms, cache, nc, p, l)
 cache3 = Kₘₛ, Fₘₛ
@@ -102,17 +107,14 @@ sol = Kₘₛ\Fₘₛ
 cache2 = uhsol, sol_cache
 build_solution!(cache2, sol, local_basis_vecs)
 
-assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
-@btime begin
-  matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
+# Now time solving the problem using the MS-Method
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices)
+Tms = @belapsed begin
+  matrix_cache = mat_contribs!(contrib_cache, D₂)
   cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
   fillsKms!(sKms, cache, nc, p, l)
   for times=1:10^3
-    ###### Bottleneck ######
-    fillsFe!(assem_cache, f)
-    #Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]))
-    #vector_cache = split_load_vector(Fϵ, global_to_patch_indices)
-    ######
+    vector_cache = vec_contribs!(contrib_cache, f)
     cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
     fillsFms!(sFms, cache, nc, p, l)
     assemble_MS!(cache3, sKms, sFms, ms_elem)
@@ -122,5 +124,48 @@ assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
   end
 end
 #=
-15.680 s (152235 allocations: 6.37 GiB)
+###### 15.388 s (190421 allocations: 11.26 GiB) ######
+=#
+
+# % GAIN using the MS method
+gain = (Td - (Tbasis+Tms))/Td*100
+
+#=
+Check the new implementation with the old once
+=#
+assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices);
+# Check stiffness matrix contribution
+@btime begin
+  fillsKe!(assem_cache,D₁)
+  Kϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
+  matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
+end;
+#=
+ 8.621 ms (170 allocations: 32.01 MiB)
+=#
+@btime begin
+  mat_contribs!(contrib_cache, D₁)
+end;
+#=
+ 5.831 ms (420 allocations: 28.51 MiB)
+=#
+
+# Check load-vector contribution
+@btime begin
+  fillsFe!(assem_cache, f);
+  Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]));
+  vector_cache = split_load_vector(Fϵ, global_to_patch_indices);
+end;
+#=
+ 15.502 ms (66 allocations: 12.00 MiB)
+=#
+@btime begin
+  vec_contribs!(contrib_cache, f);
+end;
+#=
+ 10.368 ms (184 allocations: 11.50 MiB)
+=#
+#=
+Conclusion: The new method of constructing the contributions is effective, especially when the aspect ratio (H/h) is large
 =#
