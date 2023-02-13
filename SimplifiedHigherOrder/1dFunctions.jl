@@ -89,26 +89,25 @@ compute_ms_basis!(cache, nc, q, p, D₃) # Random Coefficient
 fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
 nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
 nds_fineₛ, elem_fineₛ = fine
-nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, L, Lᵀ, ipcache = patch
+nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
 sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
 assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
 sKms, sFms = multiscale
 
 # Compute the full stiffness matrix on the fine scale
-sKe_ϵ = zeros(Float64, q+1, q+1, nf)
-sFe_ϵ = zeros(Float64, q+1, nf)
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₁) 
+assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
+fillsKe!(assem_cache, D₁)
+fillsFe!(assem_cache, f)
 #=
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₁) # Smooth Coefficient
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₂) # Oscillatory Coefficient
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₃) # Random Coefficient
+fillsKe!(assem_cache, D₁) # Smooth Coefficient
+fillsKe!(assem_cache D₂) # Oscillatory Coefficient
+fillsKe!(assem_cache, D₃) # Random Coefficient
 =#
-fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
-Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
-Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
+Kϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
+Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]))
 solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 solϵ = vcat(0,solϵ,0)
-contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices)
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
 matrix_cache = mat_contribs!(contrib_cache, D₁)
 #=
 matrix_cache = mat_contribs!(contrib_cache, D₁)
@@ -116,9 +115,9 @@ matrix_cache = mat_contribs!(contrib_cache, D₂)
 matrix_cache = mat_contribs!(contrib_cache, D₃)
 =#
 vector_cache = vec_contribs!(contrib_cache, f)
-cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
+cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
 fillsKms!(sKms, cache, nc, p, l)
-cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
+cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
 fillsFms!(sFms, cache, nc, p, l)
 
 Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))

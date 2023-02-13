@@ -34,7 +34,7 @@ preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
 fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
 nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
 nds_fineₛ, elem_fineₛ = fine
-nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, L, Lᵀ, ipcache = patch
+nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
 sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
 assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
 sKms, sFms = multiscale
@@ -93,12 +93,12 @@ Fₘₛ = zeros(Float64,nc*(p+1))
 uhsol = zeros(Float64,nf+1)
 sol_cache = similar(uhsol)
 # Get the patch-wise stiffness and load contribution
-contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices)
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
 matrix_cache = mat_contribs!(contrib_cache, D₂)
 vector_cache = vec_contribs!(contrib_cache, f)
-cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
+cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
 fillsKms!(sKms, cache, nc, p, l)
-cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
+cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
 fillsFms!(sFms, cache, nc, p, l)
 cache3 = Kₘₛ, Fₘₛ
 assemble_MS!(cache3, sKms, sFms, ms_elem)
@@ -108,14 +108,14 @@ cache2 = uhsol, sol_cache
 build_solution!(cache2, sol, local_basis_vecs)
 
 # Now time solving the problem using the MS-Method
-contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices)
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
 Tms = @belapsed begin
   matrix_cache = mat_contribs!(contrib_cache, D₂)
-  cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
+  cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
   fillsKms!(sKms, cache, nc, p, l)
   for times=1:10^3
     vector_cache = vec_contribs!(contrib_cache, f)
-    cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
+    cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
     fillsFms!(sFms, cache, nc, p, l)
     assemble_MS!(cache3, sKms, sFms, ms_elem)
     Kₘₛ, Fₘₛ = cache3
@@ -134,12 +134,12 @@ gain = (Td - (Tbasis+Tms))/Td*100
 Check the new implementation with the old once
 =#
 assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
-contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, global_to_patch_indices);
+contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices);
 # Check stiffness matrix contribution
 @btime begin
   fillsKe!(assem_cache,D₁)
   Kϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
-  matrix_cache = split_stiffness_matrix(Kϵ, global_to_patch_indices)
+  matrix_cache = split_stiffness_matrix(Kϵ, elem_indices_to_global_indices)
 end;
 #=
  8.621 ms (170 allocations: 32.01 MiB)
@@ -155,7 +155,7 @@ end;
 @btime begin
   fillsFe!(assem_cache, f);
   Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]));
-  vector_cache = split_load_vector(Fϵ, global_to_patch_indices);
+  vector_cache = split_load_vector(Fϵ, elem_indices_to_global_indices);
 end;
 #=
  15.502 ms (66 allocations: 12.00 MiB)

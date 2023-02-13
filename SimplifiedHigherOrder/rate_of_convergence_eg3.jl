@@ -62,13 +62,12 @@ assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
 [H¹Conn(q,i,j) for j=0:q, _=0:q, i=1:nf], 
 [H¹Conn(q,i,j) for j=0:q, i=1:nf])
 # Fill the final-scale matrix vector system
-sKe_ϵ = zeros(Float64, q+1, q+1, nf)
-sFe_ϵ = zeros(Float64, q+1, nf)
-fillsKe!(sKe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, D₃)
-fillLoadVec!(sFe_ϵ, basis_cache(q), nds_fine, elem_fine, q, quad, f)
-Kϵ = sparse(vec(assem_H¹H¹[1]), vec(assem_H¹H¹[2]), vec(sKe_ϵ))
-Fϵ = collect(sparsevec(vec(assem_H¹H¹[3]), vec(sFe_ϵ)))
-solϵ = Kϵ[2:nf,2:nf]\Fϵ[2:nf]
+assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
+fillsKe!(assem_cache, D₃)
+fillsFe!(assem_cache, f)
+Kϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
+Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]))
+solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 solϵ = vcat(0,solϵ,0)
 
 # for l in [4,5,6,7,8,9,10]
@@ -83,30 +82,30 @@ for l in [4,5,6,7,8,9]
     local fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
     local nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
     local nds_fineₛ, elem_fineₛ = fine
-    local nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, global_to_patch_indices, L, Lᵀ, ipcache = patch
+    local nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
     local sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
     local assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
     local sKms, sFms = multiscale
     
     # Compute the full stiffness matrix on the fine scale    
-    local matrix_cache = split_stiffness_matrix(sKe_ϵ, (assem_H¹H¹[1],assem_H¹H¹[2]), global_to_patch_indices)
-    local vector_cache = split_load_vector(sFe_ϵ, assem_H¹H¹[3], global_to_patch_indices)
-    local cache = local_basis_vecs, global_to_patch_indices, L, Lᵀ, matrix_cache, ipcache
+    local contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
+    local matrix_cache = mat_contribs!(contrib_cache, D₃)
+    local vector_cache = vec_contribs!(contrib_cache, f)
+    local cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
     fillsKms!(sKms, cache, nc, p, l)
-    local cache = local_basis_vecs, global_to_patch_indices, Lᵀ, vector_cache
+    local cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
     fillsFms!(sFms, cache, nc, p, l)
     
     local Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
     local Fₘₛ = zeros(Float64,nc*(p+1))
-    for t=1:nc
-      Kₘₛ[ms_elem[t], ms_elem[t]] += sKms[t]
-      Fₘₛ[ms_elem[t]] += sFms[t]
-    end
+    local cache = Kₘₛ, Fₘₛ
+    assemble_MS!(cache, sKms, sFms, ms_elem)
     local sol = Kₘₛ\Fₘₛ
-    local uhsol = zeros(Float64,nf+1)
-    for j=1:nc, i=0:p      
-      uhsol[:] += sol[(p+1)*j+i-p]*local_basis_vecs[j][:,i+1]
-    end
+    local uhsol = zeros(Float64,q*nf+1)
+    local sol_cache = similar(uhsol)
+    local cache = uhsol, sol_cache
+    build_solution!(cache, sol, local_basis_vecs)
+    uhsol, _ = cache
     
     ## Compute the errors
     local bc = basis_cache(q)

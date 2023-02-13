@@ -35,7 +35,7 @@ function preallocate_matrices(domain::Tuple{Float64,Float64},
   nds_patchₛ = Vector{AbstractVector{Float64}}(undef,nc)
   patch_indices_to_global_indices = Vector{AbstractVector{Int64}}(undef,nc)
   ms_elem = Vector{Vector{Int64}}(undef,nc)
-  global_to_patch_nds = Vector{AbstractVector{Int64}}(undef,nc)
+  elem_indices_to_global_indices = Vector{AbstractVector{Int64}}(undef,nc)
 
   # Multiscale matrices
   sKms = Vector{Matrix{Float64}}(undef,nc)
@@ -72,15 +72,15 @@ function preallocate_matrices(domain::Tuple{Float64,Float64},
     patch_indices_to_global_indices[i] = (1:length(nds_fineₛ[i])) .+ ((start-1)*aspect_ratio) 
     ms_elem[i] = start*(p+1)-p:last*(p+1)
 
-    global_to_patch_nds[i] = i*(aspect_ratio) - aspect_ratio + 1 : i*(aspect_ratio)+1
+    elem_indices_to_global_indices[i] = i*(aspect_ratio) - aspect_ratio + 1 : i*(aspect_ratio)+1
   end
-  L = zeros(Float64,length(global_to_patch_nds[1]))
+  L = zeros(Float64,length(elem_indices_to_global_indices[1]))
   Lᵀ = similar(L)
   ipcache = similar(L)
   fill!(Lᵀ,0.0)
   fill!(ipcache,0.0)
   (nds_coarse, elem_coarse, nds_fine, elem_fine, assem_H¹H¹), 
-  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, global_to_patch_nds, L, Lᵀ, ipcache), 
+  (nds_fineₛ, elem_fineₛ), (nds_patchₛ, patch_elemₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache), 
   basis_vec_patch, 
   (sKeₛ, sLeₛ, sFeₛ, sLVeₛ), (assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem), (sKms, sFms)
 end
@@ -102,69 +102,18 @@ function set_local_basis!(local_basis_vecs::Vector{Matrix{Float64}},
   end
 end
 
-function split_stiffness_matrix(Kϵ::Array{Float64}, assem_H¹H¹::Tuple{Array{Int64}, Array{Int64}}, global_to_patch_indices::Vector{AbstractVector{Int64}})
-  nc = length(global_to_patch_indices)
-  coarse_to_fine_stima = Vector{SparseMatrixCSC{Float64,Int64}}(undef,nc)
-  iM, jM = assem_H¹H¹
-  for t=1:nc
-    global_to_elem_indices = global_to_patch_indices[t][1]:global_to_patch_indices[t][end]-1
-    iM_elem = @views iM[:,:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
-    jM_elem = @views jM[:,:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
-    coarse_to_fine_stima[t] = @views sparse(vec(iM_elem), vec(jM_elem), vec(Kϵ[:, :, global_to_elem_indices]))
-  end
-  coarse_to_fine_stima
-end
-
-function split_load_vector(Fϵ::Matrix{Float64}, assem_H¹H¹::Matrix{Int64}, global_to_patch_indices::Vector{AbstractVector{Int64}})
-  nc = length(global_to_patch_indices)
-  coarse_to_fine_load_vec = Vector{Vector{Float64}}(undef,nc)
-  vM = assem_H¹H¹
-  for t=1:nc
-    global_to_elem_indices = global_to_patch_indices[t][1]:global_to_patch_indices[t][end]-1
-    vM_elem = @views vM[:,global_to_elem_indices] .- (minimum(global_to_elem_indices)-1)
-    coarse_to_fine_load_vec[t] = @views collect(sparsevec(vec(vM_elem), vec(Fϵ[:,global_to_elem_indices])))
-  end
-  coarse_to_fine_load_vec
-end
-
-function split_stiffness_matrix(Kϵ::SparseMatrixCSC, 
-  global_to_patch_indices::Vector{AbstractVector{Int64}})
-  nc = length(global_to_patch_indices)
-  coarse_to_fine_stima = Vector{SparseMatrixCSC{Float64,Int64}}(undef,nc)
-  for t=1:nc
-    fine_stima = Kϵ[global_to_patch_indices[t], global_to_patch_indices[t]]
-    (t!=1) && (fine_stima[1,1] /=2.0)
-    (t!=nc) && (fine_stima[end,end] /=2.0)
-    coarse_to_fine_stima[t] = fine_stima
-  end
-  coarse_to_fine_stima
-end
-
-function split_load_vector(Fϵ::AbstractVector{Float64},
-  global_to_patch_indices::Vector{AbstractVector{Int64}})
-  nc = length(global_to_patch_indices)
-  coarse_to_fine_load_vec = Vector{Vector{Float64}}(undef,nc)
-  for t=1:nc
-    F = Fϵ[global_to_patch_indices[t]]
-    (t!=1) && (F[1]/=2.0)
-    (t!=nc) && (F[end] /=2.0)
-    coarse_to_fine_load_vec[t] = F
-  end
-  coarse_to_fine_load_vec
-end
-
 function mat_contribs!(cache, D::Function)
-  full_cache, assem_data, global_to_patch_indices, matcontribs, _ = cache
+  full_cache, assem_data, elem_indices_to_global_indices, matcontribs, _ = cache
   elem_cache, bc, quad_data, J_elem, matdata, vecdata, q, quad, index = assem_data
   xqs_elem, Dxqs_elem = quad_data
   xqs, _ = full_cache[3]
   J = full_cache[4]
   (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem) = matdata, vecdata
-  nc = size(global_to_patch_indices,1)
+  nc = size(elem_indices_to_global_indices,1)
   nf = size(xqs,1)
   aspect_ratio = Int(nf/nc)
   for t=1:nc
-    gtpi = global_to_patch_indices[t]
+    gtpi = elem_indices_to_global_indices[t]
     gtpi1 = view(gtpi,1:aspect_ratio)
     fill!(iM_elem,0); fill!(jM_elem,0); fill!(vM_elem,0.0)
     fill!(iV_elem,0); fill!(vV_elem,0.0)    
@@ -184,17 +133,17 @@ function mat_contribs!(cache, D::Function)
 end
 
 function vec_contribs!(cache, f::Function)
-  full_cache, assem_data, global_to_patch_indices, _, veccontribs = cache
+  full_cache, assem_data, elem_indices_to_global_indices, _, veccontribs = cache
   elem_cache, bc, quad_data, J_elem, matdata, vecdata, q, quad, index = assem_data
   xqs_elem, Dxqs_elem = quad_data
   xqs, _ = full_cache[3]
   J = full_cache[4]
   (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem) = matdata, vecdata
-  nc = size(global_to_patch_indices,1)
+  nc = size(elem_indices_to_global_indices,1)
   nf = size(xqs,1)
   aspect_ratio = Int(nf/nc)
   for t=1:nc
-    gtpi = global_to_patch_indices[t]
+    gtpi = elem_indices_to_global_indices[t]
     gtpi1 = view(gtpi,1:aspect_ratio)
     fill!(iM_elem,0); fill!(jM_elem,0); fill!(vM_elem,0.0)
     fill!(iV_elem,0); fill!(vV_elem,0.0)    
@@ -214,12 +163,12 @@ function vec_contribs!(cache, f::Function)
 end
 
 function mat_vec_contribs_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, q::Int64, quad::Tuple{Vector{Float64},Vector{Float64}},
-  global_to_patch_indices::Vector{AbstractVector{Int64}})
-  nc = size(global_to_patch_indices,1)
+  elem_indices_to_global_indices::Vector{AbstractVector{Int64}})
+  nc = size(elem_indices_to_global_indices,1)
   assem_cache = assembler_cache(nds, elem, quad, q)
-  _, _, quad_data, J, _, _, q, _, index = assem_cache
+  _, bc, quad_data, J, _, _, q, _, index = assem_cache
   xqs, _ = quad_data
-  gtpi = global_to_patch_indices[1]
+  gtpi = elem_indices_to_global_indices[1]
   npatch = size(gtpi,1)-1 # No of elems in patch
   elem_patch = elem[1:npatch,:]
   nds_patch = nds[1:npatch+1]
@@ -242,5 +191,5 @@ function mat_vec_contribs_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64
     veccontribs[t] = zeros(Float64,npatch+1)
   end
 
-  assem_cache, ((nds_patch, elem_patch), bc, (xqs_elem, Dxqs_elem), J_elem, (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem), q, quad, index), global_to_patch_indices, matcontribs, veccontribs
+  assem_cache, ((nds_patch, elem_patch), bc, (xqs_elem, Dxqs_elem), J_elem, (iM_elem, jM_elem, vM_elem), (iV_elem, vV_elem), q, quad, index), elem_indices_to_global_indices, matcontribs, veccontribs
 end

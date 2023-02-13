@@ -111,26 +111,6 @@ function fillsFms!(sFms::Vector{Vector{Float64}}, cache, nc::Int64, p::Int64, l:
   end
 end
 
-function fillLoadVec!(sFe::AbstractMatrix{Float64}, cache, nds::AbstractVector{Float64}, 
-  elem::AbstractVecOrMat{Int64}, 
-  q::Int64, quad::Tuple{Vector{Float64}, Vector{Float64}}, f::Function)
-  fill!(sFe,0.0)
-  nf = size(elem,1)
-  for t=1:nf
-    cs = view(nds, view(elem, t, :))
-    hlocal = cs[2]-cs[1]
-    qs,ws = quad
-    for i=1:lastindex(qs)
-      x̂ = (cs[2]+cs[1])*0.5 + (cs[2]-cs[1])*0.5*qs[i]
-      ϕᵢ!(cache, qs[i])
-      basis = cache[3]
-      for j=1:q+1
-        sFe[j,t] += ws[i]*f(x̂)*basis[j]*(hlocal*0.5)
-      end 
-    end 
-  end
-end
-
 function assemble_MS!(cache, sKe::Vector{Matrix{Float64}}, sFe::Vector{Vector{Float64}}, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   Kₘₛ, Fₘₛ = cache
