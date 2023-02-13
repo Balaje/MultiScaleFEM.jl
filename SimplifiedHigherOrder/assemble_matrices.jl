@@ -130,6 +130,34 @@ function assemble_MS!(cache, sKe::Vector{Matrix{Float64}}, sFe::Vector{Vector{Fl
   end
 end
 
+function assemble_MS_matrix!(cache, el_contribs::Vector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}})
+  nc = size(ms_elem,1)
+  K = cache
+  fill!(K,0.0)
+  for t=1:nc
+    local_dof = size(ms_elem[t],1)
+    elem = ms_elem[t]
+    local_mat = el_contribs[t]
+    for ti=1:local_dof, tj=1:local_dof
+        K[elem[ti],elem[tj]] += local_mat[ti,tj]     
+    end
+  end
+end
+
+function assemble_MS_vector!(cache, el_contribs::Vector{Vector{Float64}}, ms_elem::Vector{Vector{Int64}})
+  nc = size(ms_elem,1)
+  F = cache
+  fill!(F,0.0)
+  for t=1:nc
+    local_dof = size(ms_elem[t],1)
+    elem = ms_elem[t]
+    local_vec = el_contribs[t]
+    for ti=1:local_dof
+      F[elem[ti]] += local_vec[ti]  
+    end
+  end
+end
+
 function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{Matrix{Float64}})  
   nc = size(local_basis_vecs, 1)
   p = size(local_basis_vecs[1], 2)-1
@@ -167,6 +195,30 @@ function fillsKe!(cache, D::Function)
       setindex!(ii, view(elem,:,i), index+1:index+nc)
       setindex!(jj, view(elem,:,j), index+1:index+nc)      
       @views sA[index+1:index+nc] += Dxqs[:,p].*J.^(-1)*bases[i]*bases[j]*w
+      index = index+nc
+    end
+  end
+end
+
+function fillsMe!(cache, M::Function)
+  elemdata, bc, quad_data, J, matdata, _, q, quad, index = cache
+  ii,jj,sA = matdata
+  fill!(ii,0); fill!(jj,0); fill!(sA,0.0)
+  elem = elemdata[1]
+  qs, ws = quad
+  nc = size(elem,1)
+  xqs, Mxqs = quad_data
+  map!(M, Mxqs, xqs)
+  for p=1:lastindex(qs)
+    x̂ = qs[p]
+    w = ws[p]
+    ϕᵢ!(bc, x̂)
+    index = 0
+    bases = bc[3]
+    for i=1:q+1, j=1:q+1
+      setindex!(ii, view(elem,:,i), index+1:index+nc)
+      setindex!(jj, view(elem,:,j), index+1:index+nc)      
+      @views sA[index+1:index+nc] += Mxqs[:,p].*J*bases[i]*bases[j]*w
       index = index+nc
     end
   end

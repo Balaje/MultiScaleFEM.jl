@@ -40,6 +40,7 @@ function preallocate_matrices(domain::Tuple{Float64,Float64},
   # Multiscale matrices
   sKms = Vector{Matrix{Float64}}(undef,nc)
   sFms = Vector{Vector{Float64}}(undef,nc)
+  sMms = Vector{Matrix{Float64}}(undef,nc)
 
   for i=1:nc
     start = max(1,i-l)
@@ -102,7 +103,7 @@ function set_local_basis!(local_basis_vecs::Vector{Matrix{Float64}},
   end
 end
 
-function mat_contribs!(cache, D::Function)
+function mat_contribs!(cache, D::Function; matFunc=fillsKe!)
   full_cache, assem_data, elem_indices_to_global_indices, matcontribs, _ = cache
   elem_cache, bc, quad_data, J_elem, matdata, vecdata, q, quad, index = assem_data
   xqs_elem, Dxqs_elem = quad_data
@@ -125,7 +126,7 @@ function mat_contribs!(cache, D::Function)
     matdata = iM_elem, jM_elem, vM_elem
     vecdata = iV_elem, vV_elem    
     assem_elem_cache = (elem_patch, ~), bc, quad_data, J_elem, matdata, vecdata, q, quad, index
-    fillsKe!(assem_elem_cache, D)      
+    matFunc(assem_elem_cache, D)      
     matdata = assem_elem_cache[5] 
     matcontribs[t] = sparse(matdata[1], matdata[2], matdata[3])
   end
