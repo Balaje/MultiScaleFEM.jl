@@ -111,13 +111,12 @@ let
   fillsKms!(sMms, cache, nc, p, l)
   ## =
   Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
-  Mₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
+  global Mₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
   Fₘₛ = zeros(Float64,nc*(p+1))
   assemble_MS_matrix!(Kₘₛ, sKms, ms_elem)
-  assemble_MS_matrix!(Mₘₛ, sKms, ms_elem)
+  assemble_MS_matrix!(Mₘₛ, sMms, ms_elem)
   cache = contrib_cache, Fₘₛ
-  # @show fₙ_MS!(cache, Δt)
-  Uₙ = setup_initial_condition(U₀, nds_fine, elem_fine, elem_indices_to_global_indices, quad, p, q)
+  global Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
   Uₙ₊₁ = similar(Uₙ)
   fill!(Uₙ₊₁,0.0)
   t = 0
@@ -136,30 +135,21 @@ let
 end
 
 
-function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
-  elem_indices_to_global_indices::Vector{AbstractVector{Int64}}, quad::Tuple{Vector{Float64},Vector{Float64}}, 
-  p::Int64, q::Int64)
+function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, nc::Int64, nf::Int64, 
+  local_basis_vecs::Vector{Matrix{Float64}}, quad::Tuple{Vector{Float64},Vector{Float64}}, 
+  p::Int64, q::Int64, massmat::Matrix{Float64})
   qs,ws = quad
-  nc = size(elem_indices_to_global_indices,1)
-  nf = size(elem,1)
-  nds_elem = nds[elem]
   U0 = Matrix{Float64}(undef,p+1,nc)
-  xqs = Matrix{Float64}(undef, nf, size(qs,1))
-  J = (nds_elem[:,2]-nds_elem[:,1])*0.5
   bc = basis_cache(q)
-  for q=1:lastindex(qs)    
-    ϕᵢ!(bc,qs[q])    
-    for t=1:nc       
-      elem_indices = elem_indices_to_global_indices[t]
-      npatch = length(elem_indices)-1
-      lb = local_basis_vecs[t][elem_indices,:]
-      for j=1:p+1, i=1:npatch, k=1:lastindex(bc[3])             
-        x̂ = (nds_elem[elem_indices[i],2]+nds_elem[elem_indices[i],1])*0.5 + 
-        (nds_elem[elem_indices[i],2]-nds_elem[elem_indices[i],1])*0.5*qs[q]
-        U0[j,t] += ws[q] * bc[3][k] * U₀(x̂) * lb[i,j] * 
-        (nds_elem[elem_indices[i],2]-nds_elem[elem_indices[i],1])*0.5
+  for t=1:nc
+    lb = local_basis_vecs[t]
+    for qi=1:lastindex(qs)    
+      ϕᵢ!(bc,qs[qi])                
+      for i=1:q*nf, j=1:p+1, k=1:q+1             
+        x̂ = (nds[i+1]+nds[i])*0.5 + (nds[i+1]-nds[i])*0.5*qs[qi]
+        U0[j,t] += ws[qi] * (bc[3][k] * lb[i,j]) * U₀(x̂) * (nds[i+1]-nds[i])*0.5
       end
     end
   end
-  vec(U0)
+  massmat\vec(U0)
 end
