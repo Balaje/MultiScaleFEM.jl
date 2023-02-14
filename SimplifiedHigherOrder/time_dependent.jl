@@ -14,6 +14,15 @@ function RK4!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Δt::Float64
   U
 end
 """
+The Crank-Nicolson scheme for solving the transient linear wave equation
+"""
+function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64,
+  M⁺::AbstractMatrix{Float64}, M⁻::AbstractMatrix{Float64}, f!::Function)
+  fₙ = (Δt)^2/2*(f!(fcache, tₙ) + 2f!(fcache, tₙ+Δt) + f!(fcache, tₙ+2Δt))
+  U = M⁺\(2*M⁻*Uₙ₊₁ - M⁺*Uₙ + fₙ)
+  U
+end
+"""
 Function to setup the initial condition by evaluating the L² projection on the MS-space.
 """
 function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, nc::Int64, nf::Int64, 

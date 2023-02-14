@@ -1,55 +1,55 @@
- ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
- ##### Julia program to solve a time-dependent problem #####
- ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
- using Plots
- using BenchmarkTools
- using NearestNeighbors
- using SparseArrays
- using LinearAlgebra
- using ForwardDiff
- using FastGaussQuadrature
- 
- include("basis_functions.jl")
- include("assemble_matrices.jl")
- include("preallocate_matrices.jl")
- include("time_dependent.jl")
- 
- #=
- Problem data 2: Oscillatory diffusion coefficient
- =#
- domain = (0.0,1.0)
- A(x) = (2 + cos(2π*x/(2e-2)))^-1
- f(x,t) = 0.0
- U₀(x) = sin(π*x)
- Uₑ(x,t) = exp(-π^2*t)*U₀(x)
- 
- # Define the necessary parameters
- nc = 2^1
- nf = 2^11
- p = 1
- q = 1
- l = 4
- quad = gausslegendre(4)
- 
- # Preallocate all the necessary data
- preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p));
- fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
- nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
- nds_fineₛ, elem_fineₛ = fine
- nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
- sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
- assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
- sKms, sFms = multiscale
- bc = basis_cache(q)
- 
- # First obtain the stiffness and mass matrix in the fine scale
- cache = assembler_cache(nds_fine, elem_fine, quad, q)
- fillsKe!(cache, A)
- Kϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
- fillsMe!(cache, x->1.0)
- Mϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
- # The RHS-vector as a function of t
- function fₙ!(fcache, tₙ::Float64)  
+##### ##### ##### ##### ##### ##### ##### ##### ##### #####
+##### Julia program to solve a time-dependent problem #####
+##### ##### ##### ##### ##### ##### ##### ##### ##### #####
+using Plots
+using BenchmarkTools
+using NearestNeighbors
+using SparseArrays
+using LinearAlgebra
+using ForwardDiff
+using FastGaussQuadrature
+
+include("basis_functions.jl")
+include("assemble_matrices.jl")
+include("preallocate_matrices.jl")
+include("time_dependent.jl")
+
+#=
+Problem data 2: Oscillatory diffusion coefficient
+=#
+domain = (0.0,1.0)
+A(x) = (2 + cos(2π*x/(2e-2)))^-1
+f(x,t) = 0.0
+U₀(x) = sin(π*x)
+Uₑ(x,t) = exp(-π^2*t)*U₀(x)
+
+# Define the necessary parameters
+nc = 2^1
+nf = 2^11
+p = 1
+q = 1
+l = 4
+quad = gausslegendre(4)
+
+# Preallocate all the necessary data
+preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p));
+fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
+nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
+nds_fineₛ, elem_fineₛ = fine
+nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
+sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
+assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
+sKms, sFms = multiscale
+bc = basis_cache(q)
+
+# First obtain the stiffness and mass matrix in the fine scale
+cache = assembler_cache(nds_fine, elem_fine, quad, q)
+fillsKe!(cache, A)
+Kϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
+fillsMe!(cache, x->1.0)
+Mϵ = sparse(cache[5][1], cache[5][2], cache[5][3])
+# The RHS-vector as a function of t
+function fₙ!(fcache, tₙ::Float64)  
   cache, fn = fcache
   fillsFe!(cache, y->f(y,tₙ))
   F = collect(sparsevec(cache[6][1], cache[6][2]))
@@ -64,7 +64,7 @@ plt₂ = plot()
 plt₃ = plot()
 fn = 2:q*nf
 
-print("Begin solving using Direct Method ... ")
+print("Begin solving using Direct Method ... \n")
 let 
   Uₙ = U₀.(nds_fine[fn])
   Uₙ₊₁ = similar(Uₙ)
@@ -115,7 +115,7 @@ Mₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
 assemble_MS_matrix!(Kₘₛ, sKms, ms_elem)
 assemble_MS_matrix!(Mₘₛ, sMms, ms_elem)
 ## = Preallocate the RHS vector
-print("Begin solving using Multiscale Method ... ")
+print("Begin solving using Multiscale Method ... \n")
 let
   Fₘₛ = zeros(Float64,nc*(p+1))
   cache = contrib_cache, Fₘₛ
@@ -126,7 +126,7 @@ let
   for i=1:ntime
     Uₙ₊₁ = RK4!(cache, t+Δt, Uₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)  
     Uₙ = Uₙ₊₁
-#    (i%nc == 0) && print("Done t="*string(t+Δt)*"\n")
+    #    (i%nc == 0) && print("Done t="*string(t+Δt)*"\n")
     t += Δt
   end
   (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
