@@ -32,12 +32,14 @@ $$
 \end{align*}
 $$
 
-Here $D_{\varepsilon}$ is a highly oscillatory coefficient. 
+Here $D_{\varepsilon}$ is a highly oscillatory coefficient. Traditional methods often need very small meshes to resolve the oscillations on the fine scale and thus we turn to multiscale methods.
 
 ## Higher order multiscale method
 -------
 
-The higher order multiscale method is similar to the localized orthogonal decomposition method, but can be extended to the higher order setting. The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. I then use the standard finite element on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to sufficiently small to resolve the oscillations. This works since the problem is solved locally and often the oscillations could be captured on a reasonably small mesh. The new basis function then contains the fine scale information and can be used to find the numerical solution that resolves the oscillations on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. The diffusion coefficient here is a piecewise constant function on a very fine scale $(\epsilon = 2^{-7})$. 
+The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. I use the standard finite element method on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to be sufficiently small to resolve the fine scale effects. Since the problem is solved locally, the fine-scale effects could be captured using reasonably large mesh on the patch. 
+
+The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. The diffusion coefficient here is a piecewise constant function on a very fine scale $(\epsilon = 2^{-7})$. 
 
 | ![Fine scale bases](./HigherOrderMS/Images/bases_el_1_random.png) |
 | --- |
@@ -59,7 +61,7 @@ where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusi
 
 ### Heat equation in 1D
 
-The script `HigherOrderMS/1d_heat_eqn.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order (explicit) Runge Kutta method. The method is conditionally stable and a small time step is required to avoid instability. I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale. I set the oscillatory coefficient $D_{\varepsilon}(x)$ equal to
+The script `HigherOrderMS/1d_heat_eqn.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order explicit Runge Kutta (RK4) method. The method is conditionally stable and a small time step is required to avoid instability. I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale. I set the oscillatory coefficient $D_{\varepsilon}(x)$ equal to
 
 $$
 D_{\varepsilon}(x) = \left(2 + \cos{\frac{2\pi x}{2^{-2}}}\right)^{-1}
@@ -70,13 +72,13 @@ $$
 D_{\varepsilon}(x) = D_0 = 0.5
 $$
 
-In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. This example can be used to study the convergence of the method.
+In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. This example can be used to study the convergence of the method. Following figure shows the solution obtained using the multiscale method.
 
 | Smooth Diffusion Term | Oscillatory Diffusion Term |
 | --- | --- |
 | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_smooth.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_oscillatory.png) |
 
-The main advantage of the multiscale method is that it provides an increase in computational efficiency. This is because: 
+**The main advantage of the multiscale method is that it provides an increase in computational efficiency.** This is because: 
 
 1) The linear system (on the coarse space) obtained after computing the multiscale basis is much smaller than the linear system obtained using the traditional method (on the fine space). Comparing the time taken to solve 100 iterations in the time marching step, we see that the multiscale method takes less time to complete the iterations. 
 
@@ -108,7 +110,7 @@ $$
 D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = 4.0 + \left( \cos{\frac{2πx}{2^{-2}}} \right)
 $$
 
-In both cases, I set the right hand side $f(x,t) = 0$, the initial conditions $u(x,0) = 0$, $u_t(x,0) = 4\pi \sin\left(2\pi x\right)$. For the smooth wave speed case, the exact solution is given by $u(x,t) = \sin\left(2\pi x\right) \sin\left(4\pi t\right)$. Again we observe that the multiscale method gives a result that is close to the exact solution in the smooth case.
+In both cases, I set the right hand side $f(x,t) = 0$, the initial conditions $u(x,0) = 0$, $u_t(x,0) = 4\pi \sin\left(2\pi x\right)$. For the smooth wave speed case, the exact solution is given by $u(x,t) = \sin\left(2\pi x\right) \sin\left(4\pi t\right)$. We observe that the multiscale method gives a good approximation to the exact solution (smooth wave speed).
 
 | Smooth wave speed | Oscillatory wave speed |
 | --- | --- |
@@ -121,7 +123,7 @@ All the rate of convergence examples can be found inside the folder `HigherOrder
 
 #### Smooth Diffusion Coefficients
 -------
-The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size, $l$. The example was run for a very smooth diffusion coefficient. Following is the test example:
+The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size, $l$. The example was run for a smooth diffusion coefficient. Following is the test example:
 
 $$
  -(A(x)u'(x))' = f(x) \quad in \quad x \in \Omega = (0,1),
