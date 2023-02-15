@@ -55,7 +55,7 @@ f(x) = sin(5π*x)
 #=
 FEM parameters
 =#
-nc = 2^6 # Number of elements in the coarse space
+nc = 2^2 # Number of elements in the coarse space
 nf = 2^15 # Number of elements in the fine space
 p = 1 # Degree of polynomials in the coarse space
 q = 1 # Degree of polynomials in the fine space
@@ -84,7 +84,7 @@ sKms, sFms = multiscale
 
 # Compute the full stiffness matrix on the fine scale
 assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
-fillsKe!(assem_cache, D₁)
+fillsKe!(assem_cache, D₃)
 fillsFe!(assem_cache, f)
 #=
 fillsKe!(assem_cache, D₁) # Smooth Coefficient
@@ -96,7 +96,7 @@ Fϵ = collect(sparsevec(assem_cache[6][1],assem_cache[6][2]))
 solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 solϵ = vcat(0,solϵ,0)
 contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
-matrix_cache = mat_contribs!(contrib_cache, D₁)
+matrix_cache = mat_contribs!(contrib_cache, D₃)
 #=
 matrix_cache = mat_contribs!(contrib_cache, D₁)
 matrix_cache = mat_contribs!(contrib_cache, D₂)

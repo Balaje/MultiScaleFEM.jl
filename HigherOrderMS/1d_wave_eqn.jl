@@ -16,8 +16,8 @@ include("time_dependent.jl")
  
 # Problem data
 # uₜₜ - (c(x)*uₓ)ₓ = f 
-# c(x) = 4.0
-c(x) = (4.0 + cos(2π*x/(2e-2)))
+c(x) = 4.0
+#c(x) = (4.0 + cos(2π*x/(2e-2)))
 f(x,t) = 0.0
 U₀(x) = 0.0
 U₁(x) = 4π*sin(2π*x)
@@ -106,7 +106,7 @@ let
   build_solution!(cache2, Uₙ₊₂, local_basis_vecs)
   uhsol = cache2[1]
   plot!(plt, nds_fine, uhsol, label="Approximate sol. (MS Method)", lw=2, lc=:red)
-  uexact = [Uₑ(x,tf) for x in nds_fine]   
-  plot!(plt, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
+  # uexact = [Uₑ(x,tf) for x in nds_fine]   
+  # plot!(plt, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
 end
 print("End solving using Multiscale Method.\n\n")
