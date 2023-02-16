@@ -15,8 +15,8 @@ the heat equation supplemented with initial and boundary conditions
 
 $$
 \begin{align*}
-  u_t - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad x \in \Omega \times t = (0,1) \times (0,\infty),\\
-  u(x,0) = u_0(x) &\quad x \in \Omega,\\
+  u_t - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
+  u(x,0) = u_0(x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,\infty),
 \end{align*}
 $$
@@ -25,9 +25,9 @@ and the wave equation
 
 $$
 \begin{align*}
-  u_{tt} - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad x \in \Omega \times t = (0,1) \times (0,\infty),\\
-  u(x,0) = u_0(x) &\quad x \in \Omega,\\
-  u_t(x,0) = u_1(x) &\quad x \in \Omega,\\
+  u_{tt} - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
+  u(x,0) = u_0(x) &\quad x \in (0,1),\\
+  u_t(x,0) = u_1(x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,\infty),
 \end{align*}
 $$
