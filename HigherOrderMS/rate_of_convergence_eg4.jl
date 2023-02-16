@@ -28,14 +28,14 @@ Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
 ∇Uₑ(x,t) = exp(-0.5*π^2*t)*∇U₀(x)
 
 # Define the necessary parameters
-nf = 2^11
+nf = 2^12
 p = 1
 q = 1
 quad = gausslegendre(4)
 
 # Temporal parameters
-Δt = 1e-4
-tf = 100*Δt
+Δt = 1e-5
+tf = 1000*Δt
 ntime = ceil(Int,tf/Δt)
 plt = plot()
 plt1 = plot()
@@ -45,18 +45,16 @@ fn = 2:q*nf
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [2,3,4,5,6]
+for l in [8]
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     
     let
       preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
       
       fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
-      nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
-      nds_fineₛ, elem_fineₛ = fine
-      nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
-      sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
-      assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
+      nds_coarse, elems_coarse, nds_fine, elem_fine = fullspace[1:4]
+      patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch[3:7]
+      ms_elem = assems[3]
       sKms, sFms = multiscale
       bc = basis_cache(q)
       
@@ -102,7 +100,7 @@ for l in [2,3,4,5,6]
           (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
           t += Δt
         end
-        (isnan(sum(Uₙ₊₁))) && exit(1)
+        (isnan(sum(Uₙ₊₁))) && print("Unstable...\n")
         uhsol = zeros(Float64,q*nf+1)
         sol_cache = similar(uhsol)
         cache2 = uhsol, sol_cache

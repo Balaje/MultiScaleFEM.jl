@@ -59,54 +59,55 @@ for l in [4,5,6,7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
-    local preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
-    local cache = basis_cache(q), zeros(Float64,p+1), quad, preallocated_data
-    compute_ms_basis!(cache, nc, q, p, D₂)
+    let
+      preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
+      cache = basis_cache(q), zeros(Float64,p+1), quad, preallocated_data
+      compute_ms_basis!(cache, nc, q, p, D₂)
     
-    local fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
-    local nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
-    local nds_fineₛ, elem_fineₛ = fine
-    local nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
-    local sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
-    local assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
-    local sKms, sFms = multiscale
+      fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
+      nds_coarse, elems_coarse, nds_fine, elem_fine = fullspace[1:4]
+      patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch[3:7]
+      ms_elem = assems[3]
+      sKms, sFms = multiscale
+      bc = basis_cache(q)
     
-    # Compute the full stiffness matrix on the fine scale    
-    local contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
-    local matrix_cache = mat_contribs!(contrib_cache, D₂)
-    local vector_cache = vec_contribs!(contrib_cache, f)
-    local cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
-    fillsKms!(sKms, cache, nc, p, l)
-    local cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
-    fillsFms!(sFms, cache, nc, p, l)
+      # Compute the full stiffness matrix on the fine scale    
+      contrib_cache = mat_vec_contribs_cache(nds_fine, elem_fine, q, quad, elem_indices_to_global_indices)
+      matrix_cache = mat_contribs!(contrib_cache, D₂)
+      vector_cache = vec_contribs!(contrib_cache, f)
+      cache = local_basis_vecs, elem_indices_to_global_indices, L, Lᵀ, matrix_cache, ipcache
+      fillsKms!(sKms, cache, nc, p, l)
+      cache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
+      fillsFms!(sFms, cache, nc, p, l)
     
-    local Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
-    local Fₘₛ = zeros(Float64,nc*(p+1))
-    local cache = Kₘₛ, Fₘₛ
-    assemble_MS!(cache, sKms, sFms, ms_elem)
-    local sol = Kₘₛ\Fₘₛ
-    local uhsol = zeros(Float64,nf+1)
-    local sol_cache = similar(uhsol)
-    local cache = uhsol, sol_cache
-    build_solution!(cache, sol, local_basis_vecs)
-    uhsol, _ = cache
+      Kₘₛ = zeros(Float64,nc*(p+1),nc*(p+1))
+      Fₘₛ = zeros(Float64,nc*(p+1))
+      cache = Kₘₛ, Fₘₛ
+      assemble_MS!(cache, sKms, sFms, ms_elem)
+      sol = Kₘₛ\Fₘₛ
+      uhsol = zeros(Float64,nf+1)
+      sol_cache = similar(uhsol)
+      cache = uhsol, sol_cache
+      build_solution!(cache, sol, local_basis_vecs)
+      uhsol, _ = cache
     
-    ## Compute the errors
-    # local usol = u.(nds_fine)
-    local bc = basis_cache(q)
-    local qs,ws=quad    
-    for j=1:nf, jj=1:lastindex(qs)
-      x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,2]])*0.5 + (0.5*nf^-1)*qs[jj]
-      ϕᵢ!(bc,qs[jj])
-      L²Error[itr] += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
-      ∇ϕᵢ!(bc,qs[jj])
-      H¹Error[itr] += ws[jj]*D₂(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
-    end    
+      ## Compute the errors
+      # usol = u.(nds_fine)
+      bc = basis_cache(q)
+      qs,ws=quad    
+      for j=1:nf, jj=1:lastindex(qs)
+        x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,2]])*0.5 + (0.5*nf^-1)*qs[jj]
+        ϕᵢ!(bc,qs[jj])
+        L²Error[itr] += ws[jj]*(dot(solϵ[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+        ∇ϕᵢ!(bc,qs[jj])
+        H¹Error[itr] += ws[jj]*D₂(x̂)*(dot(solϵ[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+      end    
 
-    L²Error[itr] = sqrt(L²Error[itr])
-    H¹Error[itr] = sqrt(H¹Error[itr])
+      L²Error[itr] = sqrt(L²Error[itr])
+      H¹Error[itr] = sqrt(H¹Error[itr])
         
-    println("Done nc = "*string(nc))
+      println("Done nc = "*string(nc))
+    end
   end
   
   println("Done l = "*string(l))
