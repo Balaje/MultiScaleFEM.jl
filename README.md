@@ -68,6 +68,7 @@ D_{\varepsilon}(x) = \left(2 + \cos{\frac{2\pi x}{2^{-2}}}\right)^{-1}
 $$
 
 and the smooth coefficient 
+
 $$
 D_{\varepsilon}(x) = D_0 = 0.5
 $$
