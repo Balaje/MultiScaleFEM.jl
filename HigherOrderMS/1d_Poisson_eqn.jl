@@ -75,12 +75,11 @@ compute_ms_basis!(cache, nc, q, p, D₂) # Oscillatory Coefficient
 compute_ms_basis!(cache, nc, q, p, D₃) # Random Coefficient
 =#
 fullspace, fine, patch, local_basis_vecs, mats, assems, multiscale = preallocated_data
-nds_coarse, elems_coarse, nds_fine, elem_fine, assem_H¹H¹ = fullspace
-nds_fineₛ, elem_fineₛ = fine
-nds_patchₛ, elem_patchₛ, patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch
-sKeₛ, sLeₛ, sFeₛ, sLVeₛ = mats
-assem_H¹H¹ₛ, assem_H¹L²ₛ, ms_elem = assems
+nds_coarse, elems_coarse, nds_fine, elem_fine = fullspace[1:4]
+patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcache = patch[3:7]
+ms_elem = assems[3]
 sKms, sFms = multiscale
+bc = basis_cache(q)
 
 # Compute the full stiffness matrix on the fine scale
 assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
