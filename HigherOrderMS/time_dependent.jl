@@ -25,22 +25,45 @@ end
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
-function BDFk!(fcache, t::AbstractVector{Float64}, U::AbstractMatrix{Float64}, Δt::Float64, 
-  M⁺::AbstractMatrix{Float64}, M⁻::AbstractMatrix{Float64}, f!::Function, k::Int64)
+function BDFk!(cache, t::AbstractVector{Float64}, U::AbstractMatrix{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, k::Int64)
+  # U should be arranged in descending order (n+k), (n+k-1), ...
   @assert (size(U,2) == size(t,1) == k) # Check if it is the right BDF-k
-  
+  dl_cache, fcache = cache
+  coeffs = dl!(dl_cache, k)
+  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))  
+  fill!(RHS,0.0)
+  for i=0:k
+    RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
+  end 
+  LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
+  U = LHS\RHS
 end
+function dl!(cache, k::Int64)
+  sum, prod, res = cache
+  fill!(res,0.0)
+  xⱼ = 0.0:Float64(k)
+  for i=1:k+1
+    res[i] = dlₖ!((sum,prod), Float64(k), xⱼ, i)
+  end
+  res
+end 
 function dlₖ!(cache, t::Float64, tⱼ::AbstractVector{Float64}, j::Int64)
   sum, prod = cache
   sum = 0.0
   prod = 1.0
-  for m=1:lastindex(tⱼ)
-    (j ≠ m) && begin
-     prod = prod*(t - tⱼ[m])/(tⱼ[j]-tⱼ[m])
-     sum += (1.0/(t - tⱼ[m]))
-    end
+  for l=1:lastindex(tⱼ)
+    (l ≠ j) && begin
+      prod = 1/(tⱼ[j]- tⱼ[l])
+      for m=1:lastindex(tⱼ)
+        (m ≠ j) && (m ≠ l) && begin
+          prod = prod*(t - tⱼ[m])/(tⱼ[j]-tⱼ[m])        
+        end
+      end
+      sum += prod
+    end     
   end
-  sum*prod
+  sum
 end
 """
 Function to setup the initial condition by evaluating the L² projection on the MS-space.

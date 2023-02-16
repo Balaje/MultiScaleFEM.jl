@@ -16,6 +16,7 @@ include("time_dependent.jl")
  
 # Problem data
 # uₜₜ - (c(x)*uₓ)ₓ = f 
+domain = (0.0,1.0)
 c(x) = 4.0
 #c(x) = (4.0 + cos(2π*x/(2e-2)))
 f(x,t) = 0.0
