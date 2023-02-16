@@ -23,6 +23,26 @@ function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::A
   U
 end
 """
+The Backward Difference Formula of order k for the linear heat equation
+"""
+function BDFk!(fcache, t::AbstractVector{Float64}, U::AbstractMatrix{Float64}, Δt::Float64, 
+  M⁺::AbstractMatrix{Float64}, M⁻::AbstractMatrix{Float64}, f!::Function, k::Int64)
+  @assert (size(U,2) == size(t,1) == k) # Check if it is the right BDF-k
+  
+end
+function dlₖ!(cache, t::Float64, tⱼ::AbstractVector{Float64}, j::Int64)
+  sum, prod = cache
+  sum = 0.0
+  prod = 1.0
+  for m=1:lastindex(tⱼ)
+    (j ≠ m) && begin
+     prod = prod*(t - tⱼ[m])/(tⱼ[j]-tⱼ[m])
+     sum += (1.0/(t - tⱼ[m]))
+    end
+  end
+  sum*prod
+end
+"""
 Function to setup the initial condition by evaluating the L² projection on the MS-space.
 """
 function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, nc::Int64, nf::Int64, 
