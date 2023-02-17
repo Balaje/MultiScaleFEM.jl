@@ -26,7 +26,7 @@ Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
 
 # Define the necessary parameters
 nc = 2^1
-nf = 2^4
+nf = 2^11
 p = 1
 q = 1
 l = 4
@@ -87,7 +87,7 @@ let
   end
   Uₙ₊₁ = vcat(0.0, Uₙ₊ₛ[:,1], 0.0)
   (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
-  plot!(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", lc=:black, lw=2)
+  scatter!(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", markersize=2)
   uexact = [Uₑ(x,tf) for x in nds_fine]  
   plot!(plt₁, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
 end
