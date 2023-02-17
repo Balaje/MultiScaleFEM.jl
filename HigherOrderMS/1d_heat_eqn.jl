@@ -62,28 +62,39 @@ plt₁ = plot()
 plt₂ = plot()
 plt₃ = plot()
 fn = 2:q*nf
+BDFk = 4
 
 print("Begin solving using Direct Method ... \n")
 let 
-  Uₙ = U₀.(nds_fine[fn])
-  Uₙ₊₁ = similar(Uₙ)
-  fill!(Uₙ₊₁, 0.0)
-  t = 0
+  U = reshape(U₀.(nds_fine[fn]), (q*nf-1,1))
+  Uₙ₊ₛ = similar(U)
   cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
-  for i=1:ntime
-    Uₙ₊₁ = RK4!(cache, t+Δt, Uₙ, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)  
-    Uₙ = Uₙ₊₁
+  t = 0
+  for i=1:BDFk-1
+    dlcache = get_dl_cache(i)
+    fcache = dlcache, cache
+    U₁ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, i)     
+    U = hcat(U₁, U)
     t += Δt
   end
-  Uₙ₊₁ = vcat(0, Uₙ₊₁, 0)
+  dlcache = get_dl_cache(BDFk)
+  fcache = dlcache, cache
+  for i=BDFk:ntime  
+    Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, BDFk)
+    U[:,2:BDFk] = U[:,1:BDFk-1]
+    U[:,1] = Uₙ₊ₛ
+    t += Δt
+  end
+  Uₙ₊₁ = vcat(0.0, Uₙ₊ₛ[:,1], 0.0)
   (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
   plot!(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", lc=:black, lw=2)
+  uexact = [Uₑ(x,tf) for x in nds_fine]  
+  plot!(plt₁, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
 end
 print("End solving using Direct Method.\n\n")
 
 #=
 Begin solving the problem using the multiscale method
-=#
 function fₙ_MS!(cache, tₙ::Float64)
   contrib_cache, Fms = cache
   vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
@@ -177,3 +188,4 @@ let
     end
   end
 end
+=#

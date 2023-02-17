@@ -25,19 +25,22 @@ end
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
-function BDFk!(cache, t::AbstractVector{Float64}, U::AbstractMatrix{Float64}, Δt::Float64, 
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64, 
   K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, k::Int64)
   # U should be arranged in descending order (n+k), (n+k-1), ...
-  @assert (size(U,2) == size(t,1) == k) # Check if it is the right BDF-k
+  @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
   coeffs = dl!(dl_cache, k)
   RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))  
-  fill!(RHS,0.0)
-  for i=0:k
+  for i=0:k-1
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end 
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
-  U = LHS\RHS
+  Uₙ₊ₖ = LHS\RHS
+  Uₙ₊ₖ
+end
+function get_dl_cache(k::Int64)
+  0, 0, zeros(Float64,k+1)
 end
 function dl!(cache, k::Int64)
   sum, prod, res = cache
