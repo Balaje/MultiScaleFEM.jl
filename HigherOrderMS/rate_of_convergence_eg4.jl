@@ -20,12 +20,10 @@ include("time_dependent.jl")
 Problem data 2: Oscillatory diffusion coefficient
 =#
 domain = (0.0,1.0)
-A(x) = 0.5
+# A(x) = 0.5
+A(x) = (2.0 + cos((2π*x/(2e-6))))^-1
 f(x,t) = 0.0
 U₀(x) = sin(π*x)
-∇U₀(x) = π*cos(π*x)
-Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
-∇Uₑ(x,t) = exp(-0.5*π^2*t)*∇U₀(x)
 
 # Define the necessary parameters
 nf = 2^15
@@ -88,7 +86,6 @@ let
   end
   copyto!(Uₙ₊₁, vcat(0.0, Uₙ₊ₛ[:,1], 0.0))
   (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
-  plot(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", lc=:black, lw=2) 
 end
 
 𝒩 = [1,2,4,8,16,32,64,128]

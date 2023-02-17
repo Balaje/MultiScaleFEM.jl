@@ -61,7 +61,7 @@ where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusi
 
 ### Heat equation in 1D
 
-The script `HigherOrderMS/1d_heat_eqn.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order explicit Runge Kutta (RK4) method. The method is conditionally stable and a small time step is required to avoid instability. I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale. I set the oscillatory coefficient $D_{\varepsilon}(x)$ equal to
+The script `HigherOrderMS/1d_heat_eqn.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order backward difference formula (BDF4). I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale. I set the oscillatory coefficient $D_{\varepsilon}(x)$ equal to
 
 $$
 D_{\varepsilon}(x) = \left(2 + \cos{\frac{2\pi x}{2^{-2}}}\right)^{-1}
@@ -73,35 +73,20 @@ $$
 D_{\varepsilon}(x) = D_0 = 0.5
 $$
 
-In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. This example can be used to study the convergence of the method. Following figure shows the solution obtained using the multiscale method.
+In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. This example can be used to study the convergence of the method. Following figure shows the solution obtained using the multiscale method.  
 
 | Smooth Diffusion Term | Oscillatory Diffusion Term |
 | --- | --- |
-| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_smooth.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_oscillatory.png) |
+| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all_osc.png) |
 
-**The main advantage of the multiscale method is that it provides an increase in computational efficiency.** This is because: 
 
-1) The linear system (on the coarse space) obtained after computing the multiscale basis is much smaller than the linear system obtained using the traditional method (on the fine space). Comparing the time taken to solve 100 iterations in the time marching step, we see that the multiscale method takes less time to complete the iterations. 
+**The main advantage of the multiscale method is that it provides an increase in computational efficiency.** This is because the linear system (on the coarse space) obtained after computing the multiscale basis is much smaller than the linear system obtained using the traditional method (on the fine space). Comparing the time taken to solve 10000 iterations in the time marching step, we see that the multiscale method takes less time to complete the iterations. 
 
 ``` julia
-  # nf = 2^11, nc = 2^1, Δt = 1e-4
-  Running some benchmarks for 100 iterations...
-  Direct Method takes:   296.866 ms (38800 allocations: 610.24 MiB)
-  Multiscale Method takes:   138.934 ms (36700 allocations: 222.56 MiB)
-
-  # nf = 2^4, nc = 2^1, Δt = 1e-4
-  Running some benchmarks for 100 iterations...
-  Direct Method takes:   6.400 ms (35600 allocations: 6.54 MiB)
-  Multiscale Method takes:   2.526 ms (35900 allocations: 4.37 MiB)
+  # nf = 2^11, nc = 2^4, Δt = 1e-4, tf = 1.0
+  Direct Method takes:   10.260 s (1559011 allocations: 25.42 GiB)
+  Multiscale Method takes:   6.102 s (6621011 allocations: 6.63 GiB)
 ```
-
-2) Plus the CFL condition demands that the time step $\Delta t \lessapprox (\Delta x)^\alpha$ where $\Delta x$ is the spatial mesh size. For the multiscale method, since $H \gg h$, the CFL condition is much less strict compared to the traditional method. Thus we can compute the solution using much bigger time steps, while still capturing the small scale effects, resulting in a much more efficient method. 
-
-<!-- Moreover, the traditional RK4-finite element method has a stability criterion that the time step $\Delta t \propto h^2$. This means applying the traditional method on fine meshes leads to an unstable method, if $\Delta t$ is chosen too large. However, the time step requirements for the RK4-multiscale method is much less strict as $\Delta t \propto H^2$. This can be seen when the problem is run with $h=2^{-11}$ where the traditional method fails, whereas the multiscale method gives a result that is close to the exact solution. Following plot summarizes the result.
-
-| $h=2^{-4}$, $H=2^{-1}$ and $ \Delta t = 10^{-4}$ | $h=2^{-11}$, $H=2^{-1}$ and $ \Delta t = 10^{-4}$ |
-| --- | --- |
-| ![All](./HigherOrderMS/Images/heat_eq_all.png) | ![Two](./HigherOrderMS/Images/heat_eq_two.png) |  -->
 
 ### Wave equation in 1D
 
@@ -151,7 +136,7 @@ This is in line with the observation made in Maier, R., 2021. Similar observatio
 ![](./HigherOrderMS/Images/ooc_2.png) |
 --- |
 
-After eliminating the KDTree search, we can solve the problem upto the coarse-mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-12}$ with the fine scale at $h=2^{-16}$. However, the method does not show convergence for very fine coarse-meshes unless the localization parameter is chosen high enough.
+We can solve the problem upto the coarse-mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-12}$ with the fine scale at $h=2^{-16}$. However, the method does not show convergence for very fine coarse-meshes unless the localization parameter is chosen high enough.
 
 ![](./HigherOrderMS/Images/ooc_5.png) |
 --- |
@@ -164,6 +149,35 @@ Finally we can observe the same behaviour for the other choices of diffusion coe
 Oscillatory coefficient | Random coefficients |
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_6_oscillatory.png) | ![](./HigherOrderMS/Images/ooc_7_random_coeff.png) | 
+
+#### Time dependent problems
+-------
+
+Similar results can be seen in the time dependent case. I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_eg4jl)`.
+
+$$
+\begin{align*}
+  u_t - (A(x)u'(x,t))' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
+  u(x,0) = \sin(\pi x) &\quad x \in (0,1),\\
+  u(0,t) = u(1,t) =0 &\quad t \in (0,T),
+\end{align*}
+$$
+
+I take $h = 2^{-15}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-5}$ and solve till final time $T = 500 \Delta t$ (500 steps). I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
+
+$$
+A(x) = 0.5,
+$$
+
+and the oscillatory coefficient
+
+$$
+A(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1} .
+$$
+
+Constant coefficient | Oscillatory coefficient |
+--- | --- |
+![](./HigherOrderMS/Images/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/ooc_9_heat_eq_osc.png)
 
 ## Localized Orthogonal Decomposition Method
 -------

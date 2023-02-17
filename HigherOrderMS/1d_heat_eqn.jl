@@ -18,8 +18,8 @@ include("time_dependent.jl")
 Problem data 2: Oscillatory diffusion coefficient
 =#
 domain = (0.0,1.0)
-A(x) = 0.5
-#A(x) = (2.0 + cos((2π*x/(2e-2))))^-1
+#A(x) = 0.5
+A(x) = (2.0 + cos((2π*x/(2e-2))))^-1
 f(x,t) = 0.0
 U₀(x) = sin(π*x)
 Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
