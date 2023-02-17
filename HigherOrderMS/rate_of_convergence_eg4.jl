@@ -28,24 +28,76 @@ Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
 ∇Uₑ(x,t) = exp(-0.5*π^2*t)*∇U₀(x)
 
 # Define the necessary parameters
-nf = 2^12
+nf = 2^15
 p = 1
 q = 1
 quad = gausslegendre(4)
 
 # Temporal parameters
 Δt = 1e-5
-tf = 1000*Δt
+tf = 500*Δt
 ntime = ceil(Int,tf/Δt)
 plt = plot()
 plt1 = plot()
 fn = 2:q*nf
+BDFk = 4
 
-𝒩 = [1,2,4,8,16]
+# Build the matrices for the fine scale problem
+nds_fine = LinRange(domain[1], domain[2], nf+1)
+elem_fine = [elem_conn(i,j) for i=1:nf, j=0:1]
+assem_H¹H¹ = ([H¹Conn(q,i,j) for _=0:q, j=0:q, i=1:nf],
+[H¹Conn(q,i,j) for j=0:q, _=0:q, i=1:nf], 
+[H¹Conn(q,i,j) for j=0:q, i=1:nf])
+# Fill the final-scale matrix vector system
+assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
+fillsKe!(assem_cache, A)
+Kϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
+fillsMe!(assem_cache, x->1.0)
+Mϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
+# The RHS-vector as a function of t
+function fₙ!(fcache, tₙ::Float64)  
+  cache, fn = fcache
+  fillsFe!(cache, y->f(y,tₙ))
+  F = collect(sparsevec(cache[6][1], cache[6][2]))
+  F[fn]
+end
+Uₙ₊₁ = zeros(Float64,q*nf+1)
+# Solve the time-dependent problem using the BDF-k method
+let  
+  U = reshape(U₀.(nds_fine[fn]), (q*nf-1,1))
+  Uₙ₊ₛ = Vector{Float64}(undef,q*nf-1)
+  fill!(Uₙ₊ₛ,0.0)
+  cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
+  t = 0.0
+  # Starting steps
+  for i=1:BDFk-1
+    dlcache = get_dl_cache(i)
+    fcache = dlcache, cache
+    U₁ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, i)     
+    U = hcat(U₁, U)
+    t += Δt
+  end
+  # Main BDFk steps
+  dlcache = get_dl_cache(BDFk)
+  fcache = dlcache, cache
+  for i=BDFk:ntime  
+    Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, BDFk)
+    U[:,2:BDFk] = U[:,1:BDFk-1]
+    U[:,1] = Uₙ₊ₛ
+    t += Δt
+  end
+  copyto!(Uₙ₊₁, vcat(0.0, Uₙ₊ₛ[:,1], 0.0))
+  (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
+  plot(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", lc=:black, lw=2) 
+end
+
+𝒩 = [1,2,4,8,16,32,64,128]
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [8]
+for l in [4,5,6]
+  fill!(L²Error,0.0)
+  fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
     
     let
@@ -90,21 +142,33 @@ for l in [8]
       let
         Fₘₛ = zeros(Float64,nc*(p+1))
         cache = contrib_cache, Fₘₛ
-        Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-        Uₙ₊₁ = similar(Uₙ)
-        fill!(Uₙ₊₁,0.0)
-        t = 0.0
-        for i=1:ntime
-          Uₙ₊₁ = RK4!(cache, t, Uₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)  
-          Uₙ = Uₙ₊₁
-          (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
+        U = reshape(setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ), (nc*(p+1),1))
+        #@show isnan(sum(U))
+        Uₙ₊ₛ = Vector{Float64}(undef,nc*(p+1))
+        fill!(Uₙ₊ₛ,0.0)
+        t = 0
+        # Starting steps
+        for i=1:BDFk-1
+          dlcache = get_dl_cache(i)
+          fcache = dlcache, cache
+          U₁ = BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, i)
+          U = hcat(U₁,U)
           t += Δt
         end
-        (isnan(sum(Uₙ₊₁))) && print("Unstable...\n")
+        # Main BDFk steps
+        dlcache = get_dl_cache(BDFk)
+        fcache = dlcache, cache
+        for i=1:ntime
+          copyto!(Uₙ₊ₛ, BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, BDFk))
+          U[:,2:BDFk] = U[:,1:BDFk-1]
+          U[:,1] = Uₙ₊ₛ
+          t += Δt
+        end
+        (isnan(sum(Uₙ₊ₛ))) && print("\nUnstable \n")
         uhsol = zeros(Float64,q*nf+1)
         sol_cache = similar(uhsol)
         cache2 = uhsol, sol_cache
-        build_solution!(cache2, Uₙ₊₁, local_basis_vecs)
+        build_solution!(cache2, Uₙ₊ₛ, local_basis_vecs)
         uhsol = cache2[1]
 
         bc = basis_cache(q)
@@ -112,9 +176,9 @@ for l in [8]
         for j=1:nf, jj=1:lastindex(qs)
           x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,2]])*0.5 + (0.5*nf^-1)*qs[jj]
           ϕᵢ!(bc,qs[jj])
-          L²Error[itr] += ws[jj]*(Uₑ(x̂, tf) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+          L²Error[itr] += ws[jj]*(dot(Uₙ₊₁[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
           ∇ϕᵢ!(bc,qs[jj])
-          H¹Error[itr] += ws[jj]*A(x̂)*(∇Uₑ(x̂, tf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+          H¹Error[itr] += ws[jj]*A(x̂)*(dot(Uₙ₊₁[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
         end
         L²Error[itr] = sqrt(L²Error[itr])
         H¹Error[itr] = sqrt(H¹Error[itr])

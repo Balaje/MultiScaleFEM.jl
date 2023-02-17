@@ -25,12 +25,13 @@ U₀(x) = sin(π*x)
 Uₑ(x,t) = exp(-0.5*π^2*t)*U₀(x)
 
 # Define the necessary parameters
-nc = 2^1
+nc = 2^4
 nf = 2^11
 p = 1
 q = 1
-l = 4
+l = 5
 quad = gausslegendre(4)
+
 
 # Preallocate all the necessary data
 preallocated_data = preallocate_matrices(domain, nc, nf, l, (q,p))
@@ -40,6 +41,7 @@ patch_indices_to_global_indices, elem_indices_to_global_indices, L, Lᵀ, ipcach
 ms_elem = assems[3]
 sKms, sFms = multiscale
 bc = basis_cache(q)
+Uₙ₊₁ = zeros(Float64,q*nf+1)
 
 # First obtain the stiffness and mass matrix in the fine scale
 cache = assembler_cache(nds_fine, elem_fine, quad, q)
@@ -68,8 +70,10 @@ print("Begin solving using Direct Method ... \n")
 let 
   U = reshape(U₀.(nds_fine[fn]), (q*nf-1,1))
   Uₙ₊ₛ = similar(U)
+  fill!(Uₙ₊ₛ,0.0)
   cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
   t = 0
+  # Starting steps
   for i=1:BDFk-1
     dlcache = get_dl_cache(i)
     fcache = dlcache, cache
@@ -77,6 +81,7 @@ let
     U = hcat(U₁, U)
     t += Δt
   end
+  # Main BDFk steps
   dlcache = get_dl_cache(BDFk)
   fcache = dlcache, cache
   for i=BDFk:ntime  
@@ -87,14 +92,13 @@ let
   end
   Uₙ₊₁ = vcat(0.0, Uₙ₊ₛ[:,1], 0.0)
   (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
-  scatter!(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", markersize=2)
-  uexact = [Uₑ(x,tf) for x in nds_fine]  
-  plot!(plt₁, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
+  plot!(plt₁, nds_fine, Uₙ₊₁, label="Approximate sol. (direct method)", lc=:black, lw=2) 
 end
 print("End solving using Direct Method.\n\n")
 
 #=
 Begin solving the problem using the multiscale method
+=#
 function fₙ_MS!(cache, tₙ::Float64)
   contrib_cache, Fms = cache
   vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
@@ -127,27 +131,54 @@ assemble_MS_matrix!(Mₘₛ, sMms, ms_elem)
 ## = Preallocate the RHS vector
 print("Begin solving using Multiscale Method ... \n")
 let
+  l2err = 0.0
+  h1err = 0.0
   Fₘₛ = zeros(Float64,nc*(p+1))
   cache = contrib_cache, Fₘₛ
-  Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-  Uₙ₊₁ = similar(Uₙ)
-  fill!(Uₙ₊₁,0.0)
-  t = 0
-  for i=1:ntime
-    Uₙ₊₁ = RK4!(cache, t+Δt, Uₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)  
-    Uₙ = Uₙ₊₁
-    #    (i%nc == 0) && print("Done t="*string(t+Δt)*"\n")
+  U = reshape(setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ), (nc*(p+1),1))
+  Uₙ₊ₛ = Vector{Float64}(undef,nc*(p+1))
+  fill!(Uₙ₊ₛ,0.0)
+  t = 0.0
+  # Starting steps
+  for i=1:BDFk-1
+    dlcache = get_dl_cache(i)
+    fcache = dlcache, cache
+    U₁ = BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, i)
+    U = hcat(U₁,U)
     t += Δt
   end
-  (isnan(sum(Uₙ₊₁))) && print("\nUnstable \n")
+  # Main BDF-k steps
+  dlcache = get_dl_cache(BDFk)
+  fcache = dlcache, cache
+  for i=1:ntime
+    copyto!(Uₙ₊ₛ, BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, BDFk))
+    U[:,2:BDFk] = U[:,1:BDFk-1]
+    U[:,1] = Uₙ₊ₛ
+    t += Δt
+  end
+  (isnan(sum(Uₙ₊ₛ))) && print("\nUnstable \n")
   uhsol = zeros(Float64,q*nf+1)
   sol_cache = similar(uhsol)
   cache2 = uhsol, sol_cache
-  build_solution!(cache2, Uₙ₊₁, local_basis_vecs)
+  build_solution!(cache2, Uₙ₊ₛ, local_basis_vecs)
   uhsol = cache2[1]
   plot!(plt₂, nds_fine, uhsol, label="Approximate sol. (MS Method)", lw=2, lc=:red)
   uexact = [Uₑ(x,tf) for x in nds_fine]  
   plot!(plt₃, nds_fine, uexact, label="Exact solution", lw=2, lc=:green)
+
+  # Compute the errors
+  bc = basis_cache(q)
+  qs,ws=quad    
+  for j=1:nf, jj=1:lastindex(qs)
+    x̂ = (nds_fine[elem_fine[j,1]] + nds_fine[elem_fine[j,2]])*0.5 + (0.5*nf^-1)*qs[jj]
+    ϕᵢ!(bc,qs[jj])
+    l2err += ws[jj]*(dot(Uₙ₊₁[elem_fine[j,:]],bc[3]) - dot(uhsol[elem_fine[j,:]],bc[3]))^2*(0.5*nf^-1)
+    ∇ϕᵢ!(bc,qs[jj])
+    h1err += ws[jj]*A(x̂)*(dot(Uₙ₊₁[elem_fine[j,:]],bc[3])*(2*nf) - dot(uhsol[elem_fine[j,:]],bc[3])*(2*nf))^2*(0.5*nf^-1)
+  end
+  l2err = sqrt(l2err)
+  h1err = sqrt(h1err)
+  @show l2err, h1err
 end
 print("End solving using Multiscale Method.\n\n")
 
@@ -156,36 +187,58 @@ display(plot(plt₁, plt₂, plt₃, layout=(3,1)))
 #=
 Some benchmarking
 =#
-#1) RK4 Solution using the direct method
 print("Running some benchmarks for 100 iterations...\n")
-let
+function timeit_1()
+  dlcache = get_dl_cache(BDFk)
   cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
-  Uₙ = U₀.(nds_fine[fn])
-  Uₙ₊₁ = similar(Uₙ)
-  fill!(Uₙ₊₁,0.0)
-  t = 0
-  print("Direct Method takes: ")
-  @btime begin
-    for i=1:100
-      Uₙ₊₁ = RK4!($cache, $(t+Δt), $Uₙ, $Δt, $Kϵ[fn,fn], $Mϵ[fn,fn], $fₙ!) 
-      Uₙ = Uₙ₊₁
-      $(t+=Δt)
-    end
+  U = reshape(U₀.(nds_fine[fn]), (q*nf-1,1))
+  t = 0.0
+  # Starting steps
+  for i=1:BDFk-1
+    dlcache = get_dl_cache(i)
+    fcache = dlcache, cache
+    U₁ = BDFk!(fcache, (t+Δt), U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, i)     
+    U = hcat(U₁, U)
+    t += Δt
   end
-  #2) RK4 Solution using the MS method
-  Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-  Uₙ₊₁ = similar(Uₙ)
-  fill!(Uₙ₊₁,0.0)
-  t = 0
-  Fₘₛ = zeros(Float64,nc*(p+1))
-  cache = contrib_cache, Fₘₛ
-  print("Multiscale Method takes: ")
-  @btime begin   
-    for i=1:100
-      Uₙ₊₁ = RK4!($cache, $(t+Δt), $Uₙ, $(Δt), $Kₘₛ, $Mₘₛ, $fₙ_MS!)  
-      Uₙ = Uₙ₊₁
-      $(t += Δt)
-    end
+  # Main BDFk steps
+  dlcache = get_dl_cache(BDFk)
+  fcache = dlcache, cache
+  for i=BDFk:ntime  
+    Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, BDFk)
+    U[:,2:BDFk] = U[:,1:BDFk-1]
+    U[:,1] = Uₙ₊ₛ
+    t += Δt
   end
 end
-=#
+# print("Direct Method takes = ")
+# @btime timeit_1(); 
+# print("\n")
+
+function timeit_2()
+  Fₘₛ = zeros(Float64,nc*(p+1))
+  cache = contrib_cache, Fₘₛ
+  U = reshape(setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ), (nc*(p+1),1))
+  Uₙ₊ₛ = similar(U)
+  t = 0
+  # Starting steps
+  for i=1:BDFk-1
+    dlcache = get_dl_cache(i)
+    fcache = dlcache, cache
+    U₁ = BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, i)
+    U = hcat(U₁,U)
+    t += Δt
+  end
+  # Main BDFk steps
+  dlcache = get_dl_cache(BDFk)
+  fcache = dlcache, cache
+  for i=1:ntime
+    Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, BDFk)
+    U[:,2:BDFk] = U[:,1:BDFk-1]
+    U[:,1] = Uₙ₊ₛ
+    t += Δt
+  end
+end
+# print("Multiscale Method takes: ")
+# @btime timeit_2(); 
+# print("\n")

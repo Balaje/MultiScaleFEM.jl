@@ -76,6 +76,7 @@ function setup_initial_condition(U₀::Function, nds::AbstractVector{Float64}, n
   p::Int64, q::Int64, massmat::Matrix{Float64})
   qs,ws = quad
   U0 = Matrix{Float64}(undef,p+1,nc)
+  fill!(U0,0.0)
   bc = basis_cache(q)
   for t=1:nc
     lb = local_basis_vecs[t]
