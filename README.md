@@ -136,7 +136,6 @@ This is in line with the observation made in Maier, R., 2021. Similar observatio
 `(p=2)` | `(p=3)` |
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_2.png) | ![](./HigherOrderMS/Images/ooc_10_p3.png) |
---- | --- |
 
 We can solve the problem upto the coarse-mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-12}$ with the fine scale at $h=2^{-16}$. However, the method does not show convergence for very fine coarse-meshes unless the localization parameter is chosen high enough.
 
