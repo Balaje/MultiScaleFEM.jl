@@ -8,29 +8,29 @@ Basis function for the discontinuous space. Returns the legendre polynomials upt
 function Λₖ!(res::AbstractVector{Float64}, x::Float64, nds::AbstractVector{Float64}, p::Int64)
   a,b = nds  
   fill!(res,0.0)
-  if(((x-a) ≥ 1e-10) && ((x-b) ≤ 1e-10))
+  if(a < x < b)
     x̂ = -(b+a)/(b-a) + 2.0*x/(b-a)  
     if(p==0)
-      res[1] = 1.0
+      res[1] = 1.0      
     elseif(p==1)
       res[1] = 1.0
       res[2] = x̂
-    else      
+    else     
       res[1] = 1.0
       res[2] = x̂
       for j=2:p
-        res[j+1] = (2j-1)/(j)*x̂*res[j] - (j-1)/(j)*res[j-1]  
+        res[j+1] = (2j-1)/(j)*x̂*res[j] - (j-1)/(j)*res[j-1]          
       end
     end
-  else
-    return
   end
+  return res
 end 
 # Basis function of Vₕᵖ(K)
 function fₖ!(res::Vector{Float64}, x::Float64, j::Int64, 
   nds::AbstractVector{Float64}, elem_coarse::Matrix{Int64}, el::Int64)      
   nodes = view(nds, view(elem_coarse,el,:))
-  Λₖ!(res, x, nodes, p)
+  p=size(res,1)-1
+  res = Λₖ!(res, x, nodes, p)
   res[j]
 end 
 """
@@ -96,6 +96,10 @@ function compute_ms_basis!(cache, nc::Int64, q::Int64, p::Int64, D::Function)
       KK = sparse(vec(assem_H¹H¹ₛ[i][1]), vec(assem_H¹H¹ₛ[i][2]), vec(sKeₛ[i]))
       LL = sparse(vec(assem_H¹L²ₛ[i][1]), vec(assem_H¹L²ₛ[i][2]), vec(sLeₛ[i]))
       FF = collect(sparsevec(vec(assem_H¹L²ₛ[i][3]), vec(sFeₛ[i])))
+      # (i==1) && begin 
+      #   display(FF);
+      #   display(nds_coarse[elem_coarse[i,:]]) 
+      # end
       nfᵢ = size(KK,1)
       fn = 2:nfᵢ-1
       K = KK[fn,fn]; L = LL[fn,:]; F = FF;

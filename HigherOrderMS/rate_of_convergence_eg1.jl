@@ -25,10 +25,10 @@ domain = (0.0,1.0)
 #=
 Constant paramters
 =#
-p = 1
+p = 3
 q = 1
 nf = 2^16 # Size of the background mesh
-qorder = 3
+qorder = 6
 quad = gausslegendre(qorder)
 
 # 𝒩 = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096]
@@ -55,7 +55,8 @@ solϵ = Kϵ[2:q*nf,2:q*nf]\Fϵ[2:q*nf]
 solϵ = vcat(0,solϵ,0)
 
 # for l in [4,5,6,7,8,9,10]
-for l in [4,5,6,7,8,9]
+# for l in [4,5,6,7,8,9]
+for l in [7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
