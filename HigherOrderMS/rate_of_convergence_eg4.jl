@@ -27,13 +27,13 @@ U₀(x) = sin(π*x)
 
 # Define the necessary parameters
 nf = 2^15
-p = 1
+p = 3
 q = 1
-quad = gausslegendre(4)
+quad = gausslegendre(6)
 
 # Temporal parameters
-Δt = 1e-5
-tf = 500*Δt
+Δt = 1e-4
+tf = 1.0
 ntime = ceil(Int,tf/Δt)
 plt = plot()
 plt1 = plot()
@@ -55,9 +55,13 @@ Mϵ = sparse(assem_cache[5][1], assem_cache[5][2], assem_cache[5][3])
 # The RHS-vector as a function of t
 function fₙ!(fcache, tₙ::Float64)  
   cache, fn = fcache
-  fillsFe!(cache, y->f(y,tₙ))
-  F = collect(sparsevec(cache[6][1], cache[6][2]))
-  F[fn]
+  # fillsFe!(cache, y->f(y,tₙ))
+  # F = collect(sparsevec(cache[6][1], cache[6][2]))
+  # F[fn]
+  ####   ####   ####   ####   ####   ####  ####
+  #### NOTE: This works only if f(x,t) ≡ 0 ####
+  ####   ####   ####   ####   ####   ####  ####
+  zeros(Float64,size(fn,1)) 
 end
 Uₙ₊₁ = zeros(Float64,q*nf+1)
 # Solve the time-dependent problem using the BDF-k method
@@ -82,6 +86,7 @@ let
     Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!, BDFk)
     U[:,2:BDFk] = U[:,1:BDFk-1]
     U[:,1] = Uₙ₊ₛ
+    (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
     t += Δt
   end
   copyto!(Uₙ₊₁, vcat(0.0, Uₙ₊ₛ[:,1], 0.0))
@@ -92,7 +97,7 @@ end
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [4,5,6]
+for l in [6,7,8]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
@@ -113,11 +118,15 @@ for l in [4,5,6]
       # RHS Function
       function fₙ_MS!(cache, tₙ::Float64)
         contrib_cache, Fms = cache
-        vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
-        fcache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
-        fillsFms!(sFms, fcache, nc, p, l)
-        assemble_MS_vector!(Fms, sFms, ms_elem)
-        Fms
+        # vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
+        # fcache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
+        # fillsFms!(sFms, fcache, nc, p, l)
+        # assemble_MS_vector!(Fms, sFms, ms_elem)
+        # Fms
+        ####   ####   ####   ####   ####   ####  ####
+        #### NOTE: This works only if f(x,t) ≡ 0 ####
+        ####   ####   ####   ####   ####   ####  ####
+        0*Fms
       end
       
       # Compute the Stiffness and Mass Matrices
@@ -155,10 +164,11 @@ for l in [4,5,6]
         # Main BDFk steps
         dlcache = get_dl_cache(BDFk)
         fcache = dlcache, cache
-        for i=1:ntime
-          copyto!(Uₙ₊ₛ, BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, BDFk))
+        for i=BDFk:ntime
+          Uₙ₊ₛ = BDFk!(fcache, t+Δt, U, Δt, Kₘₛ, Mₘₛ, fₙ_MS!, BDFk)
           U[:,2:BDFk] = U[:,1:BDFk-1]
           U[:,1] = Uₙ₊ₛ
+          (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
           t += Δt
         end
         (isnan(sum(Uₙ₊ₛ))) && print("\nUnstable \n")

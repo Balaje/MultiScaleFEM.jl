@@ -86,7 +86,7 @@ let
   Vₙ = setup_initial_condition(U₁, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
   M⁺ = (Mₘₛ + Δt^2/4*Kₘₛ)
   M⁻ = (Mₘₛ - Δt^2/4*Kₘₛ)
-  Fₙ = (fₙ_MS!(cache,0.0)+fₙ_MS!(cache,Δt))
+  Fₙ = (fₙ_MS!(cache,0.0)+fₙ_MS!(cache,Δt))*0.5
   Uₙ₊₁ = M⁺\(M⁻*Uₙ + (Δt)*M⁺*Vₙ + (Δt)^2/4*Fₙ) 
   Uₙ₊₂ = similar(Uₙ)
   fill!(Uₙ₊₂, 0.0)

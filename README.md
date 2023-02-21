@@ -164,7 +164,7 @@ $$
 \end{align*}
 $$
 
-I take $h = 2^{-15}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-5}$ and solve till final time $T = 500 \Delta t$ (500 steps). I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
+I take $h = 2^{-15}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-4}$ and solve till final time $T = 1.0$. I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
 
 $$
 A(x) = 0.5,
@@ -179,6 +179,31 @@ $$
 Constant coefficient | Oscillatory coefficient |
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/ooc_9_heat_eq_osc.png)
+
+Similar behavior can be seen for higher order methods also.
+
+`(p=2)` (Oscillatory coefficient) | `(p=3)` (Oscillatory coefficient) |
+--- | --- |
+![](./HigherOrderMS/Images/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/ooc_12_heat_eq_osc_p3.png) |
+
+**NOTE:** I modified the vector assembly function by simply forcing the function to return zeros.
+
+``` julia
+# RHS Function
+function fₙ_MS!(cache, tₙ::Float64)
+  contrib_cache, Fms = cache
+  # vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
+  # fcache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
+  # fillsFms!(sFms, fcache, nc, p, l)
+  # assemble_MS_vector!(Fms, sFms, ms_elem)
+  # Fms
+  ####   ####   ####   ####   ####   ####  ####
+  #### NOTE: This works only if f(x,t) ≡ 0 ####
+  ####   ####   ####   ####   ####   ####  ####
+  0*Fms
+end
+```
+This effectively bypasses the assembly routine and will make the code run faster. This works only for the case $f(x,t) = 0$. Please note that the actual assembly step is a major bottleneck in the implementation and needs to optimized further to make the code more efficient (future work).
 
 ## Localized Orthogonal Decomposition Method
 -------
