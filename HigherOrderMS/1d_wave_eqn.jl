@@ -84,15 +84,12 @@ let
   cache = contrib_cache, Fₘₛ
   Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
   Vₙ = setup_initial_condition(U₁, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-  M⁺ = (Mₘₛ + Δt^2/4*Kₘₛ)
-  M⁻ = (Mₘₛ - Δt^2/4*Kₘₛ)
-  Fₙ = (fₙ_MS!(cache,0.0)+fₙ_MS!(cache,Δt))*0.5
-  Uₙ₊₁ = M⁺\(M⁻*Uₙ + (Δt)*M⁺*Vₙ + (Δt)^2/4*Fₙ) 
+  Uₙ₊₁ = CN1!(cache, Uₙ, Vₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
   Uₙ₊₂ = similar(Uₙ)
   fill!(Uₙ₊₂, 0.0)
   t = Δt
   for i=2:ntime
-    Uₙ₊₂ = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, M⁺, M⁻, fₙ_MS!)  
+    Uₙ₊₂ = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, Kₘₛ, Mₘₛ, fₙ_MS!) 
     Uₙ = Uₙ₊₁
     Uₙ₊₁ = Uₙ₊₂
     (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")

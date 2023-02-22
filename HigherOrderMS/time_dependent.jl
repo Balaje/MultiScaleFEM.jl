@@ -17,10 +17,42 @@ end
 The Crank-Nicolson scheme for solving the transient linear wave equation
 """
 function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64,
-  M⁺::AbstractMatrix{Float64}, M⁻::AbstractMatrix{Float64}, f!::Function)
-  fₙ = (Δt)^2/2*(f!(fcache, tₙ) + f!(fcache, tₙ+Δt))
-  U = M⁺\(2*M⁻*Uₙ₊₁ - M⁺*Uₙ + fₙ)
-  U
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
+  NM!(fcache, tₙ, Uₙ, Uₙ₊₁, Δt, K, M, f!, 1/4, 1/2)
+end
+function CN1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
+  NM1!(fcache, U₀, V₀, Δt, K, M, f!, 1/4, 1/2)
+end
+"""
+The Leap-Frog scheme for solve the transient linear wave equation
+"""
+function LF!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64,
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
+  NM!(fcache, tₙ, Uₙ, Uₙ₊₁, Δt, K, M, f!, 0.0, 1/2)
+end
+function LF1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
+  NM1!(fcache, U₀, V₀, Δt, K, M, f!, 0.0, 1/2)
+end
+"""
+General Newmark scheme for the wave equation
+"""
+function NM!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, β::Float64, γ::Float64)
+  M⁺ = (M + Δt^2*(β)*K)
+  M⁻ = (M - Δt^2/4*(1-4β+2γ)*K)
+  M̃  = (M + Δt^2/2*(1+2β-2γ)*K)
+  Fₙ = Δt^2*(f!(fcache,tₙ-Δt)+f!(fcache,tₙ))*0.5
+  M⁺\(2*M⁻*Uₙ₊₁ - M̃ *Uₙ + Fₙ)
+end
+function NM1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, β::Float64, γ::Float64)
+  M⁺ = (2M + Δt^2/2*(1+4β-2γ)*K)
+  M⁻ = (M - Δt^2/4*(1-4β+2γ)*K)
+  M̃  = (M + Δt^2/2*(1+2β-2γ)*K)
+  Fₙ = Δt^2*(f!(fcache,0.0)+f!(fcache,Δt))*0.5
+  M⁺\(2*M⁻*U₀ + 2*Δt*M̃ *V₀ + Fₙ)
 end
 """
 The Backward Difference Formula of order k for the linear heat equation

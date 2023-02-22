@@ -37,7 +37,7 @@ quad = gausslegendre(6)
 
 # Temporal parameters
 Δt = 1e-4
-tf = 1.125
+tf = 2Δt
 ntime = ceil(Int,tf/Δt)
 plt = plot()
 plt1 = plot()
@@ -69,21 +69,17 @@ let
   cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
   Uₙ = U₀.(nds_fine[fn])
   Vₙ = U₁.(nds_fine[fn])
-  M⁺ = (Mϵ[fn,fn] + Δt^2/4*Kϵ[fn,fn])
-  M⁻ = (Mϵ[fn,fn] - Δt^2/4*Kϵ[fn,fn])
-  Fₙ = (fₙ!(cache, 0.0) + fₙ!(cache,Δt))*0.5
-  Uₙ₊₁ = M⁺\(M⁻*Uₙ + (Δt)*M⁺*Vₙ + (Δt)^2/4*Fₙ)
+  Uₙ₊₁ = CN1!(cache, Uₙ, Vₙ, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)
   U = similar(Uₙ₊₁)
   fill!(U,0.0)
   t = Δt
   for i=2:ntime
-    U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, M⁺, M⁻, fₙ!)
+    U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)
     Uₙ = Uₙ₊₁
     Uₙ₊₁ = U
     (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
     t+=Δt
   end  
-  display(plot(nds_fine[fn], U))
   copyto!(Uϵₙ₊₂, vcat(0.0, U, 0.0))  
 end
 plt3 = plot(nds_fine, Uϵₙ₊₂, label="Exact solution", lw=2, lc=:black)
@@ -93,7 +89,7 @@ plt3 = plot(nds_fine, Uϵₙ₊₂, label="Exact solution", lw=2, lc=:black)
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [4,5,6]
+for l in [4,5,6,7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
@@ -146,15 +142,12 @@ for l in [4,5,6]
         cache = contrib_cache, Fₘₛ
         Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
         Vₙ = setup_initial_condition(U₁, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-        M⁺ = (Mₘₛ + Δt^2/4*Kₘₛ)
-        M⁻ = (Mₘₛ - Δt^2/4*Kₘₛ)
-        Fₙ = (fₙ_MS!(cache,0.0)+fₙ_MS!(cache,Δt))*0.5
-        Uₙ₊₁ = M⁺\(M⁻*Uₙ + (Δt)*M⁺*Vₙ + (Δt)^2/4*Fₙ) 
+        Uₙ₊₁ = CN1!(cache, Uₙ, Vₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
         U = similar(Uₙ)
         fill!(U, 0.0)
         t = Δt
         for i=2:ntime
-          U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, M⁺, M⁻, fₙ_MS!)
+          U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
           Uₙ = Uₙ₊₁
           Uₙ₊₁ = U
           (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
