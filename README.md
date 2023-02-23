@@ -154,7 +154,7 @@ Oscillatory coefficient | Random coefficients |
 #### Time dependent problems
 -------
 
-**Heat equation**
+##### **Heat equation**
 
 I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_eg4jl)`.
 
@@ -207,7 +207,7 @@ end
 ```
 This effectively bypasses the assembly routine and will make the code run faster. This works only for the case $f(x,t) = 0$. Please note that the actual assembly step is a major bottleneck in the implementation and needs to optimized further to make the code more efficient (future work).
 
-**Wave Equation**
+##### **Wave Equation**
 
 I solve the following wave equation along with the prescribed initial and boundary conditions
 
