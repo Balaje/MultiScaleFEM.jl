@@ -22,7 +22,7 @@ Problem data 2: Oscillatory diffusion coefficient
 # Problem data
 # uₜₜ - (c(x)*uₓ)ₓ = f 
 domain = (0.0,1.0)
-c(x) = 1.0
+c(x) = (2.0 + cos(2π*x/(2e-2)))
 #c(x) = (4.0 + cos(2π*x/(2e-2)))
 f(x,t) = 0.0
 U₀(x) = 0.0
@@ -31,7 +31,7 @@ Uₑ(x,t) = sin(π*x)*sin(π*t)
 
 # Define the necessary parameters
 nf = 2^15
-p = 3
+p = 1
 q = 1
 quad = gausslegendre(6)
 
@@ -89,7 +89,7 @@ plt3 = plot(nds_fine, Uϵₙ₊₂, label="Exact solution", lw=2, lc=:black)
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [7,8,9]
+for l in [4,5,6,7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))

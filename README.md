@@ -220,7 +220,7 @@ $$
 \end{align*}
 $$
 
-using the multiscale method in space and the Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final time $T = 1.0$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
+using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final time $T = 1.0$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-7}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
 
 `(p=1)` $T=1.0$ s | `(p=1)` $T=2.0$ s | 
 --- | --- |
@@ -232,6 +232,18 @@ Now, for the higher order case `(p=2,3)`, we observe the following rate of conve
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1s.png) |
 
+
+Finally I also solve the wave equation with oscillatory wave speed. I assume that the wave speed 
+
+$$
+c(x) = \left(2 + \cos\left( \frac{2\pi x}{2^{-2}}\right)\right)^{1/2},
+$$
+
+and solve the problem using the multiscale method + Crank-Nicolson method. I use the same discretization parameters used to test the smooth case. Below I show the wave speed, the solution profiles and the rate of convergence for the multiscale method with `p=1`.
+
+$c^2(x)$ | Solution profiles | Rate of convergence |
+--- | --- | --- |
+![](./HigherOrderMS/Images/wave_eq_wave_speed.png) | ![](./HigherOrderMS/Images/wave_eq_exact_sol.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s_osc.png) |
 
 
 ## Localized Orthogonal Decomposition Method
