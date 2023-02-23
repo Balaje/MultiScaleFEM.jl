@@ -15,7 +15,7 @@ the heat equation supplemented with initial and boundary conditions
 
 $$
 \begin{align*}
-  u_t - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
+  u_t(x,t) - (D_{\varepsilon}(x)u_x(x,t))_x = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
   u(x,0) = u_0(x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,\infty),
 \end{align*}
@@ -25,7 +25,7 @@ and the wave equation
 
 $$
 \begin{align*}
-  u_{tt} - (D_{\varepsilon}(x)u'(x,t))' = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
+  u_{tt}(x,t) - (D_{\varepsilon}(x)u_x(x,t))_x = f(x,t) &\quad (x,t) \in (0,1) \times (0,\infty),\\
   u(x,0) = u_0(x) &\quad x \in (0,1),\\
   u_t(x,0) = u_1(x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,\infty),
@@ -154,11 +154,13 @@ Oscillatory coefficient | Random coefficients |
 #### Time dependent problems
 -------
 
-Similar results can be seen in the time dependent case. I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_eg4jl)`.
+**Heat equation**
+
+I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_eg4jl)`.
 
 $$
 \begin{align*}
-  u_t - (A(x)u'(x,t))' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
+  u_t - (A(x)u_x(x,t))_x = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
   u(x,0) = \sin(\pi x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,T),
 \end{align*}
@@ -204,6 +206,33 @@ function fₙ_MS!(cache, tₙ::Float64)
 end
 ```
 This effectively bypasses the assembly routine and will make the code run faster. This works only for the case $f(x,t) = 0$. Please note that the actual assembly step is a major bottleneck in the implementation and needs to optimized further to make the code more efficient (future work).
+
+**Wave Equation**
+
+I solve the following wave equation along with the prescribed initial and boundary conditions
+
+$$
+\begin{align*}
+  u_{tt} - \left(c^2(x)u'(x,t)\right)' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
+  u(x,0) = 0 &\quad x \in (0,1),\\
+  u_t(x,0) = \pi \sin(\pi x) &\quad x \in (0,1),\\
+  u(0,t) = u(1,t) =0 &\quad t \in (0,T),
+\end{align*}
+$$
+
+using the multiscale method in space and the Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final time $T = 1.0\,s$ and $T = 2.0\,s$. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
+
+`(p=1)` $T=1.0\,s$ | `(p=1)` $T=2.0\,s$ | 
+--- | --- |
+![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_2s.png) |
+
+Now, for the higher order case `(p=2,3)`, we observe the following rate of convergence:
+
+`(p=2)` $T=1.0\,s$ | `(p=3)` $T=1.0\,s$ |
+--- | --- |
+![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1s.png) |
+
+
 
 ## Localized Orthogonal Decomposition Method
 -------
