@@ -32,7 +32,6 @@ Uₑ(x,t) = sin(π*x)*sin(π*t)
 
 # Define the necessary parameters
 nf = 2^15
-p = 3
 q = 1
 quad = gausslegendre(6)
 
@@ -40,8 +39,6 @@ quad = gausslegendre(6)
 Δt = 1e-4
 tf = 1.5
 ntime = ceil(Int,tf/Δt)
-plt = plot()
-plt1 = plot()
 fn = 2:q*nf
 
 # Build the matrices for the fine scale problem
@@ -70,18 +67,14 @@ let
   cache = assembler_cache(nds_fine, elem_fine, quad, q), fn
   Uₙ = U₀.(nds_fine[fn])
   Vₙ = U₁.(nds_fine[fn])
-  Uₙ₊₁ = CN1!(cache, Uₙ, Vₙ, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)
-  U = similar(Uₙ₊₁)
-  fill!(U,0.0)
-  t = Δt
-  for i=2:ntime
-    U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)
-    Uₙ = Uₙ₊₁
-    Uₙ₊₁ = U
+  t = 0.0
+  for i=1:ntime
+    U, V = CN!(cache, t, Uₙ, Vₙ, Δt, Kϵ[fn,fn], Mϵ[fn,fn], fₙ!)
+    Uₙ, Vₙ = U, V
     (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
     t+=Δt
   end  
-  copyto!(Uϵₙ₊₂, vcat(0.0, U, 0.0))  
+  copyto!(Uϵₙ₊₂, vcat(0.0, Uₙ, 0.0))  
 end
 plt3 = plot(nds_fine, Uϵₙ₊₂, label="Exact solution", lw=2, lc=:black)
 # Uₙ₊₂  is the exact solution
@@ -90,7 +83,10 @@ plt3 = plot(nds_fine, Uϵₙ₊₂, label="Exact solution", lw=2, lc=:black)
 L²Error = zeros(Float64,size(𝒩))
 H¹Error = zeros(Float64,size(𝒩))
 
-for l in [4,5,6,7,8]
+p = 3
+plt = plot()
+plt1 = plot()
+for l in [7,8,9]
   fill!(L²Error,0.0)
   fill!(H¹Error,0.0)
   for (nc,itr) in zip(𝒩,1:lastindex(𝒩))
@@ -142,22 +138,18 @@ for l in [4,5,6,7,8]
         Fₘₛ = zeros(Float64,nc*(p+1))
         cache = contrib_cache, Fₘₛ
         Uₙ = setup_initial_condition(U₀, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-        Vₙ = setup_initial_condition(U₁, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)
-        Uₙ₊₁ = CN1!(cache, Uₙ, Vₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
-        U = similar(Uₙ)
-        fill!(U, 0.0)
-        t = Δt
-        for i=2:ntime
-          U = CN!(cache, t, Uₙ, Uₙ₊₁, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
-          Uₙ = Uₙ₊₁
-          Uₙ₊₁ = U
+        Vₙ = setup_initial_condition(U₁, nds_fine, nc, nf, local_basis_vecs, quad, p, q, Mₘₛ)        
+        t = 0.0
+        for i=1:ntime
+          U, V = CN!(cache, t, Uₙ, Vₙ, Δt, Kₘₛ, Mₘₛ, fₙ_MS!)
+          Uₙ, Vₙ = U, V
           (i%1000 == 0) && print("Done t="*string(t+Δt)*"\n")
           t += Δt
         end        
         uhsol = zeros(Float64,q*nf+1)
         sol_cache = similar(uhsol)
         cache2 = uhsol, sol_cache
-        build_solution!(cache2, U, local_basis_vecs)
+        build_solution!(cache2, Uₙ, local_basis_vecs)
         uhsol = cache2[1]
         
         bc = basis_cache(q)

@@ -16,24 +16,13 @@ end
 """
 The Crank-Nicolson scheme for solving the transient linear wave equation
 """
-function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64,
+function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Vₙ::AbstractVector{Float64}, Δt::Float64,
   K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
-  NM!(fcache, tₙ, Uₙ, Uₙ₊₁, Δt, K, M, f!, 1/4, 1/2)
-end
-function CN1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
-  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
-  NM1!(fcache, U₀, V₀, Δt, K, M, f!, 1/4, 1/2)
-end
-"""
-The Leap-Frog scheme for solve the transient linear wave equation
-"""
-function LF!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64,
-  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
-  NM!(fcache, tₙ, Uₙ, Uₙ₊₁, Δt, K, M, f!, 0.0, 1/2)
-end
-function LF1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
-  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function)
-  NM1!(fcache, U₀, V₀, Δt, K, M, f!, 0.0, 1/2)
+  M⁺ = (M + Δt^2/4*K)
+  M⁻ = (M - Δt^2/4*K)
+  fₙ = 0.5*(f!(fcache, tₙ) + f!(fcache, tₙ+Δt))
+  U = M⁺\(M⁻*Uₙ + Δt*M*Vₙ + Δt^2/2*fₙ)
+  (U, 2*(U-Uₙ)/Δt - Vₙ)
 end
 """
 General Newmark scheme for the wave equation
