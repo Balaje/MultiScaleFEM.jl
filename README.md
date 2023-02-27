@@ -220,17 +220,20 @@ $$
 \end{align*}
 $$
 
-using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final time $T = 1.0$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-7}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
+using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final times $T = 1.0$ s, $T=1.5$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-7}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
 
-`(p=1)` $T=1.0$ s | `(p=1)` $T=2.0$ s | 
---- | --- |
-![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_2s.png) |
+`(p=1)` $T=1.0$ s | `(p=1)` $T=1.5$ s |  `(p=1)` $T=2.0$ s | 
+--- | --- | --- |
+![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1.5s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_2s.png) |
 
 Now, for the higher order case `(p=2,3)`, we observe the following rate of convergence:
 
 `(p=2)` $T=1.0$ s | `(p=3)` $T=1.0$ s |
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1s.png) |
+`(p=2)` $T=1.5$ s | `(p=3)` $T=1.5$ s |
+![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1.5s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1.5s.png) |
+
 
 
 Finally I also solve the wave equation with oscillatory wave speed. I assume that the wave speed 

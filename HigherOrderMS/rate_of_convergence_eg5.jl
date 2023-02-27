@@ -32,7 +32,7 @@ Uₑ(x,t) = sin(π*x)*sin(π*t)
 
 # Define the necessary parameters
 nf = 2^15
-p = 2
+p = 3
 q = 1
 quad = gausslegendre(6)
 
