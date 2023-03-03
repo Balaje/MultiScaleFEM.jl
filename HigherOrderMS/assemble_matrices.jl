@@ -31,7 +31,6 @@ module AssembleMatrices
     fill!(Dxqs,0.0)
     bc = MultiScaleBases.lagrange_basis_cache(q)
     h1elem =  [q*i+j-(q-1) for i = 1:nel, j=0:q]
-    index = 0
     assem_mat = spzeros(Float64, q*nel+1, q*nel+1)
     assem_vec = zeros(Float64, q*nel+1)
     (xqs, Dxqs, J), (iiM, jjM, vvM), (iiV, vvV), (h1elem, h1elem), (bc,bc), quad, assem_mat, assem_vec
