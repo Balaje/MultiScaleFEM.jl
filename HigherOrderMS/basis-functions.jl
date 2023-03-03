@@ -1,8 +1,7 @@
 ##### ###### ###### ###### ###### ###### ###### ###### #
 # Basis functions for the direct and multiscale method #
 ##### ###### ###### ###### ###### ###### ###### ###### #
-module MultiScaleBases
-
+module StandardBases
   using LinearAlgebra
 
   function lagrange_basis_cache(p::Int64)
@@ -72,6 +71,6 @@ module MultiScaleBases
       x̂ = -(b+a)/(b-a) + 2.0*x/(b-a)
       LP!(cache, x̂)
     end
-    cache    
+    cache
   end
 end

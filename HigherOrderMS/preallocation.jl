@@ -34,16 +34,16 @@ module PreAllocateMatrices
       multiscale_matrix[i] = zeros(Float64, npatch*(p+1), npatch*(p+1))
       multiscale_vector[i] = zeros(Float64, npatch*(p+1))
 
-      patch_elem_indices_to_fine_elem_indices[i] = (1:(q*aspect_ratio)*npatch) .+ ((start-1)*(q*aspect_ratio))
+      patch_elem_indices_to_fine_elem_indices[i] = (1:(q*aspect_ratio)*npatch+1) .+ ((start-1)*(q*aspect_ratio))
       coarse_elem_indices_to_fine_elem_indices[i] = i*(q*aspect_ratio) - (q*aspect_ratio) + 1 : i*(q*aspect_ratio) + 1
       multiscale_elem[i] = start*(p+1)-p : last*(p+1)
+
+      basis_vec_multiscale[i] = zeros(Float64, q*nf+1, p+1)
     end
 
     L = zeros(Float64, length(coarse_elem_indices_to_fine_elem_indices[1]))
-    Lt = similar(L)
-    ipcache = similar(L) # Cache for efficiently computing the inner product
-    fill!(L,0.0)
-    fill!(ipcache,0.0)
+    Lt = zero(L)
+    ipcache = zero(L) # Cache for efficiently computing the inner product
 
     (nds_coarse, elem_coarse, nds_fine, elem_fine), patch_elems, patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices, (L, Lt, ipcache),
     basis_vec_multiscale, (multiscale_elem, multiscale_matrix, multiscale_vector)
