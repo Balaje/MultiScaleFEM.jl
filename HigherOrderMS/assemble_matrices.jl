@@ -110,7 +110,7 @@ module AssembleMatrices
         index+=nel
       end
     end
-    @inbounds for k=1:lastindex(iiV)
+    @turbo for k=1:lastindex(iiV)
       F[iiV[k]] += vvV[k]
     end
     F
