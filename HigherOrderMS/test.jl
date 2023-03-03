@@ -9,10 +9,10 @@ include("solve.jl")
 include("multiscale_basis-functions.jl")
 
 nc = 2^2
-nf = 2^7
+nf = 2^15
 q = 1
 p = 1
-l = 2
+l = 10
 
 prob_data = PreAllocateMatrices.preallocate_matrices((0.0,1.0), nc, nf, l, (q,p))
 nds_coarse = prob_data[1][1]
@@ -28,4 +28,4 @@ lm_l2_mat_cache= AssembleMatrices.lm_l2_matrix_cache(nds_coarse, elem_coarse, p,
 
 matcache = stima_cache, l_mat_cache, lm_l2_mat_cache
 cache = MultiScaleBases.ms_basis_cache!(matcache, (nds_coarse, nds_fine), (elem_coarse, elem_fine), quad, (q,p), x->1.0, prob_data[6], prob_data[3])
-basis_vec_ms = MultiScaleBases.compute_ms_bases!(cache, p)
+basis_vec_ms = MultiScaleBases.compute_ms_bases!(cache, p, l) # Needs some more work, but managed to reduce the time substantially
