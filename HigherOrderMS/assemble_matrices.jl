@@ -159,6 +159,7 @@ module AssembleMatrices
     qs, ws = quad
     nc = size(nodes,1)     
     p = size(nodes,2)-1
+    fill!(fvecs,0.0)
     for qq=1:lastindex(qs), t=1:nc, ii=1:p+1, jj=1:p+1  
       nds = (nodes[t,1], nodes[t,2])
       xhat = (nds[2]+nds[1])*0.5 + (nds[2]-nds[1])*0.5*qs[qq]
