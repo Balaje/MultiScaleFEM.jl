@@ -2,46 +2,76 @@
 # Module containing the MultiScaleBases implementation #
 #### ##### ##### ##### ##### ##### ##### ##### ##### ###
 
-module MultiScaleBases
-  include("basis-functions.jl")
-  include("assemble_matrices.jl")
-  include("solve.jl")
-
-  using SparseArrays
-  using LoopVectorization
-
-  function compute_ms_bases!(cache, p::Int64, l::Int64)
-    mats, fvecs, bases_data = cache
-    f1, f2 = fvecs
-    stima, lmat = mats
-    basis_vec_ms, fns = bases_data
-    nc = size(basis_vec_ms,1)
-    index = 1
-    for t=1:nc
-      start = max(1,t-l)
-      last = min(nc,t+l)
-      fn = fns[t]
-      stima_el = stima[fn, fn]
-      lmat_el = lmat[fn, start*(p+1)-p:last*(p+1)]
-      for tt=1:p+1
-        fvecs_el = vcat(f1[fn,index], f2[start*(p+1)-p:last*(p+1), index])
-        lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64,size(lmat_el,2), size(lmat_el,2))]
-        rhs = fvecs_el                      
-        basis_vec_ms[t][fn,tt] = (lhs\rhs)[1:size(stima_el,1)]
-        index += 1   
-      end
+function compute_ms_bases!(cache, p::Int64, l::Int64)
+  mats, fvecs, bases_data = cache
+  f1, f2 = fvecs
+  stima, lmat = mats
+  basis_vec_ms, fns = bases_data
+  nc = size(basis_vec_ms,1)
+  index = 1
+  for t=1:nc
+    start = max(1,t-l)
+    last = min(nc,t+l)
+    fn = fns[t]
+    gn = start*(p+1)-p:last*(p+1)    
+    stima_el = stima[fn,fn]
+    lmat_el = lmat[fn,gn]
+    for tt=1:p+1
+      fvecs_el = @views [f1[fn]; f2[gn, index]]
+      lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
+      rhs = fvecs_el           
+      sol = lhs\rhs                 
+      basis_vec_ms[t][fn,tt] = sol[1:length(fn)]
+      index += 1   
     end
-    basis_vec_ms
   end
-
-  function ms_basis_cache!(matcache, nf::Int64, nc::Int64, fespaces::Tuple{Int64,Int64}, 
-    D::Function, basis_vec_ms::Vector{Matrix{Float64}}, patch_to_fine_scale::Vector{AbstractVector{Int64}})
-    q,p = fespaces
-    stima_cache, l_mat_cache, l2_mat_cache = matcache
-    stima = AssembleMatrices.assemble_matrix!(stima_cache, D, StandardBases.∇φᵢ!, StandardBases.∇φᵢ!, -1)
-    lmat = AssembleMatrices.assemble_lm_matrix!(l_mat_cache, StandardBases.Λₖ!, StandardBases.φᵢ!, 1)
-    fvecs = AssembleMatrices.assemble_lm_l2_matrix!(l2_mat_cache, StandardBases.Λₖ!, StandardBases.Λₖ!, 1) 
-    fns = [gn[2:length(gn)-1] for gn in patch_to_fine_scale]
-    (stima, lmat), (zeros(Float64, q*nf+1, nc*(p+1)), fvecs), (basis_vec_ms, fns)
-  end
+  basis_vec_ms
 end
+
+function ms_basis_cache!(matcache, nf::Int64, nc::Int64, fespaces::Tuple{Int64,Int64}, 
+  basis_vec_ms::Vector{Matrix{Float64}}, patch_to_fine_scale::Vector{AbstractVector{Int64}})
+  q,p = fespaces
+  stima, lmat, fvecs = matcache    
+  fns = [gn[2:length(gn)-1] for gn in patch_to_fine_scale]
+  (stima, lmat), (zeros(Float64, q*nf+1), fvecs), (basis_vec_ms, fns)
+end
+
+function get_local_basis!(cache, fullvec::Vector{Matrix{Float64}}, el::Int64, fn::AbstractVector{Int64}, ind::Int64)
+  @assert length(cache) == length(fn)
+  lbv = fullvec[el]
+  copyto!(cache, view(lbv, fn, ind))
+end
+
+"""
+Function to extract the stiffness matrices element wise
+"""
+function mat_contribs!(assem_cache, D::Function, u!::Function, v!::Function, J_exp::Int64)
+  nel = size(assem_cache, 1)
+  for t=1:nel
+    assemble_matrix!(assem_cache[t], D, u!, v!, J_exp)
+  end
+  assem_cache
+end
+"""
+Function to extract the load vector element wise
+"""
+function vec_contribs!(assem_cache, f::Function, u!::Function, J_exp::Int64)
+  nel = size(assem_cache, 1)
+  for t=1:nel
+    assemble_vector!(assem_cache[t], f, u!, J_exp)
+  end
+  assem_cache
+end
+function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine_elem_indices::Vector{AbstractVector{Int64}}, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
+  nc = size(coarse_elem_indices_to_fine_elem_indices,1)
+  mat_vec_contrib_cache = Vector{Any}(undef,nc)
+  for t=1:nc
+    el_conn_el = [i+j for i=1:length(coarse_elem_indices_to_fine_elem_indices[t])-1, j=0:1]
+    nds_el = nds[coarse_elem_indices_to_fine_elem_indices[t]]
+    mat_vec_contrib_cache[t] = assembler_cache(nds_el, el_conn_el, quad, q)
+  end
+  mat_vec_contrib_cache
+end
+get_stiffness_matrix_from_cache(cache) = cache[7]
+get_load_vector_from_cache(cache) = cache[8]
