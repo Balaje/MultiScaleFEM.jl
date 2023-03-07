@@ -5,21 +5,17 @@
 """
 Function to assemble the stiffness matrix
 """
-function assemble_matrix!(cache, D::Function, u!::Function, v!::Function, J_exp::Int64)
-  quadData = cache[1]
-  matData = cache[2]
-  elems = cache[4]
-  bu, bv = cache[5] 
-  quad = cache[6]
-  M = cache[7]
+function assemble_stiffness_matrix!(cache, D::Function, u!::Function, v!::Function, J_exp::Int64)
+  quad_data, matData,elems, bases, M = cache  
   # Unpack all the data
-  qs, ws = quad
-  xqs, Dxqs, J = quadData
+  xqs, Dxqs, J, quad = quad_data
   iiM, jjM, vvM = matData    
   elem_i, elem_j = elems
+  bu, bv = bases
   nel = size(elem_i,1)
   p = size(elem_i,2) - 1
   q = size(elem_j,2) - 1
+  qs, ws = quad
   # Fill up the matrices
   qrule = size(xqs, 2)
   map!(D, Dxqs, xqs)
@@ -48,19 +44,14 @@ end
 """
 Function to assemble the load vector
 """
-function assemble_vector!(cache, f::Function, u!::Function, J_exp::Int64)
-  quadData = cache[1]
-  vecData = cache[3]
-  elems = cache[4]
-  bu = cache[5][1]
-  quad = cache[6]
-  F = cache[8]
+function assemble_load_vector!(cache, f::Function, u!::Function, J_exp::Int64)
+  quad_data, vecData, h1elem, bu, F = cache
   # Unpack all the data
-  qs, ws = quad
-  xqs, fxqs, J = quadData
+  xqs, fxqs, J, quad = quad_data
   iiV, vvV = vecData
-  elem_i = elems[1]
+  elem_i = h1elem
   nel = size(elem_i,1)
+  qs, ws = quad
   q = size(elem_i,2) - 1
   # Fill up the matrices
   qrule = size(xqs,2)
@@ -85,33 +76,43 @@ function assemble_vector!(cache, f::Function, u!::Function, J_exp::Int64)
   end
   F
 end
-function assembler_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
-  quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
+function get_quad_data(nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}})
   nds_elem = nds[elem]
-  nel = size(elem,1)
-  iiM = Vector{Int64}(undef, (q+1)^2*nel)
-  jjM = Vector{Int64}(undef, (q+1)^2*nel)
-  vvM = Vector{Float64}(undef, (q+1)^2*nel)
-  fill!(iiM,0)
-  fill!(jjM,0)
-  fill!(vvM,0.0)
-  iiV = Vector{Int64}(undef,(q+1)*nel)
-  vvV = Vector{Float64}(undef,(q+1)*nel)
-  fill!(iiV,0)
-  fill!(vvV,0.0)
   qs = quad[1]
+  nel = size(elem,1)
   xqs = Matrix{Float64}(undef, nel, length(qs))
   J = (nds_elem[:,2]-nds_elem[:,1])*0.5
   for i=1:lastindex(qs)
     xqs[:,i] = (nds_elem[:,2]+nds_elem[:,1])*0.5 + (nds_elem[:,2]-nds_elem[:,1])*0.5*qs[i]
   end
-  Dxqs = similar(xqs)
-  fill!(Dxqs,0.0)
+  Dxqs = zero(xqs)
+  xqs, Dxqs, J, quad
+end
+function stiffness_matrix_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
+  nel = size(elem,1)
+  iiM = Vector{Int64}(undef, (q+1)^2*nel)
+  jjM = Vector{Int64}(undef, (q+1)^2*nel)
+  vvM = Vector{Float64}(undef, (q+1)^2*nel)
+  fill!(iiM,0); fill!(jjM,0); fill!(vvM,0.0) 
+  quad_data = get_quad_data(nds, elem, quad)
   bc = lagrange_basis_cache(q)
   h1elem =  [q*i+j-(q-1) for i = 1:nel, j=0:q]
   assem_mat = spzeros(Float64, q*nel+1, q*nel+1)
+  quad_data, (iiM, jjM, vvM), (h1elem, h1elem), (bc, bc), assem_mat
+end
+function load_vector_cache(nds::AbstractVector{Float64}, elem::Matrix{Int64}, 
+  quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
+  nel = size(elem,1)
+  iiV = Vector{Int64}(undef,(q+1)*nel)
+  vvV = Vector{Float64}(undef,(q+1)*nel)
+  fill!(iiV,0); fill!(vvV,0.0)
+  quad_data = get_quad_data(nds, elem, quad)
+  bc = lagrange_basis_cache(q)
+  h1elem =  [q*i+j-(q-1) for i = 1:nel, j=0:q]
   assem_vec = zeros(Float64, q*nel+1)
-  (xqs, Dxqs, J), (iiM, jjM, vvM), (iiV, vvV), (h1elem, h1elem), (bc,bc), quad, assem_mat, assem_vec
+  quad_data, (iiV, vvV), h1elem, bc, assem_vec
 end
 
 """
@@ -127,8 +128,8 @@ function assemble_lm_matrix!(cache, Λ!::Function, u!::Function, J_exp::Int64)
     nds = (nds_elem[t,1], nds_elem[t,2])
     for tt=1:p+1    
       l(y) = Λ!(lb_cache, y, nds)[tt]
-      assemble_vector!(assem_cache, l, u!, J_exp)
-      F = assem_cache[8]
+      assemble_load_vector!(assem_cache, l, u!, J_exp)
+      F = assem_cache[5]
       @inbounds @simd for k=1:lastindex(F)
         L[k,index] = F[k]
       end
@@ -145,7 +146,7 @@ function lm_matrix_cache(nds::Tuple{AbstractVector{Float64}, AbstractVector{Floa
   nf = size(elem_fine,1)
   nc = size(elem_coarse,1)
   q,p = fespaces
-  assem_cache = assembler_cache(nds_fine, elem_fine, quad, q)
+  assem_cache = load_vector_cache(nds_fine, elem_fine, quad, q)
   assem_lm_mat = spzeros(Float64, q*nf+1, (p+1)*nc)
   assem_cache, (nds_coarse[elem_coarse], assem_lm_mat, legendre_basis_cache(p))
 end
@@ -158,29 +159,29 @@ function assemble_lm_l2_matrix!(l2mat, nds::AbstractVector{Float64}, elem::Matri
   index = 1
   for t=1:nel
     h = nds[elem[t,2]] - nds[elem[t,1]]
-    @inbounds @fastmath for i=1:p+1, j=1:p+1
-      l2mat[(index-1)+i, (index-1)+j] = (i==j)*(h/(2*(j-1)+1))
+    @simd for i=1:p+1
+      @inbounds l2mat[(index-1)+i, (index-1)+i] = (h/(2*(i-1)+1))
     end
     index = index + (p+1)
   end
   l2mat
 end
 function lm_l2_matrix_cache(nc::Int64, p::Int64)
-  zeros(Float64, nc*(p+1), nc*(p+1))
+  Diagonal(ones(Float64,nc*(p+1)))
 end
 
 """
 Function to assemble the multiscale stiffness matrix
 """
-function fillsKms!(sKms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, 
-  contrib_cache, ip, nc::Int64, p::Int64, l::Int64, t::Int64)  
+function fillsKms(local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, 
+  Kₛ, ip, nc::Int64, p::Int64, l::Int64, t::Int64)  
   L, Lt, ipcache = ip
   start = max(1, t-l)
   last = min(nc, t+l)
   binds = start:last
   nd = (last-start+1)*(p+1)
   gtpi = coarse_elem_indices_to_fine_elem_indices
-  fill!(sKms,0.0)
+  sKms = zeros(Float64, nd, nd)
   fill!(L,0.0)
   fill!(Lt,0.0)
   fill!(ipcache,0.0)
@@ -190,7 +191,6 @@ function fillsKms!(sKms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_
     ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1 
     get_local_basis!(L, local_basis_vecs, binds[ii2], gtpi, ll2)     
     get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1) 
-    Kₛ = get_stiffness_matrix_from_cache(contrib_cache)
     mul!(ipcache, Kₛ, Lt)    
     @simd for tt=1:lastindex(ipcache)
       @inbounds sKms[ii,jj] += L[tt]*ipcache[tt]
@@ -199,19 +199,20 @@ function fillsKms!(sKms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_
   sKms
 end
 
-function fillsFms!(sFms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64},
-  contrib_cache, ip, nc::Int64, p::Int64, l::Int64, t::Int64)
+function fillsFms(local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64},
+  F, ip, nc::Int64, p::Int64, l::Int64, t::Int64)
   Lt = ip[2]
   start = max(1,t-l)
   last = min(nc,t+l)
   binds = start:last     
   nd = (last-start+1)*(p+1)    
   gtpi = coarse_elem_indices_to_fine_elem_indices
+  sFms = zeros(Float64, nd)
+  fill!(Lt,0.0)
   for ii=1:nd
     ii1 = ceil(Int,ii/(p+1));
     ll1 = ceil(Int,(ii-1)%(p+1)) + 1;      
     get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1)
-    F = get_load_vector_from_cache(contrib_cache)
     @simd for tt=1:lastindex(Lt)
       @inbounds sFms[ii] += F[tt]*Lt[tt]
     end
@@ -222,7 +223,7 @@ end
 function assemble_ms_matrix!(cache, sKms::AbstractVector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   K = cache
-  fill!(cache,0.0)
+  fill!(K,0.0)
   for t=1:nc
     local_dof = size(ms_elem[t],1)
     elem = ms_elem[t]
@@ -243,6 +244,20 @@ function assemble_ms_vector!(cache, sFms::AbstractVector{Vector{Float64}}, ms_el
     local_vec = sFms[t]
     @turbo for ti=1:local_dof
       F[elem[ti]] += local_vec[ti]  
+    end
+  end
+end
+
+function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{Matrix{Float64}})  
+  nc = size(local_basis_vecs, 1)
+  p = size(local_basis_vecs[1], 2)-1
+  res, sol_cache = cache
+  fill!(sol_cache,0.0)
+  fill!(res, 0.0)
+  for j=1:nc, i=0:p
+    get_local_basis!(sol_cache, local_basis_vecs, j, 1:length(sol_cache), i+1)
+    @turbo for tt=1:lastindex(res)
+      res[tt] += sol[(p+1)*j+i-p]*sol_cache[tt]
     end
   end
 end

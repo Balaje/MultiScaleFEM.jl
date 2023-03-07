@@ -75,19 +75,8 @@ end
 """
 Create cell wise repeating functions for efficient broadcasting
 """
-# Create the cell-wise functions
-function get_cell_wise_data(f::Function, D::Function, φᵢ!::Function, ∇φᵢ!::Function)
-  fs = Vector{Function}(undef,nc)
-  Ds = similar(fs)
-  bases = similar(fs)
-  ∇_bases = similar(fs)
-  fill!(fs,f)
-  fill!(Ds,D)
-  fill!(bases, φᵢ!)
-  fill!(∇_bases, ∇φᵢ!)
-  (fs,Ds,bases,∇_bases)
+function convert_to_cell_wise(X, nc::Int64)
+  tX = typeof(X)
+  cell_wise_X = Vector{tX}(undef,nc)
+  fill!(cell_wise_X, X)
 end
-get_load_func_cell_wise(cell_wise_data) = cell_wise_data[1];
-get_diffusion_func_cell_wise(cell_wise_data) = cell_wise_data[2];
-get_bases_cell_wise(cell_wise_data) = cell_wise_data[3];
-get_grad_bases_cell_wise(cell_wise_data) = cell_wise_data[3];

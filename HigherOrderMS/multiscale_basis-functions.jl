@@ -28,10 +28,13 @@ function compute_ms_bases!(cache, p::Int64, l::Int64)
   basis_vec_ms
 end
 
-function ms_basis_cache!(matcache, nf::Int64, nc::Int64, fespaces::Tuple{Int64,Int64}, 
+function ms_basis_cache!(matcache, D::Function, nf::Int64, fespaces::Tuple{Int64,Int64}, 
   basis_vec_ms::Vector{Matrix{Float64}}, patch_to_fine_scale::Vector{AbstractVector{Int64}})
   q,p = fespaces
-  stima, lmat, fvecs = matcache    
+  stima_cache, lmat_cache, fvecs_cache = matcache
+  stima = assemble_stiffness_matrix!(stima_cache, D, ∇φᵢ!, ∇φᵢ!, -1)
+  lmat = assemble_lm_matrix!(lmat_cache, Λₖ!, φᵢ!, 1)
+  fvecs = assemble_lm_l2_matrix!(fvecs_cache, nds_coarse, elem_coarse, p)
   fns = [gn[2:length(gn)-1] for gn in patch_to_fine_scale]
   (stima, lmat), (zeros(Float64, q*nf+1), fvecs), (basis_vec_ms, fns)
 end
@@ -46,26 +49,28 @@ end
 Function to extract the stiffness matrices element wise
 """
 function mat_contribs!(assem_cache, D::Function, u!::Function, v!::Function, J_exp::Int64)
-  assemble_matrix!(assem_cache, D, u!, v!, J_exp)
-  assem_cache
+  assemble_stiffness_matrix!(assem_cache, D, u!, v!, J_exp)
+  get_stiffness_matrix_from_cache(assem_cache)
 end
 """
 Function to extract the load vector element wise
 """
 function vec_contribs!(assem_cache, f::Function, u!::Function, J_exp::Int64)
-  assemble_vector!(assem_cache, f, u!, J_exp)
-  assem_cache
+  assemble_load_vector!(assem_cache, f, u!, J_exp)
+  get_load_vector_from_cache(assem_cache)
 end
 function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine_elem_indices::Vector{AbstractVector{Int64}}, 
   quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
   nc = size(coarse_elem_indices_to_fine_elem_indices,1)
-  mat_vec_contrib_cache = Vector{Any}(undef,nc)
+  mat_contrib_cache = Vector{Any}(undef,nc)  
+  vec_contrib_cache = Vector{Any}(undef,nc)  
   for t=1:nc
     el_conn_el = [i+j for i=1:length(coarse_elem_indices_to_fine_elem_indices[t])-1, j=0:1]
     nds_el = nds[coarse_elem_indices_to_fine_elem_indices[t]]
-    mat_vec_contrib_cache[t] = assembler_cache(nds_el, el_conn_el, quad, q)
+    mat_contrib_cache[t] = stiffness_matrix_cache(nds_el, el_conn_el, quad, q)
+    vec_contrib_cache[t] = load_vector_cache(nds_el, el_conn_el, quad, q)
   end
-  mat_vec_contrib_cache
+  mat_contrib_cache, vec_contrib_cache
 end
-get_stiffness_matrix_from_cache(cache) = cache[7]
-get_load_vector_from_cache(cache) = cache[8]
+get_stiffness_matrix_from_cache(cache) = cache[5]
+get_load_vector_from_cache(cache) = cache[5]
