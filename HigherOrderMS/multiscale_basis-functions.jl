@@ -46,20 +46,14 @@ end
 Function to extract the stiffness matrices element wise
 """
 function mat_contribs!(assem_cache, D::Function, u!::Function, v!::Function, J_exp::Int64)
-  nel = size(assem_cache, 1)
-  for t=1:nel
-    assemble_matrix!(assem_cache[t], D, u!, v!, J_exp)
-  end
+  assemble_matrix!(assem_cache, D, u!, v!, J_exp)
   assem_cache
 end
 """
 Function to extract the load vector element wise
 """
 function vec_contribs!(assem_cache, f::Function, u!::Function, J_exp::Int64)
-  nel = size(assem_cache, 1)
-  for t=1:nel
-    assemble_vector!(assem_cache[t], f, u!, J_exp)
-  end
+  assemble_vector!(assem_cache, f, u!, J_exp)
   assem_cache
 end
 function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine_elem_indices::Vector{AbstractVector{Int64}}, 

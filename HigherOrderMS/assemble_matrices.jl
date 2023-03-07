@@ -172,51 +172,77 @@ end
 """
 Function to assemble the multiscale stiffness matrix
 """
-function fillsKms!(cache, nc::Int64, p::Int64, l::Int64)
-  sKms, local_basis_vecs, coarse_elem_indices_to_fine_elem_indices, ccs, ip = cache
+function fillsKms!(sKms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, 
+  contrib_cache, ip, nc::Int64, p::Int64, l::Int64, t::Int64)  
   L, Lt, ipcache = ip
-  for t=1:nc
-    start = max(1, t-l)
-    last = min(nc, t+l)
-    binds = start:last
-    nd = (last-start+1)*(p+1)
-    gtpi = coarse_elem_indices_to_fine_elem_indices[t]
-    for ii=1:nd, jj=1:nd
-      fill!(ipcache, 0.0)
-      ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
-      ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1 
-      get_local_basis!(L, local_basis_vecs, binds[ii2], gtpi, ll2)     
-      get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1) 
-      Kₛ = get_stiffness_matrix_from_cache(ccs[t])
-      mul!(ipcache, Kₛ, Lt)
-      stima_el = sKms[t]
-      @simd for tt=1:lastindex(ipcache)
-        @inbounds stima_el[ii,jj] += L[tt]*ipcache[tt]
-      end   
-    end
+  start = max(1, t-l)
+  last = min(nc, t+l)
+  binds = start:last
+  nd = (last-start+1)*(p+1)
+  gtpi = coarse_elem_indices_to_fine_elem_indices
+  fill!(sKms,0.0)
+  fill!(L,0.0)
+  fill!(Lt,0.0)
+  fill!(ipcache,0.0)
+  for ii=1:nd, jj=1:nd
+    fill!(ipcache, 0.0)
+    ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
+    ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1 
+    get_local_basis!(L, local_basis_vecs, binds[ii2], gtpi, ll2)     
+    get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1) 
+    Kₛ = get_stiffness_matrix_from_cache(contrib_cache)
+    mul!(ipcache, Kₛ, Lt)    
+    @simd for tt=1:lastindex(ipcache)
+      @inbounds sKms[ii,jj] += L[tt]*ipcache[tt]
+    end   
   end
   sKms
 end
 
-function fillsFms!(cache, nc::Int64, p::Int64, l::Int64)
-  sFms, local_basis_vecs, coarse_elem_indices_to_fine_elem_indices, ccs, ip = cache  
-  L, Lt, ipcache = ip
-  for t=1:nc
-    start = max(1,t-l)
-    last = min(nc,t+l)
-    binds = start:last     
-    nd = (last-start+1)*(p+1)    
-    gtpi = coarse_elem_indices_to_fine_elem_indices[t] 
-    for ii=1:nd
-      ii1 = ceil(Int,ii/(p+1));
-      ll1 = ceil(Int,(ii-1)%(p+1)) + 1;      
-      get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1)
-      F = get_load_vector_from_cache(ccs[t])
-      load_el = sFms[t]
-      @simd for tt=1:lastindex(Lt)
-        @inbounds load_el[ii] += F[tt]*Lt[tt]
-      end
+function fillsFms!(sFms, local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64},
+  contrib_cache, ip, nc::Int64, p::Int64, l::Int64, t::Int64)
+  Lt = ip[2]
+  start = max(1,t-l)
+  last = min(nc,t+l)
+  binds = start:last     
+  nd = (last-start+1)*(p+1)    
+  gtpi = coarse_elem_indices_to_fine_elem_indices
+  for ii=1:nd
+    ii1 = ceil(Int,ii/(p+1));
+    ll1 = ceil(Int,(ii-1)%(p+1)) + 1;      
+    get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1)
+    F = get_load_vector_from_cache(contrib_cache)
+    @simd for tt=1:lastindex(Lt)
+      @inbounds sFms[ii] += F[tt]*Lt[tt]
     end
   end
   sFms
+end
+
+function assemble_ms_matrix!(cache, sKms::AbstractVector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}})
+  nc = size(ms_elem,1)
+  K = cache
+  fill!(cache,0.0)
+  for t=1:nc
+    local_dof = size(ms_elem[t],1)
+    elem = ms_elem[t]
+    local_mat = sKms[t]
+    @turbo for ti=1:local_dof, tj=1:local_dof
+      K[elem[ti], elem[tj]] += local_mat[ti,tj]
+    end
+  end
+end
+
+function assemble_ms_vector!(cache, sFms::AbstractVector{Vector{Float64}}, ms_elem::Vector{Vector{Int64}})
+  nc = size(ms_elem,1)
+  F = cache
+  fill!(F,0.0)
+  for t=1:nc
+    local_dof = size(ms_elem[t],1)
+    elem = ms_elem[t]
+    local_vec = sFms[t]
+    @turbo for ti=1:local_dof
+      F[elem[ti]] += local_vec[ti]  
+    end
+  end
 end
