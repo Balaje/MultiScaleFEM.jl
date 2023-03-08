@@ -173,54 +173,24 @@ end
 """
 Function to assemble the multiscale stiffness matrix
 """
-function fillsKms(local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, 
-  Kₛ, ip, nc::Int64, p::Int64, l::Int64, t::Int64)  
-  L, Lt, ipcache = ip
-  start = max(1, t-l)
-  last = min(nc, t+l)
-  binds = start:last
-  nd = (last-start+1)*(p+1)
-  gtpi = coarse_elem_indices_to_fine_elem_indices
-  sKms = zeros(Float64, nd, nd)
-  fill!(L,0.0)
-  fill!(Lt,0.0)
-  fill!(ipcache,0.0)
-  for ii=1:nd, jj=1:nd
-    fill!(ipcache, 0.0)
-    ii1 = ceil(Int,ii/(p+1)); ii2 = ceil(Int,jj/(p+1))
-    ll1 = ceil(Int,(ii-1)%(p+1)) + 1; ll2 = ceil(Int,(jj-1)%(p+1)) + 1 
-    get_local_basis!(L, local_basis_vecs, binds[ii2], gtpi, ll2)     
-    get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1) 
-    mul!(ipcache, Kₛ, Lt)    
-    @simd for tt=1:lastindex(ipcache)
-      @inbounds sKms[ii,jj] += L[tt]*ipcache[tt]
-    end   
-  end
-  sKms
+function fillsKms!(cache, local_basis_vecs::Matrix{Float64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, Kₛ::AbstractMatrix{Float64})  
+  C, Ct, Lt, _ = cache 
+  L = @views local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
+  transpose!(Lt, L)
+  mul!(Ct, Kₛ, L)
+  mul!(C, Lt, Ct)  
+  C
 end
 
-function fillsFms(local_basis_vecs::Vector{Matrix{Float64}}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64},
-  F, ip, nc::Int64, p::Int64, l::Int64, t::Int64)
-  Lt = ip[2]
-  start = max(1,t-l)
-  last = min(nc,t+l)
-  binds = start:last     
-  nd = (last-start+1)*(p+1)    
-  gtpi = coarse_elem_indices_to_fine_elem_indices
-  sFms = zeros(Float64, nd)
-  fill!(Lt,0.0)
-  for ii=1:nd
-    ii1 = ceil(Int,ii/(p+1));
-    ll1 = ceil(Int,(ii-1)%(p+1)) + 1;      
-    get_local_basis!(Lt, local_basis_vecs, binds[ii1], gtpi, ll1)
-    @simd for tt=1:lastindex(Lt)
-      @inbounds sFms[ii] += F[tt]*Lt[tt]
-    end
-  end
-  sFms
+function fillsFms!(cache, local_basis_vecs::Matrix{Float64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, F::AbstractVector{Float64})
+  _,_, Lt, res = cache
+  L = @views local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
+  transpose!(Lt, L)
+  mul!(res, Lt, F)
+  res
 end
 
-function assemble_ms_matrix!(cache, sKms::AbstractVector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}})
+function assemble_ms_matrix!(cache, sKms, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   K = cache
   fill!(K,0.0)
@@ -234,7 +204,7 @@ function assemble_ms_matrix!(cache, sKms::AbstractVector{Matrix{Float64}}, ms_el
   end
 end
 
-function assemble_ms_vector!(cache, sFms::AbstractVector{Vector{Float64}}, ms_elem::Vector{Vector{Int64}})
+function assemble_ms_vector!(cache, sFms, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   F = cache
   fill!(F,0.0)

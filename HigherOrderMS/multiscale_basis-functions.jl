@@ -39,6 +39,22 @@ function ms_basis_cache!(matcache, D::Function, nf::Int64, fespaces::Tuple{Int64
   (stima, lmat), (zeros(Float64, q*nf+1), fvecs), (basis_vec_ms, fns)
 end
 
+function sort_basis_vectors!(sorted_basis, basis_vec_ms::Vector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}}, p::Int64, l::Int64)
+  nc = size(ms_elem,1)
+  for t=1:nc
+    start = max(1, t-l)
+    last = min(nc, t+l)
+    binds = start:last
+    nd = (last-start+1)*(p+1)
+    for j=1:nd
+      ii1 = ceil(Int,j/(p+1))
+      ll1 = ceil(Int,(j-1)%(p+1)) + 1
+      sorted_basis[t][:,j] = basis_vec_ms[binds[ii1]][:,ll1]
+    end
+  end
+  sorted_basis
+end
+
 function get_local_basis!(cache, fullvec::Vector{Matrix{Float64}}, el::Int64, fn::AbstractVector{Int64}, ind::Int64)
   @assert length(cache) == length(fn)
   lbv = fullvec[el]

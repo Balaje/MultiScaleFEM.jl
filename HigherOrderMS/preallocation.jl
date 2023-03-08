@@ -19,10 +19,12 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
   coarse_elem_indices_to_fine_elem_indices = Vector{AbstractVector{Int64}}(undef, nc) # Mapping between the coarse elements to the fine scale     
   # Empty matrices
   multiscale_elem = Vector{Vector{Int64}}(undef,nc) # Connectivity of the multiscale elements
-  basis_vec_multiscale = Vector{Matrix{Float64}}(undef,nc) # To store the multiscale basis functions  
+  basis_vec_multiscale = Vector{Matrix{Float64}}(undef,nc) # To store the multiscale basis functions
+  basis_elem_multiscale = Vector{Matrix{Float64}}(undef,nc)
   # Preallocate the shape of a multiscale matrix-vector system
   multiscale_matrix = zeros(Float64, (p+1)*nc, (p+1)*nc)
   multiscale_vector = zeros(Float64, (p+1)*nc)  
+  ip_elem_cache = Vector{Tuple{Matrix{Float64}, Matrix{Float64}, Matrix{Float64}, Vector{Float64}}}(undef,nc)
   for i=1:nc
     start = max(1,i-l)
     last = min(nc,i+l)
@@ -31,6 +33,8 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
     coarse_elem_indices_to_fine_elem_indices[i] = i*(q*aspect_ratio) - (q*aspect_ratio) + 1 : i*(q*aspect_ratio) + 1
     multiscale_elem[i] = start*(p+1)-p : last*(p+1)    
     basis_vec_multiscale[i] = zeros(Float64, q*nf+1, p+1)    
+    basis_elem_multiscale[i] = zeros(Float64, q*nf+1, npatch*(p+1))    
+    ip_elem_cache[i] = zeros(Float64, npatch*(p+1), npatch*(p+1)), zeros(Float64, length(coarse_elem_indices_to_fine_elem_indices[i]), npatch*(p+1)), zeros(Float64, npatch*(p+1), length(coarse_elem_indices_to_fine_elem_indices[i])), zeros(Float64, npatch*(p+1))
   end
   L = zeros(Float64, length(coarse_elem_indices_to_fine_elem_indices[1]))
   Lt = zero(L)
@@ -44,10 +48,9 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
   nc_elem = convert_to_cell_wise(nc, nc)
   p_elem = convert_to_cell_wise(p, nc)
   l_elem = convert_to_cell_wise(l, nc)
-  ip_elem_wise = convert_to_cell_wise((L,Lt,ipcache), nc)
   (nds_coarse, elem_coarse, nds_fine, elem_fine), patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices,
-  basis_vec_multiscale, (multiscale_elem, multiscale_matrix, multiscale_vector), 
-  (Ds, fs, Φs, ∇Φs, jacobian_exp, nc_elem, p_elem, l_elem, ip_elem_wise) 
+  (basis_vec_multiscale, basis_elem_multiscale), (multiscale_elem, multiscale_matrix, multiscale_vector), 
+  (Ds, fs, Φs, ∇Φs, jacobian_exp, nc_elem, p_elem, l_elem, ip_elem_cache) 
 end
 
 get_node_elem_coarse(prob_data) = (prob_data[1][1], prob_data[1][2])
