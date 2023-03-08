@@ -44,7 +44,9 @@ end
 """
 Function to assemble the load vector
 """
-function assemble_load_vector!(cache, f::Function, u!::Function, J_exp::Int64)
+function assemble_load_vector!(
+  cache::Tuple{Tuple{Matrix{Float64}, Matrix{Float64}, Vector{Float64}, Tuple{Vector{Float64}, Vector{Float64}}}, Tuple{Vector{Int64}, Vector{Float64}}, 
+  Matrix{Int64}, Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, Vector{Float64}}, f::Function, u!::Function, J_exp::Int64)
   quad_data, vecData, h1elem, bu, F = cache
   # Unpack all the data
   xqs, fxqs, J, quad = quad_data
@@ -173,24 +175,17 @@ end
 """
 Function to assemble the multiscale stiffness matrix
 """
-function fillsKms!(cache, local_basis_vecs::Matrix{Float64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, Kₛ::AbstractMatrix{Float64})  
-  C, Ct, Lt, _ = cache 
-  L = @views local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
-  transpose!(Lt, L)
-  mul!(Ct, Kₛ, L)
-  mul!(C, Lt, Ct)  
-  C
+function fillsKms(local_basis_vecs::SparseMatrixCSC{Float64, Int64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, Kₛ::SparseMatrixCSC{Float64})  
+  L = local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
+  L'*Kₛ*L
 end
 
-function fillsFms!(cache, local_basis_vecs::Matrix{Float64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, F::AbstractVector{Float64})
-  _,_, Lt, res = cache
-  L = @views local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
-  transpose!(Lt, L)
-  mul!(res, Lt, F)
-  res
+function fillsFms(local_basis_vecs::SparseMatrixCSC{Float64, Int64}, coarse_elem_indices_to_fine_elem_indices::AbstractVector{Int64}, F::Vector{Float64})
+  L = local_basis_vecs[coarse_elem_indices_to_fine_elem_indices, :]
+  L'*F
 end
 
-function assemble_ms_matrix!(cache, sKms, ms_elem::Vector{Vector{Int64}})
+function assemble_ms_matrix!(cache, sKms::BroadcastVector, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   K = cache
   fill!(K,0.0)
@@ -198,36 +193,38 @@ function assemble_ms_matrix!(cache, sKms, ms_elem::Vector{Vector{Int64}})
     local_dof = size(ms_elem[t],1)
     elem = ms_elem[t]
     local_mat = sKms[t]
-    @turbo for ti=1:local_dof, tj=1:local_dof
-      K[elem[ti], elem[tj]] += local_mat[ti,tj]
+    @simd for ti=1:local_dof
+      @simd for tj=1:local_dof
+        @inbounds K[elem[ti], elem[tj]] += local_mat[ti,tj]
+      end
     end
   end
 end
 
-function assemble_ms_vector!(cache, sFms, ms_elem::Vector{Vector{Int64}})
+function assemble_ms_vector!(cache, sFms::BroadcastVector, ms_elem::Vector{Vector{Int64}})
   nc = size(ms_elem,1)
   F = cache
   fill!(F,0.0)
   for t=1:nc
     local_dof = size(ms_elem[t],1)
     elem = ms_elem[t]
-    local_vec = sFms[t]
-    @turbo for ti=1:local_dof
-      F[elem[ti]] += local_vec[ti]  
+    local_vec = sFms[t]    
+    @simd for ti=1:local_dof
+      @inbounds F[elem[ti]] += local_vec[ti]  
     end
   end
 end
 
-function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{Matrix{Float64}})  
+function build_solution!(cache, sol::Vector{Float64}, local_basis_vecs::Vector{SparseMatrixCSC{Float64,Int64}})  
   nc = size(local_basis_vecs, 1)
   p = size(local_basis_vecs[1], 2)-1
   res, sol_cache = cache
   fill!(sol_cache,0.0)
   fill!(res, 0.0)
   for j=1:nc, i=0:p
-    get_local_basis!(sol_cache, local_basis_vecs, j, 1:length(sol_cache), i+1)
-    @turbo for tt=1:lastindex(res)
-      res[tt] += sol[(p+1)*j+i-p]*sol_cache[tt]
+    get_local_basis!(sol_cache, local_basis_vecs, j, 1:length(sol_cache), i+1)    
+    @simd for tt=1:lastindex(res)
+      @inbounds res[tt] += sol[(p+1)*j+i-p]*sol_cache[tt]
     end
   end
 end

@@ -28,7 +28,7 @@ coarse_indices_to_fine_indices = get_coarse_indices_to_fine_indices(prob_data)
 quad = gausslegendre(2)
 
 # Extract all the caches
-Ds, fs, Φs, ∇Φs, jacobian_exp, nc_elem, p_elem, l_elem, ip_elem_wise = get_elem_wise_data(prob_data)
+Ds, fs, Φs, ∇Φs, jacobian_exp, nc_elem, p_elem, l_elem = get_elem_wise_data(prob_data)
 basis_vec_ms = get_basis_multiscale(prob_data)
 patch_indices_to_global_indices = get_patch_indices_to_global_indices(prob_data)
 stima_cache = stiffness_matrix_cache(nds_fine, elem_fine, quad, q)
@@ -45,15 +45,15 @@ sol_cache = zeros(Float64,q*nf+1), zeros(Float64,q*nf+1);
 # Compute MS bases
 compute_ms_bases!(basis_cache, p, l)
 # Function to sort the basis vectors element-wise in the coarse scale
-basis_elem_ms = sort_basis_vectors!(basis_vec_ms[2], basis_vec_ms[1], ms_elem, p, l)
+basis_elem_ms = sort_basis_vectors!(basis_vec_ms[2], basis_vec_ms[1], ms_elem, p, l);
 
-mat_contribs = BroadcastVector(assemble_stiffness_matrix!, mat_contrib_cache, Ds, ∇Φs, ∇Φs, jacobian_exp*(-1));
-ms_elem_mats = BroadcastVector(fillsKms!, ip_elem_wise, basis_elem_ms, coarse_indices_to_fine_indices, mat_contribs);
+mat_contribs = BroadcastVector(assemble_stiffness_matrix!, mat_contrib_cache, Ds, ∇Φs, ∇Φs, jacobian_exp*(-1))
+ms_elem_mats = BroadcastVector(fillsKms, basis_elem_ms, coarse_indices_to_fine_indices, mat_contribs);
 assemble_ms_matrix!(stima_ms, ms_elem_mats, ms_elem);
 
 # fs = convert_to_cell_wise(f, nc);
 vec_contribs = BroadcastVector(assemble_load_vector!, vec_contrib_cache, fs, Φs, jacobian_exp);
-ms_elem_vecs = BroadcastVector(fillsFms!, ip_elem_wise, basis_elem_ms, coarse_indices_to_fine_indices, vec_contribs);
+ms_elem_vecs = BroadcastVector(fillsFms, basis_elem_ms, coarse_indices_to_fine_indices, vec_contribs);
 assemble_ms_vector!(loadvec_ms, ms_elem_vecs, ms_elem);  
 build_solution!(sol_cache, (stima_ms\loadvec_ms), basis_vec_ms[1]);
 

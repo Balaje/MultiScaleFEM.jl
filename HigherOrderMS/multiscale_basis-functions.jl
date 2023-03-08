@@ -2,7 +2,7 @@
 # Module containing the MultiScaleBases implementation #
 #### ##### ##### ##### ##### ##### ##### ##### ##### ###
 
-function compute_ms_bases!(cache, p::Int64, l::Int64)
+function compute_ms_bases!(cache::Tuple{Tuple{SparseMatrixCSC{Float64, Int64}, SparseMatrixCSC{Float64, Int64}}, Tuple{Vector{Float64}, Diagonal{Float64, Vector{Float64}}}, Tuple{Vector{SparseMatrixCSC{Float64, Int64}}, Vector{UnitRange{Int64}}}}, p::Int64, l::Int64)
   mats, fvecs, bases_data = cache
   f1, f2 = fvecs
   stima, lmat = mats
@@ -28,8 +28,12 @@ function compute_ms_bases!(cache, p::Int64, l::Int64)
   basis_vec_ms
 end
 
-function ms_basis_cache!(matcache, D::Function, nf::Int64, fespaces::Tuple{Int64,Int64}, 
-  basis_vec_ms::Vector{Matrix{Float64}}, patch_to_fine_scale::Vector{AbstractVector{Int64}})
+function ms_basis_cache!(matcache::Tuple{Tuple{Tuple{Matrix{Float64}, Matrix{Float64}, Vector{Float64}, Tuple{Vector{Float64}, Vector{Float64}}},
+   Tuple{Vector{Int64}, Vector{Int64}, Vector{Float64}}, Tuple{Matrix{Int64}, Matrix{Int64}}, 
+   Tuple{Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}}, 
+   SparseMatrixCSC{Float64, Int64}}, Tuple{Tuple{Tuple{Matrix{Float64}, Matrix{Float64}, Vector{Float64}, Tuple{Vector{Float64}, Vector{Float64}}}, Tuple{Vector{Int64}, Vector{Float64}}, Matrix{Int64}, Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, Vector{Float64}}, Tuple{Matrix{Float64}, SparseMatrixCSC{Float64, Int64}, Vector{Float64}}}, 
+   Diagonal{Float64, Vector{Float64}}}, D::Function, nf::Int64, fespaces::Tuple{Int64,Int64}, 
+  basis_vec_ms::Vector{SparseMatrixCSC{Float64,Int64}}, patch_to_fine_scale::Vector{AbstractVector{Int64}})
   q,p = fespaces
   stima_cache, lmat_cache, fvecs_cache = matcache
   stima = assemble_stiffness_matrix!(stima_cache, D, ∇φᵢ!, ∇φᵢ!, -1)
@@ -39,7 +43,7 @@ function ms_basis_cache!(matcache, D::Function, nf::Int64, fespaces::Tuple{Int64
   (stima, lmat), (zeros(Float64, q*nf+1), fvecs), (basis_vec_ms, fns)
 end
 
-function sort_basis_vectors!(sorted_basis, basis_vec_ms::Vector{Matrix{Float64}}, ms_elem::Vector{Vector{Int64}}, p::Int64, l::Int64)
+function sort_basis_vectors!(sorted_basis::Vector{SparseMatrixCSC{Float64,Int64}}, basis_vec_ms::Vector{SparseMatrixCSC{Float64,Int64}}, ms_elem::Vector{Vector{Int64}}, p::Int64, l::Int64)
   nc = size(ms_elem,1)
   for t=1:nc
     start = max(1, t-l)
@@ -55,7 +59,7 @@ function sort_basis_vectors!(sorted_basis, basis_vec_ms::Vector{Matrix{Float64}}
   sorted_basis
 end
 
-function get_local_basis!(cache, fullvec::Vector{Matrix{Float64}}, el::Int64, fn::AbstractVector{Int64}, ind::Int64)
+function get_local_basis!(cache, fullvec::Vector{SparseMatrixCSC{Float64,Int64}}, el::Int64, fn::AbstractVector{Int64}, ind::Int64)
   @assert length(cache) == length(fn)
   lbv = fullvec[el]
   copyto!(cache, view(lbv, fn, ind))
@@ -79,7 +83,8 @@ function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine
   quad::Tuple{Vector{Float64}, Vector{Float64}}, q::Int64)
   nc = size(coarse_elem_indices_to_fine_elem_indices,1)
   mat_contrib_cache = Vector{Any}(undef,nc)  
-  vec_contrib_cache = Vector{Any}(undef,nc)  
+  vec_contrib_cache = Vector{Tuple{Tuple{Matrix{Float64}, Matrix{Float64}, Vector{Float64}, Tuple{Vector{Float64}, Vector{Float64}}}, Tuple{Vector{Int64}, Vector{Float64}}, 
+  Matrix{Int64}, Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, Vector{Float64}}}(undef,nc)  
   for t=1:nc
     el_conn_el = [i+j for i=1:length(coarse_elem_indices_to_fine_elem_indices[t])-1, j=0:1]
     nds_el = nds[coarse_elem_indices_to_fine_elem_indices[t]]
