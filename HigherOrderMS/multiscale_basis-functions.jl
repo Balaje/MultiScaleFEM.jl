@@ -21,44 +21,33 @@ function ms_basis_cache(
   ms_basis_cache{Float64,Int64}(stima, lmat, zeros(Float64,q*nf+1), fvecs)
 end
 
-function compute_ms_basis(cache::ms_basis_cache{Float64,Int64}, fespaces::Tuple{Int64,Int64}, l::Int64, t::Int64, fullnodes::AbstractVector{Int64})
+function compute_ms_basis(cache::ms_basis_cache{Float64,Int64}, fespaces::Tuple{Int64,Int64}, l::Int64, 
+  nels::Tuple{Int64,Int64}, fullnodes::Vector{AbstractVector{Int64}})
   q,p = fespaces 
+  nf,nc = nels
+  basis_vec_ms = spzeros(Float64,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
   stima = cache.stima 
   lmat = cache.lmat
   f1 = cache.zvals
   f2 = cache.fvecs
-  fn = fullnodes[2:length(fullnodes)-1]
-  basis_vec_ms = spzeros(Float64, size(stima,1), p+1)
-  start = max(1,t-l)
-  last = min(nc,t+l)
-  index = t*(p+1)-p
-  gn = start*(p+1)-p:last*(p+1)    
-  stima_el = stima[fn,fn]
-  lmat_el = lmat[fn,gn]
-  for tt=1:p+1
-    fvecs_el = @views [f1[fn]; f2[gn, index]]
-    lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
-    rhs = fvecs_el           
-    sol = lhs\rhs                 
-    basis_vec_ms[fn,tt] = sol[1:length(fn)]
-    index += 1   
+  index = 1;
+  for t=1:nc
+    fn = fullnodes[t][2:end-1]
+    start = max(1,t-l)
+    last = min(nc,t+l)
+    gn = start*(p+1)-p:last*(p+1)    
+    stima_el = stima[fn,fn]
+    lmat_el = lmat[fn,gn]
+    for _=1:p+1
+      fvecs_el = @views [f1[fn]; f2[gn, index]]
+      lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
+      rhs = fvecs_el           
+      sol = lhs\rhs                 
+      basis_vec_ms[fn,index] = sol[1:length(fn)]
+      index += 1   
+    end
   end
   basis_vec_ms
-end
-
-function sort_basis_vectors(basis_vec_ms::AbstractVector{SparseMatrixCSC{Float64,Int64}}, p::Int64, l::Int64, t::Int64)
-  nc = size(basis_vec_ms,1)
-  start = max(1, t-l)
-  last = min(nc, t+l)
-  binds = start:last
-  nd = (last-start+1)*(p+1)
-  sorted_basis = spzeros(Float64, length(basis_vec_ms[1][:,1]), nd)
-  for j=1:nd
-    ii1 = ceil(Int,j/(p+1))
-    ll1 = ceil(Int,(j-1)%(p+1)) + 1
-    sorted_basis[:,j] = basis_vec_ms[binds[ii1]][:,ll1]
-  end    
-  sorted_basis
 end
 
 function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine_elem_indices::Vector{AbstractVector{Int64}}, 
@@ -74,5 +63,3 @@ function contrib_cache(nds::AbstractVector{Float64}, coarse_elem_indices_to_fine
   end
   mat_contrib_cache, vec_contrib_cache
 end
-get_stiffness_matrix_from_cache(cache) = cache.assem_mat
-get_load_vector_from_cache(cache) = cache.assem_vec

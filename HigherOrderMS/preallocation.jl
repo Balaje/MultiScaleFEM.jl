@@ -17,7 +17,6 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
   coarse_elem_indices_to_fine_elem_indices = Vector{AbstractVector{Int64}}(undef, nc) # Mapping between the coarse elements to the fine scale     
   # Empty matrices
   multiscale_elem = Vector{Vector{Int64}}(undef,nc) # Connectivity of the multiscale elements
-  basis_vec_multiscale = Vector{SparseMatrixCSC{Float64,Int64}}(undef,nc) # To store the multiscale basis functions
   # Preallocate the shape of a multiscale matrix-vector system
   multiscale_matrix = zeros(Float64, (p+1)*nc, (p+1)*nc)
   multiscale_vector = zeros(Float64, (p+1)*nc)    
@@ -28,15 +27,12 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
     patch_elem_indices_to_fine_elem_indices[i] = (1:(q*aspect_ratio)*npatch+1) .+ ((start-1)*(q*aspect_ratio))
     coarse_elem_indices_to_fine_elem_indices[i] = i*(q*aspect_ratio) - (q*aspect_ratio) + 1 : i*(q*aspect_ratio) + 1
     multiscale_elem[i] = start*(p+1)-p : last*(p+1)    
-    basis_vec_multiscale[i] = spzeros(Float64, q*nf+1, p+1)        
   end
   # Store the data cell-wise
-  (nds_coarse, elem_coarse, nds_fine, elem_fine), patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices,
-  basis_vec_multiscale, (multiscale_elem, multiscale_matrix, multiscale_vector)
+  (nds_coarse, elem_coarse, nds_fine, elem_fine), patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices, (multiscale_elem, multiscale_matrix, multiscale_vector)
 end
 get_node_elem_coarse(prob_data) = (prob_data[1][1], prob_data[1][2])
 get_node_elem_fine(prob_data) = (prob_data[1][3], prob_data[1][4])
 get_patch_indices_to_global_indices(prob_data) = prob_data[2]
 get_coarse_indices_to_fine_indices(prob_data) = prob_data[3]
-get_basis_multiscale(prob_data) = prob_data[4]
-get_multiscale_data(prob_data) = prob_data[5]
+get_multiscale_data(prob_data) = prob_data[4]
