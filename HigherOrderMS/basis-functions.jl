@@ -1,6 +1,7 @@
 ##### ###### ###### ###### ###### ###### ###### ###### #
 # Basis functions for the direct and multiscale method #
 ##### ###### ###### ###### ###### ###### ###### ###### #
+using FillArrays
 
 function lagrange_basis_cache(p::Int64)
   xq = LinRange(-1,1,p+1)
@@ -18,7 +19,7 @@ end
 """
 Function to compute the Lagrange basis functions in (-1,1)
 """
-function φᵢ!(cache, x)
+function φᵢ!(cache::Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, x::Float64)
   A,b,res = cache
   fill!(res,0.0)
   q = length(res)
@@ -30,7 +31,7 @@ end
 """
 Function to compute the gradient of the Lagrange basis functions in (-1,1)
 """
-function ∇φᵢ!(cache, x)
+function ∇φᵢ!(cache::Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, x::Float64)
   A,b,res = cache
   fill!(res,0.0)
   q = length(res)
@@ -43,7 +44,7 @@ end
 """
 Function to compute the Legendre basis functions on (-1,1)
 """
-function LP!(cache, x::Float64)
+function LP!(cache::Vector{Float64}, x::Float64)
   p = size(cache,1) - 1
   if(p==0)
     cache[1] = 1.0
@@ -70,13 +71,4 @@ function Λₖ!(cache, x::Float64, nds::Tuple{Float64,Float64})
     LP!(cache, x̂)
   end
   cache
-end
-
-"""
-Create cell wise repeating functions for efficient broadcasting
-"""
-function convert_to_cell_wise(X, nc::Int64)
-  tX = typeof(X)
-  cell_wise_X = Vector{tX}(undef,nc)
-  fill!(cell_wise_X, X)
 end
