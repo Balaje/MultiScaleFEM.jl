@@ -1,46 +1,6 @@
 ##### ###### ###### ###### ###### ###### ###### ###### #
 # Basis functions for the direct and multiscale method #
 ##### ###### ###### ###### ###### ###### ###### ###### #
-using FillArrays
-
-function lagrange_basis_cache(p::Int64)
-  xq = LinRange(-1,1,p+1)
-  Q = [xq[i]^j for i=1:p+1, j=0:p]
-  A = Q\I(p+1)
-  b = Vector{Float64}(undef,p+1)
-  fill!(b,0.0)
-  res = similar(b)
-  fill!(res,0.0)
-  return A', b, res
-end
-function legendre_basis_cache(p::Int64)
-  zeros(Float64,p+1)
-end
-"""
-Function to compute the Lagrange basis functions in (-1,1)
-"""
-function φᵢ!(cache::Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, x::Float64)
-  A,b,res = cache
-  fill!(res,0.0)
-  q = length(res)
-  for i=0:q-1
-    b[i+1] = x^i      
-  end
-  mul!(res, A, b)
-end
-"""
-Function to compute the gradient of the Lagrange basis functions in (-1,1)
-"""
-function ∇φᵢ!(cache::Tuple{Adjoint{Float64, Matrix{Float64}}, Vector{Float64}, Vector{Float64}}, x::Float64)
-  A,b,res = cache
-  fill!(res,0.0)
-  q = length(res)
-  for i=1:q-1
-    b[i+1] = i*x^(i-1)
-  end
-  mul!(res, view(A,:,2:q), view(b,2:q))
-end
-
 """
 Function to compute the Legendre basis functions on (-1,1)
 """
@@ -63,12 +23,13 @@ end
 """
 Shifted Legendre Polynomial with support (a,b)
 """
-function Λₖ!(cache, x::Float64, nds::Tuple{Float64,Float64})
+function Λₖ!(x, nds::Tuple{Float64,Float64}, p::Int64, j::Int64)
   a,b = nds
+  cache = Vector{Float64}(undef, p+1)
   fill!(cache,0.0)
   if(a < x < b)
     x̂ = -(b+a)/(b-a) + 2.0*x/(b-a)
     LP!(cache, x̂)
   end
-  cache
+  cache[j]
 end

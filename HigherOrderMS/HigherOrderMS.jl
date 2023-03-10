@@ -3,7 +3,9 @@ using LinearAlgebra
 using Plots
 using SparseArrays   
 using LoopVectorization
-# using LazyArrays
+using LazyArrays
+using SparseArrays
+using Gridap
 using FillArrays
 using BenchmarkTools
 

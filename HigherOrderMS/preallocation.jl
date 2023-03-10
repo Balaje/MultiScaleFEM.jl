@@ -8,18 +8,11 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
   aspect_ratio = Int(nf/nc)  
   @assert abs(Int(nf/nc) - (nf/nc)) == 0.0 # Determine if the aspect ratio is an integer.  
   q,p = fespaces
-  nds_coarse = LinRange(domain[1], domain[2], nc+1)
-  nds_fine = LinRange(domain[1], domain[2], nf+1)
-  elem_coarse = [i+j for i=1:nc, j=0:1]
-  elem_fine = [i+j for i=1:nf, j=0:1]
-  # To be defined
+  
   patch_elem_indices_to_fine_elem_indices = Vector{AbstractVector{Int64}}(undef, nc) # Mapping between the patch elements to the fine scale 
   coarse_elem_indices_to_fine_elem_indices = Vector{AbstractVector{Int64}}(undef, nc) # Mapping between the coarse elements to the fine scale     
-  # Empty matrices
   multiscale_elem = Vector{Vector{Int64}}(undef,nc) # Connectivity of the multiscale elements
-  # Preallocate the shape of a multiscale matrix-vector system
-  multiscale_matrix = zeros(Float64, (p+1)*nc, (p+1)*nc)
-  multiscale_vector = zeros(Float64, (p+1)*nc)    
+
   for i=1:nc
     start = max(1,i-l)
     last = min(nc,i+l)
@@ -29,10 +22,8 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
     multiscale_elem[i] = start*(p+1)-p : last*(p+1)    
   end
   # Store the data cell-wise
-  (nds_coarse, elem_coarse, nds_fine, elem_fine), patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices, (multiscale_elem, multiscale_matrix, multiscale_vector)
+  patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices, multiscale_elem
 end
-get_node_elem_coarse(prob_data) = (prob_data[1][1], prob_data[1][2])
-get_node_elem_fine(prob_data) = (prob_data[1][3], prob_data[1][4])
-get_patch_indices_to_global_indices(prob_data) = prob_data[2]
-get_coarse_indices_to_fine_indices(prob_data) = prob_data[3]
-get_multiscale_data(prob_data) = prob_data[4]
+get_patch_indices_to_global_indices(prob_data) = prob_data[1]
+get_coarse_indices_to_fine_indices(prob_data) = prob_data[2]
+get_multiscale_elem(prob_data) = prob_data[3]
