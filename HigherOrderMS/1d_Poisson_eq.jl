@@ -1,4 +1,4 @@
-# include("HigherOrderMS.jl");
+include("HigherOrderMS.jl");
 
 D(x) = (2 + cos(2π*x[1]/2e-2))^-1
 f(x) = 1.0
@@ -7,18 +7,14 @@ nc = 2^1
 nf = 2^16
 q = 1
 p = 1
-l = 8
+l = 1
 qorder = 2
 
-prob_data = preallocate_matrices((0.0,1.0), nc, nf, l, (q,p));
-
-coarse_indices_to_fine_indices = get_coarse_indices_to_fine_indices(prob_data)
-patch_indices_to_global_indices = get_patch_indices_to_global_indices(prob_data)
-ms_elem = get_multiscale_elem(prob_data);
+patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
 
 # Compute MS bases
 Kf, basis_vec_ms = compute_ms_basis((0.0,1.0), D, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder);
-stima, loadvec = Kf
+stima, massma, loadvec = Kf
 
 # Solve the problem
 basis_elem_ms = BroadcastVector(getindex, Fill(basis_vec_ms,nc), coarse_indices_to_fine_indices, ms_elem);

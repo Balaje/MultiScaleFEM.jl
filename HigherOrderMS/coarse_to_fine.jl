@@ -1,9 +1,8 @@
-##### ###### ###### ###### ###### ###### ###### ###### ###### ###### #####
-# Preallocate important data structures and empty arrays for perfomance
-##### ###### ###### ###### ###### ###### ###### ###### ###### ###### #####
+##### ###### ###### ###### ###### ###### ###### ###### ###### ###### ##### ##### ##### 
+# Compute the mapping between the coarse-scale and the fine-scale discretizations ####
+##### ###### ###### ###### ###### ###### ###### ###### ###### ###### ##### ##### #####
 
-
-function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int64, l::Int64, fespaces::Tuple{Int64,Int64})
+function coarse_space_to_fine_space(nc::Int64, nf::Int64, l::Int64, fespaces::Tuple{Int64,Int64})
   # Define the aspect ratio between the coarse and fine scale
   aspect_ratio = Int(nf/nc)  
   @assert abs(Int(nf/nc) - (nf/nc)) == 0.0 # Determine if the aspect ratio is an integer.  
@@ -21,9 +20,6 @@ function preallocate_matrices(domain::Tuple{Float64,Float64}, nc::Int64, nf::Int
     coarse_elem_indices_to_fine_elem_indices[i] = i*(q*aspect_ratio) - (q*aspect_ratio) + 1 : i*(q*aspect_ratio) + 1
     multiscale_elem[i] = start*(p+1)-p : last*(p+1)    
   end
-  # Store the data cell-wise
+  
   patch_elem_indices_to_fine_elem_indices, coarse_elem_indices_to_fine_elem_indices, multiscale_elem
 end
-get_patch_indices_to_global_indices(prob_data) = prob_data[1]
-get_coarse_indices_to_fine_indices(prob_data) = prob_data[2]
-get_multiscale_elem(prob_data) = prob_data[3]

@@ -13,10 +13,13 @@ function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f
   dΩ = Measure(Ω,qorder)
   # The main system.
   a(u,v) = ∫(D*(∇(v))⊙(∇(u)))dΩ
+  c(u,v) = ∫((v)⋅(u))dΩ
   l(v) = ∫(f*v)dΩ
-  op = AffineFEOperator(a,l,U,U) 
+  op = AffineFEOperator(a,l,U,U)   
   K = op.op.matrix
   F = op.op.vector
+  op = AffineFEOperator(c,l,U,U)
+  M = op.op.matrix
   # The rectangular matrix
   elem_coarse = [i+j for i=1:nc, j=0:p]
   nds_coarse = LinRange(domain[1], domain[2], nc+1)
@@ -34,7 +37,7 @@ function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f
   end
   # The L² Projection of the Legendre basis
   Λ = assemble_lm_l2_matrix(nds_coarse, elem_coarse, p)
-  (K,F), L, Λ
+  (K,M,F), L, Λ
 end
 
 """

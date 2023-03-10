@@ -1,6 +1,6 @@
-##### ###### ###### ###### ###### ###### ###### ###### #
-# Basis functions for the direct and multiscale method #
-##### ###### ###### ###### ###### ###### ###### ###### #
+##### ###### ###### ###### ###### ###### ####
+# Contains the shifted Legendre polynomials #
+##### ###### ###### ###### ###### ###### ####
 """
 Function to compute the Legendre basis functions on (-1,1)
 """
