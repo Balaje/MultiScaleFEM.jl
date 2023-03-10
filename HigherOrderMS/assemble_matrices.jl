@@ -194,12 +194,12 @@ function assemble_ms_matrix(ms_elem_mats, ms_elem::Vector{Vector{Int64}}, nc::In
   IJV2 = BroadcastVector(vec, BroadcastVector(repeat, BroadcastVector(transpose,ms_elem), BroadcastVector(length, ms_elem)));
   IJV3 = BroadcastVector(getindex, IJV, 3);
   M = BroadcastVector(sparse, IJV1, IJV2, IJV3, nc*(p+1), nc*(p+1));
-  stima_ms = applied(sum, applied(Tuple, BroadcastVector(+, M)))
+  stima_ms = applied(sum, applied(Tuple, M))
   materialize(stima_ms)
 end
 function assemble_ms_vector(ms_elem_vecs, ms_elem::Vector{Vector{Int64}}, nc::Int64, p::Int64)
   V = BroadcastVector(sparsevec, ms_elem, ms_elem_vecs, nc*(p+1))
-  loadvec_ms = applied(sum, applied(Tuple, BroadcastVector(+, V)))
+  loadvec_ms = applied(sum, applied(Tuple, V))
   collect(materialize(loadvec_ms))
 end
 

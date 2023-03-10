@@ -1,10 +1,10 @@
 # include("HigherOrderMS.jl");
 
 f(x::Float64)::Float64 = 1.0
-D(x::Float64)::Float64 = 1.0
+D(x::Float64)::Float64 = (2 + cos(2π*x/2e-2))^-1
 
-nc = 2^8
-nf = 2^16
+nc = 2^1
+nf = 2^14
 q = 1
 p = 1
 l = 10
@@ -37,6 +37,7 @@ vec_contribs = BroadcastVector(assemble_load_vector!, vec_contrib_cache, Fill(1,
 mat_contribs = BroadcastVector(assemble_stiffness_matrix!, mat_contrib_cache, Fill(-1,nc));
 ms_elem_mats = BroadcastVector(*, basis_elem_ms_t, mat_contribs, basis_elem_ms);
 ms_elem_vecs = BroadcastVector(*, basis_elem_ms_t, vec_contribs);
-stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p)
-loadvec_ms = assemble_ms_vector(ms_elem_vecs, ms_elem, nc, p)
-build_solution!(sol_cache, (stima_ms\loadvec_ms), basis_vec_ms)
+stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p);
+loadvec_ms = assemble_ms_vector(ms_elem_vecs, ms_elem, nc, p);
+build_solution!(sol_cache, (stima_ms\loadvec_ms), basis_vec_ms);
+plot(nds_fine, sol_cache[1])
