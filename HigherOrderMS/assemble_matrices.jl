@@ -37,7 +37,7 @@ function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f
   end
   # The L² Projection of the Legendre basis
   Λ = assemble_lm_l2_matrix(nds_coarse, elem_coarse, p)
-  (K,M,F), L, Λ
+  (K,M,F), L, Λ, U
 end
 
 """

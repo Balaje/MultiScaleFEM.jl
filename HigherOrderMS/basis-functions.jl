@@ -15,7 +15,7 @@ function LP!(cache::Vector{Float64}, x::Float64)
     cache[1] = 1.0
     cache[2] = x
     for j=2:p
-      cache[j+1] = (2j-1)/j*x*res[j] - (j-1)/j*res[j-1]
+      cache[j+1] = (2j-1)/j*x*cache[j] - (j-1)/j*cache[j-1]
     end
   end
   cache

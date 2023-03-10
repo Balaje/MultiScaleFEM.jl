@@ -8,7 +8,7 @@ function compute_ms_basis(domain::Tuple{Float64,Float64}, D::Function, f::Functi
   q,p = fespaces 
   nf,nc = nels
   basis_vec_ms = spzeros(Float64,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
-  KMf, lmat, f2 = get_saddle_point_problem(domain, D, f, fespaces, nels, qorder)
+  KMf, lmat, f2, U = get_saddle_point_problem(domain, D, f, fespaces, nels, qorder)
   stima, massma, loadvec = KMf
   f1 = zero(loadvec)
   index = 1
@@ -28,7 +28,7 @@ function compute_ms_basis(domain::Tuple{Float64,Float64}, D::Function, f::Functi
       index += 1   
     end
   end
-  (stima, massma, loadvec), basis_vec_ms
+  (stima, massma, loadvec), basis_vec_ms, U
 end
 
 function mat_contribs(stima::SparseMatrixCSC{Float64,Int64}, coarse_indices_to_fine_indices::AbstractVector{Int64}, t::Int64, nc::Int64)::SparseMatrixCSC{Float64,Int64}
