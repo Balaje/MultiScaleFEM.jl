@@ -67,8 +67,7 @@ function assemble_ms_matrix(ms_elem_mats, ms_elem::Vector{Vector{Int64}}, nc::In
 end
 function assemble_ms_vector(ms_elem_vecs, ms_elem::Vector{Vector{Int64}}, nc::Int64, p::Int64)
   v = BroadcastVector(sparsevec, ms_elem, ms_elem_vecs, nc*(p+1))
-  loadvec_ms = applied(sum, applied(Tuple, v))
-  applied(collect, materialize(loadvec_ms))  
+  applied(sum, applied(Tuple, v))
 end
 
 function get_solution(sol, basis_vecs::SparseMatrixCSC{Float64,Int64})  
