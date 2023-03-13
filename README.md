@@ -1,5 +1,7 @@
 # MultiscaleFEM.jl
 
+**NOTE:** I have made some changes to the code, and some of the scripts in `HigherOrderMS/` may not be available. The script for solving the Poisson equation is available for testing. I will add the code as soon as possible. However, the results for the heat and wave equation are available in `README.md`. The biggest change in this version: I use [Gridap.jl](https://github.com/gridap/Gridap.jl) to construct the saddle point system. I also reduce clutter and make the code more readable.
+
 ## Introduction
 
 This repository contains the source code to implement the Localized Orthogonal Decomposition method and the Higher order Multiscale Method to solve the Poisson problem
