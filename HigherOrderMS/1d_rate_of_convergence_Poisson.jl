@@ -39,23 +39,22 @@ for l=[7,8]
     let
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       
-      Kf, basis_vec_ms, U = compute_ms_basis((0.0,1.0), D₁, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder);
+      Kf, Bs, U = compute_ms_basis((0.0,1.0), D₁, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder, coarse_indices_to_fine_indices, ms_elem);
       stima, massma, loadvec = Kf
-      
+      basis_vec_ms, B, Bt = Bs
+
       # Solve the problem
-      basis_elem_ms = BroadcastVector(getindex, Fill(basis_vec_ms,nc), coarse_indices_to_fine_indices, ms_elem);
-      basis_elem_ms_t = BroadcastVector(transpose, basis_elem_ms);
       # (-) Get the multiscale stiffness matrix
-      mat_el = BroadcastVector(mat_contribs, Fill(stima, nc), coarse_indices_to_fine_indices, 1:nc, nc)
-      ms_elem_mats = BroadcastVector(*, basis_elem_ms_t, mat_el, basis_elem_ms);
-      stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p);
+      stima_el = lazy_map(mat_contribs, Fill(stima, nc), coarse_indices_to_fine_indices, 1:nc, Fill(nc,nc));
+      ms_elem_mats = lazy_map(*, SparseMatrixCSC{Float64,Int64}, Bt, stima_el, B);
+      stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p)
       # (-) Get the multiscale load vector  
-      vec_el = BroadcastVector(vec_contribs, Fill(loadvec, nc), coarse_indices_to_fine_indices, 1:nc, nc)
-      ms_elem_vecs = BroadcastVector(*, basis_elem_ms_t, vec_el);
+      loadvec_el = lazy_map(vec_contribs, Vector{Float64}, Fill(loadvec, nc), coarse_indices_to_fine_indices, 1:nc, Fill(nc,nc));
+      ms_elem_vecs = lazy_map(*ᵐ(), Vector{Float64}, Bt, loadvec_el);
       loadvec_ms = assemble_ms_vector(ms_elem_vecs, ms_elem, nc, p);
       # (-) Solve the problem
-      sol = materialize(stima_ms)\materialize(loadvec_ms)
-      sol_fine_scale = get_solution(sol, basis_vec_ms);
+      sol = stima_ms\collect(loadvec_ms)
+      sol_fine_scale = get_solution(sol, basis_vec_ms);      
 
       dΩ = Measure(get_triangulation(U), qorder)
       uₕ = interpolate_everywhere(sol_ϵ, U)

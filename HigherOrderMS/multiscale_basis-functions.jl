@@ -4,7 +4,8 @@
 # 2) the matrix-vector contributions.        #
 #### ##### ##### ##### ##### ##### ##### #####
 function compute_ms_basis(domain::Tuple{Float64,Float64}, D::Function, f::Function, fespaces::Tuple{Int64,Int64},
-  nels::Tuple{Int64,Int64}, l::Int64, fullnodes::Vector{AbstractVector{Int64}}, qorder::Int64)
+  nels::Tuple{Int64,Int64}, l::Int64, fullnodes::Vector{AbstractVector{Int64}}, qorder::Int64,
+  coarse_indices_to_fine_indices::Vector{AbstractVector{Int64}}, ms_elem::Vector{Vector{Int64}})
   q,p = fespaces 
   nf,nc = nels
   basis_vec_ms = spzeros(Float64,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
@@ -28,7 +29,11 @@ function compute_ms_basis(domain::Tuple{Float64,Float64}, D::Function, f::Functi
       index += 1   
     end
   end
-  (stima, massma, loadvec), basis_vec_ms, U
+  basis_elem_ms = lazy_map(Reindex(basis_vec_ms), coarse_indices_to_fine_indices, ms_elem); 
+  basis_elem_ms_t = lazy_map(transpose, basis_elem_ms);
+  B = cache(basis_elem_ms);
+  Bt = cache(basis_elem_ms_t);
+  (stima, massma, loadvec), (basis_vec_ms,B,Bt), U
 end
 
 function mat_contribs(stima::SparseMatrixCSC{Float64,Int64}, coarse_indices_to_fine_indices::AbstractVector{Int64}, t::Int64, nc::Int64)::SparseMatrixCSC{Float64,Int64}
