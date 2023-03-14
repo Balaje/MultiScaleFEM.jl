@@ -50,7 +50,7 @@ for l=[7,8]
       stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p)
       # (-) Get the multiscale load vector  
       loadvec_el = lazy_map(vec_contribs, Vector{Float64}, Fill(loadvec, nc), coarse_indices_to_fine_indices, 1:nc, Fill(nc,nc));
-      ms_elem_vecs = lazy_map(*ᵐ(), Vector{Float64}, Bt, loadvec_el);
+      ms_elem_vecs = lazy_map(*, Vector{Float64}, Bt, loadvec_el);
       loadvec_ms = assemble_ms_vector(ms_elem_vecs, ms_elem, nc, p);
       # (-) Solve the problem
       sol = stima_ms\collect(loadvec_ms)
