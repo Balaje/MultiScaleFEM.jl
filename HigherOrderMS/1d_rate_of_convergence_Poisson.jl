@@ -8,8 +8,8 @@ plt1 = plot()
 Problem data
 =#
 domain = (0.0,1.0)
-D₁(x) = 1.0 # Smooth Diffusion coefficient
-# D₁(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
+D(x) = 1.0 # Smooth Diffusion coefficient
+# D(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
 f(x) = (π)^2*sin(π*x[1])
 bvals = [0.0,0.0];
 u(x) = sin(π*x[1])
