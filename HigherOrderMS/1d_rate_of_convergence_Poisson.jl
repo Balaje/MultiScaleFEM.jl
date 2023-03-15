@@ -7,12 +7,13 @@ plt1 = plot()
 #=
 Problem data
 =#
+domain = (0.0,1.0)
 D₁(x) = 1.0 # Smooth Diffusion coefficient
 # D₁(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
 f(x) = (π)^2*sin(π*x[1])
+bvals = [0.0,0.0];
 u(x) = sin(π*x[1])
 ∇u(x) = π*cos(π*x[1])
-domain = (0.0,1.0)
 
 p = 1
 q = 1
@@ -20,16 +21,23 @@ N = [1,2,4,8,16,32,64]
 nf = 2^16
 qorder = 2
 
-L²Error = zeros(Float64,size(N))
-H¹Error = zeros(Float64,size(N))
+L²Error = zeros(Float64,size(N));
+H¹Error = zeros(Float64,size(N));
 
 #=
 Solve the full problem once
 =#
-KMf, _, _, U = get_saddle_point_problem(domain, D₁, f, (q,p), (nf,nc), qorder)
-stima, _, loadvec = KMf
-fn = 2:q*nf
-sol_ϵ = vcat(0.0,stima[fn,fn]\loadvec[fn])
+# Use Gridap to construct the space
+model = CartesianDiscreteModel(domain, (nf,));
+U0 = TestFESpace(Triangulation(model), ReferenceFE(lagrangian, Float64, q), conformity=:H1, dirichlet_tags="boundary");
+U = TrialFESpace(bvals, U0);
+
+stima = assemble_stiffness_matrix(domain, D, q, nf, qorder);
+loadvec = assemble_load_vector(domain, f, q, nf, qorder);
+fullnodes = 1:q*nf+1;
+bnodes = [1, q*nf+1];
+freenodes = setdiff(fullnodes, bnodes);
+sol_ϵ = (stima[freenodes,freenodes])\(loadvec[freenodes]-stima[freenodes,bnodes]*bvals);
 
 
 for l=[7,8]
@@ -38,27 +46,24 @@ for l=[7,8]
   for (nc,itr) in zip(N, 1:lastindex(N))
     let
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-      
-      Kf, Bs, U = compute_ms_basis((0.0,1.0), D₁, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder, coarse_indices_to_fine_indices, ms_elem);
-      stima, massma, loadvec = Kf
-      basis_vec_ms, B, Bt = Bs
+
+      # Compute MS bases
+      basis_vec_ms = compute_ms_basis(domain, D, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder, [1,q*nf+1], [0.0,0.0]);
 
       # Solve the problem
-      # (-) Get the multiscale stiffness matrix
-      stima_el = lazy_map(mat_contribs, Fill(stima, nc), coarse_indices_to_fine_indices, 1:nc, Fill(nc,nc));
-      ms_elem_mats = lazy_map(*, SparseMatrixCSC{Float64,Int64}, Bt, stima_el, B);
-      stima_ms = assemble_ms_matrix(ms_elem_mats, ms_elem, nc, p)
-      # (-) Get the multiscale load vector  
-      loadvec_el = lazy_map(vec_contribs, Vector{Float64}, Fill(loadvec, nc), coarse_indices_to_fine_indices, 1:nc, Fill(nc,nc));
-      ms_elem_vecs = lazy_map(*ᵐ(), Vector{Float64}, Bt, loadvec_el);
-      loadvec_ms = assemble_ms_vector(ms_elem_vecs, ms_elem, nc, p);
-      # (-) Solve the problem
-      sol = stima_ms\collect(loadvec_ms)
-      sol_fine_scale = get_solution(sol, basis_vec_ms);      
+      stima = assemble_stiffness_matrix(domain, D, q, nf, qorder);
+      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
+      loadvec = assemble_load_vector(domain, f, q, nf, qorder);
+      Fₘₛ = basis_vec_ms'*loadvec;
+      sol = Kₘₛ\Fₘₛ
 
+      # Obtain the solution in the fine scale for plotting
+      sol_fine_scale = get_solution(sol, basis_vec_ms, nc, p);
+
+      # Compute the errors
       dΩ = Measure(get_triangulation(U), qorder)
-      uₕ = interpolate_everywhere(sol_ϵ, U)
-      uₘₛ = interpolate_everywhere(sol_fine_scale[1:end-1], U)    
+      uₕ = FEFunction(U, sol_ϵ)
+      uₘₛ = FEFunction(U, sol_fine_scale[freenodes])    
       e = uₕ - uₘₛ
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(D*∇(e)⋅∇(e))dΩ));
