@@ -1,32 +1,32 @@
 include("HigherOrderMS.jl");
 
 # Create empty plots
-plt = plot()
-plt1 = plot()
+plt = plot();
+plt1 = plot();
 
 #=
 Problem data
 =#
 domain = (0.0,1.0)
-c²(x) = 1.0 # Smooth Diffusion coefficient
+c²(x) = 4.0 # Smooth Diffusion coefficient
 f(x,t) = 0.0
 u₀(x) = 0.0
 u₁(x) = 4π*sin(2π*x[1])
-u(x,t) = sin(2π*x)*sin(4π*t)
+u(x,t) = sin(2π*x)*sin(4π*t) # Exact solution
 
-# Problem parameters
+# Problem parameters - fine scale
 nf = 2^16
 q = 1
 qorder = 4
+nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
 Δt = 10^-3
 tf = 1.125
 ntime = ceil(Int, tf/Δt)
 
-# Solve the fine scale problem once for exact solution
+# Solve the fine scale problem for exact solution
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
-nds_fine = LinRange(domain[1], domain[2], q*nf+1)
-stima = assemble_stiffness_matrix(fine_scale_space, A)
+stima = assemble_stiffness_matrix(fine_scale_space, c²)
 massma = assemble_mass_matrix(fine_scale_space, x->1.0)
 fullnodes = 1:q*nf+1;
 bnodes = [1, q*nf+1];
@@ -36,6 +36,7 @@ function fₙϵ!(cache, tₙ::Float64)
   F = assemble_load_vector(fspace, y->f(y,tₙ))
   F[freenodes]
 end
+# Time marching
 let 
   U₀ = u₀.(nds_fine[freenodes])
   V₀ = u₁.(nds_fine[freenodes])
@@ -54,7 +55,7 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32,64]
-p = 2
+p = 3
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -64,7 +65,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[7,8]
+for l=[4,5,6,7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -72,10 +73,11 @@ for l=[7,8]
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute the multiscale basis
-      basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      basis_vec_ms = compute_ms_basis(fine_scale_space, c², p, nc, l, patch_indices_to_global_indices);
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
+      # Time marching
       let 
         U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)
         V₀ = setup_initial_condition(u₁, basis_vec_ms, fine_scale_space)

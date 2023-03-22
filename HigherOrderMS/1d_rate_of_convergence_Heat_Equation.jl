@@ -35,6 +35,7 @@ function fₙϵ!(cache, tₙ::Float64)
   F = assemble_load_vector(fspace, y->f(y,tₙ))
   F[freenodes]
 end
+# Time marching
 let 
   U₀ = u₀.(nds_fine[freenodes])
   global U = zero(U₀)  
@@ -86,6 +87,7 @@ for l=[7,8]
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
+      # Time marching
       let 
         # Project initial condition onto the multiscale space
         U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)  

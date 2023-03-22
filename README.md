@@ -1,7 +1,5 @@
 # MultiscaleFEM.jl
 
-**NOTE:** I have made some changes to the code, and some of the scripts in `HigherOrderMS/` may not be available. The script for solving the Poisson equation is available for testing. I will add the code as soon as possible. However, the results for the heat and wave equation are available in `README.md`. The biggest change in this version: I use [Gridap.jl](https://github.com/gridap/Gridap.jl) to construct the saddle point system. I also reduce clutter and make the code more readable.
-
 ## Introduction
 
 This repository contains the source code to implement the Localized Orthogonal Decomposition method and the Higher order Multiscale Method to solve the Poisson problem
@@ -48,7 +46,7 @@ The new basis function then contains the fine scale information and can be used 
 
 ### Poisson equation in 1D
 
-The script `HigherOrderMS/1d_Poisson_eqn.jl` contains the code to solve the one-dimensional Poisson problem using the Higher Order Multiscale method. I implement three different diffusion coefficients:
+The script `HigherOrderMS/1d_Poisson_eq.jl` contains the code to solve the one-dimensional Poisson problem using the Higher Order Multiscale method. I show the results three different diffusion coefficients:
 
 $$
 D_{\varepsilon}(x) = 0.5, \quad D_{\varepsilon}(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1}, \quad D_{\varepsilon}(x) = \text{rand}\left(0.5, 5.0;\, \epsilon = 2^{-12} \right).
@@ -63,36 +61,28 @@ where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusi
 
 ### Heat equation in 1D
 
-The script `HigherOrderMS/1d_heat_eqn.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order backward difference formula (BDF4). I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale. I set the oscillatory coefficient $D_{\varepsilon}(x)$ equal to
+The script `HigherOrderMS/1d_heat_equation.jl` contains the code to solve the transient heat equation in 1D. The spatial part is handled using the finite element method (both traditional and multiscale) and the temporal part is discretized using the fourth order backward difference formula (BDF4). I use $h = 2^{-11}$ on the fine scale and $H=2^{-1}$ on the coarse scale, the (oscillatory) diffusion coefficient $D_{\varepsilon}(x)$ equal to
 
 $$
 D_{\varepsilon}(x) = \left(2 + \cos{\frac{2\pi x}{2^{-2}}}\right)^{-1}
 $$
 
-and the smooth coefficient 
+and the (smooth) coefficient 
 
 $$
 D_{\varepsilon}(x) = D_0 = 0.5
 $$
 
-In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. This example can be used to study the convergence of the method. Following figure shows the solution obtained using the multiscale method.  
+In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x) = \sin{\pi x}$. In the constant diffusion case, the exact solution can be obtained analytically and is equal to $u(x,t) = \exp{\left(-D_0 \pi^2 t\right)}u_0(x)$. Following figure shows the solution obtained using the multiscale method.  
 
 | Smooth Diffusion Term | Oscillatory Diffusion Term |
 | --- | --- |
 | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all_osc.png) |
 
 
-**The main advantage of the multiscale method is that it provides an increase in computational efficiency.** This is because the linear system (on the coarse space) obtained after computing the multiscale basis is much smaller than the linear system obtained using the traditional method (on the fine space). Comparing the time taken to solve 10000 iterations in the time marching step, we see that the multiscale method takes less time to complete the iterations. 
-
-``` julia
-  # nf = 2^11, nc = 2^4, Δt = 1e-4, tf = 1.0
-  Direct Method takes:   10.260 s (1559011 allocations: 25.42 GiB)
-  Multiscale Method takes:   6.102 s (6621011 allocations: 6.63 GiB)
-```
-
 ### Wave equation in 1D
 
-The script `HigherOrderMS/1d_wave_eqn.jl` contains the code to solve the acoustic wave equation in 1D. The spatial part is handled using the multiscale finite element method and the temporal part is discretized using Crank Nicolson scheme. I check two different wave speeds
+The script `HigherOrderMS/1d_wave_equation.jl` contains the code to solve the acoustic wave equation in 1D. The spatial part is handled using the multiscale finite element method and the temporal part is discretized using Crank Nicolson scheme. I check two different wave speeds
 
 $$
 D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = 4.0 + \left( \cos{\frac{2πx}{2^{-2}}} \right)
@@ -107,7 +97,7 @@ In both cases, I set the right hand side $f(x,t) = 0$, the initial conditions $u
 ### Rate of convergence of the multiscale method
 -------
 
-All the rate of convergence examples can be found inside the folder `HigherOrderMS/`. The script `HigherOrderMS/rate_of_convergence_eg1.jl` contains the code to perform convergence analysis for the smooth diffusion case, whereas `HigherOrderMS/rate_of_convergence_eg2.jl` and `HigherOrderMS/rate_of_convergence_eg3.jl` contains the code to solve the problem with oscillatory and random diffusion coefficients, respectively.
+All the rate of convergence examples can be found inside the folder `HigherOrderMS/`. The script `HigherOrderMS/1d_rate_of_convergence_Poisson.jl` contains the code to study the convergence rates for the Poisson equation.
 
 #### Smooth Diffusion Coefficients
 -------
@@ -158,7 +148,7 @@ Oscillatory coefficient | Random coefficients |
 
 ##### **Heat equation**
 
-I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_eg4jl)`.
+I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_Heat_Equation.jl)`.
 
 $$
 \begin{align*}
@@ -168,10 +158,10 @@ $$
 \end{align*}
 $$
 
-I take $h = 2^{-15}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-4}$ and solve till final time $T = 1.0$. I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
+I take $h = 2^{-16}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-3}$ and solve till final time $T = 1.0$. I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
 
 $$
-A(x) = 0.5,
+A(x) = 1.0,
 $$
 
 and the oscillatory coefficient
@@ -190,24 +180,6 @@ Similar behavior can be seen for higher order methods also.
 --- | --- |
 ![](./HigherOrderMS/Images/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/ooc_12_heat_eq_osc_p3.png) |
 
-**NOTE:** I modified the vector assembly function by simply forcing the function to return zeros.
-
-``` julia
-# RHS Function
-function fₙ_MS!(cache, tₙ::Float64)
-  contrib_cache, Fms = cache
-  # vector_cache = vec_contribs!(contrib_cache, y->f(y,tₙ))
-  # fcache = local_basis_vecs, elem_indices_to_global_indices, Lᵀ, vector_cache
-  # fillsFms!(sFms, fcache, nc, p, l)
-  # assemble_MS_vector!(Fms, sFms, ms_elem)
-  # Fms
-  ####   ####   ####   ####   ####   ####  ####
-  #### NOTE: This works only if f(x,t) ≡ 0 ####
-  ####   ####   ####   ####   ####   ####  ####
-  0*Fms
-end
-```
-This effectively bypasses the assembly routine and will make the code run faster. This works only for the case $f(x,t) = 0$. Please note that the actual assembly step is a major bottleneck in the implementation and needs to optimized further to make the code more efficient (future work).
 
 ##### **Wave Equation**
 
@@ -217,38 +189,16 @@ $$
 \begin{align*}
   u_{tt} - \left(c^2(x)u'(x,t)\right)' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
   u(x,0) = 0 &\quad x \in (0,1),\\
-  u_t(x,0) = \pi \sin(\pi x) &\quad x \in (0,1),\\
+  u_t(x,0) = 4\pi \sin(2\pi x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,T),
 \end{align*}
 $$
 
-using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final times $T = 1.0$ s, $T=1.5$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-7}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1)`
+using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final times $T = 1.0$ s, $T=1.5$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 2.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-16}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-6}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1,2,3)`:
 
-`(p=1)` $T=1.0$ s | `(p=1)` $T=1.5$ s |
---- | --- |
-![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1.5s.png) |
-
-Now, for the higher order case `(p=2,3)`, we observe the following rate of convergence:
-
-`(p=2)` $T=1.0$ s | `(p=3)` $T=1.0$ s |
---- | --- |
-![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1s.png) |
-`(p=2)` $T=1.5$ s | `(p=3)` $T=1.5$ s |
-![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1.5s.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1.5s.png) |
-
-
-
-Finally I also solve the wave equation with oscillatory wave speed. I assume that the wave speed 
-
-$$
-c(x) = \left(2 + \cos\left( \frac{2\pi x}{2^{-2}}\right)\right)^{1/2},
-$$
-
-and solve the problem using the multiscale method + Crank-Nicolson method. I use the same discretization parameters used to test the smooth case. Below I show the wave speed, the solution profiles and the rate of convergence for the multiscale method with `p=1`.
-
-$c^2(x)$ | Solution profiles | Rate of convergence |
+`(p=1)` | `(p=2)` | `(p=3)` |
 --- | --- | --- |
-![](./HigherOrderMS/Images/wave_eq_wave_speed.png) | ![](./HigherOrderMS/Images/wave_eq_exact_sol.png) | ![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1s_osc.png) |
+![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1.125s.png)| ![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1.125s.png)| ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1.125s.png)|
 
 
 ## Localized Orthogonal Decomposition Method
