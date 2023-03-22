@@ -12,24 +12,16 @@ D(x) = 1.0 # Smooth Diffusion coefficient
 # D(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
 f(x) = (π)^2*sin(π*x[1])
 bvals = [0.0,0.0];
-u(x) = sin(π*x[1])
-∇u(x) = π*cos(π*x[1])
 
-p = 1
+# Fine scale parameters
 q = 1
-N = [1,2,4,8,16,32,64]
 nf = 2^16
 qorder = 2
 
-L²Error = zeros(Float64,size(N));
-H¹Error = zeros(Float64,size(N));
-
-#=
-Solve the full problem once
-=#
 # Use Gridap to construct the space
-
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
+
+# Solve the full problem once
 stima = assemble_stiffness_matrix(fine_scale_space, D)
 loadvec = assemble_load_vector(fine_scale_space, f)
 fullnodes = 1:q*nf+1;
@@ -39,25 +31,27 @@ sol_ϵ = (stima[freenodes,freenodes])\(loadvec[freenodes]-stima[freenodes,bnodes
 U = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(U, vcat(0.0,sol_ϵ,0.0))
 
+# Coarse scale parameters
+p = 1
+N = [1,2,4,8,16,32,64]
+L²Error = zeros(Float64,size(N));
+H¹Error = zeros(Float64,size(N));
 
 for l=[7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
     let
-      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-
+      # Compute the map between coarse and fine scale
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p))
       # Compute MS bases
-      basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
-
+      basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
       # Solve the problem
       stima = assemble_stiffness_matrix(fine_scale_space, D)
       loadvec = assemble_load_vector(fine_scale_space, f)
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
       Fₘₛ = basis_vec_ms'*loadvec;
       sol = Kₘₛ\Fₘₛ
-
-      # Obtain the solution in the fine scale
       sol_fine_scale = basis_vec_ms*sol
 
       # Compute the errors
