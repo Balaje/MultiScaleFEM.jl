@@ -28,16 +28,16 @@ H¹Error = zeros(Float64,size(N));
 Solve the full problem once
 =#
 # Use Gridap to construct the space
-model = CartesianDiscreteModel(domain, (nf,));
-U0 = TestFESpace(Triangulation(model), ReferenceFE(lagrangian, Float64, q), conformity=:H1, dirichlet_tags="boundary");
-U = TrialFESpace(bvals, U0);
 
-stima = assemble_stiffness_matrix(domain, D, q, nf, qorder);
-loadvec = assemble_load_vector(domain, f, q, nf, qorder);
+fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
+stima = assemble_stiffness_matrix(fine_scale_space, D)
+loadvec = assemble_load_vector(fine_scale_space, f)
 fullnodes = 1:q*nf+1;
 bnodes = [1, q*nf+1];
 freenodes = setdiff(fullnodes, bnodes);
 sol_ϵ = (stima[freenodes,freenodes])\(loadvec[freenodes]-stima[freenodes,bnodes]*bvals);
+U = TrialFESpace(fine_scale_space.U, 0.0)
+uₕ = FEFunction(U, vcat(0.0,sol_ϵ,0.0))
 
 
 for l=[7,8]
@@ -48,22 +48,21 @@ for l=[7,8]
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
 
       # Compute MS bases
-      basis_vec_ms = compute_ms_basis(domain, D, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder, [1,q*nf+1], [0.0,0.0]);
+      basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
 
       # Solve the problem
-      stima = assemble_stiffness_matrix(domain, D, q, nf, qorder);
+      stima = assemble_stiffness_matrix(fine_scale_space, D)
+      loadvec = assemble_load_vector(fine_scale_space, f)
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
-      loadvec = assemble_load_vector(domain, f, q, nf, qorder);
       Fₘₛ = basis_vec_ms'*loadvec;
       sol = Kₘₛ\Fₘₛ
 
-      # Obtain the solution in the fine scale for plotting
-      sol_fine_scale = get_solution(sol, basis_vec_ms, nc, p);
+      # Obtain the solution in the fine scale
+      sol_fine_scale = basis_vec_ms*sol
 
       # Compute the errors
       dΩ = Measure(get_triangulation(U), qorder)
-      uₕ = FEFunction(U, sol_ϵ)
-      uₘₛ = FEFunction(U, sol_fine_scale[freenodes])    
+      uₘₛ = FEFunction(U, sol_fine_scale)    
       e = uₕ - uₘₛ
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(D*∇(e)⋅∇(e))dΩ));

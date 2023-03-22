@@ -2,12 +2,28 @@
 #  Functions to assemble the stiffness, mass and multiscale matrix vector system   #
 ##### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### #
 
-function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f::Function, 
-  fespaces::Tuple{Int64,Int64}, nels::Tuple{Int64,Int64}, qorder::Int64)
-  nf, nc = nels
-  q, p = fespaces
+struct FineScaleSpace
+  domain::Tuple
+  nf::Int64
+  q::Int64
+  U::FESpace
+  dΩ::Measure
+  assem::SparseMatrixAssembler
+end
+function FineScaleSpace(domain::Tuple{Float64,Float64}, q::Int64, qorder::Int64, nf::Int64)
+  model = CartesianDiscreteModel(domain, (nf,))
+  reffe = ReferenceFE(lagrangian, Float64, q)
+  U = TestFESpace(model, reffe, conformity=:H1)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qorder)
+  assem = SparseMatrixAssembler(U,U)
+  FineScaleSpace(domain, nf, q, U, dΩ, assem)
+end 
+
+function get_saddle_point_problem(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64)
   # The stiffness matrix
-  K = assemble_stiffness_matrix(domain, D, q, nf, qorder)
+  domain = fspace.domain
+  K = assemble_stiffness_matrix(fspace, D)
   # The rectangular matrix
   elem_coarse = [i+j for i=1:nc, j=0:p]
   nds_coarse = LinRange(domain[1], domain[2], nc+1)
@@ -17,7 +33,7 @@ function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f
     nds = (nds_coarse[elem_coarse[t,1]], nds_coarse[elem_coarse[t,2]])
     for j=1:p+1    
       LP(y) = Λₖ!(y[1], nds, p, j)
-      L[:,index] = assemble_load_vector(domain, LP, q, nf, qorder)
+      L[:,index] = assemble_load_vector(fspace, LP)
       index += 1
     end
   end
@@ -26,39 +42,28 @@ function get_saddle_point_problem(domain::Tuple{Float64,Float64}, D::Function, f
   K, L, Λ
 end
 
-function assemble_stiffness_matrix(domain::Tuple{Float64,Float64}, D::Function, q::Int64, nf::Int64, qorder::Int64)
-  model = CartesianDiscreteModel(domain, (nf,))
-  reffe = ReferenceFE(lagrangian,Float64,q)
-  U = TestFESpace(model,reffe,conformity=:H1)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qorder)
+function assemble_stiffness_matrix(fspace::FineScaleSpace, D::Function)
+  U = fspace.U
+  assem = fspace.assem
+  dΩ = fspace.dΩ
   # The main system.
   a(u,v) = ∫(D*(∇(v))⊙(∇(u)))dΩ
-  assem = SparseMatrixAssembler(U,U)
   assemble_matrix(a, assem, U, U)
 end
-
-function assemble_load_vector(domain::Tuple{Float64,Float64}, f::Function, q::Int64, nf::Int64, qorder::Int64)
-  model = CartesianDiscreteModel(domain, (nf,))
-  reffe = ReferenceFE(lagrangian,Float64,q)
-  U = TestFESpace(model,reffe,conformity=:H1)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qorder)
+function assemble_load_vector(fspace::FineScaleSpace, f::Function)
+  U = fspace.U
+  assem = fspace.assem
+  dΩ = fspace.dΩ
   # The main system.
   l(v) = ∫(f*v)dΩ
-  assem = SparseMatrixAssembler(U,U)
   assemble_vector(l, assem, U)
 end
-
-function assemble_mass_matrix(domain::Tuple{Float64,Float64}, c::Function, q::Int64, nf::Int64, qorder::Int64)
-  model = CartesianDiscreteModel(domain, (nf,))
-  reffe = ReferenceFE(lagrangian,Float64,q)
-  U = TestFESpace(model,reffe,conformity=:H1)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qorder)
+function assemble_mass_matrix(fspace::FineScaleSpace, c::Function)
+  U = fspace.U
+  assem = fspace.assem
+  dΩ = fspace.dΩ
   # The main system.
   m(u,v) = ∫(c*(v)⋅(u))dΩ 
-  assem = SparseMatrixAssembler(U,U)
   assemble_matrix(m, assem, U, U)
 end
 
@@ -77,18 +82,4 @@ function assemble_lm_l2_matrix(nds::AbstractVector{Float64}, elem::Matrix{Int64}
     index = index + (p+1)
   end
   l2mat
-end
-
-function get_solution(sol, basis_vecs::SparseMatrixCSC{Float64,Int64}, nc::Int64, p::Int64)    
-  ndof = size(basis_vecs,1)
-  res = Vector{Float64}(undef, ndof)
-  fill!(res, 0.0)
-  index = 1
-  for j=1:nc, i=0:p
-    @simd for tt=1:ndof
-      @inbounds res[tt] += sol[(p+1)*j+i-p]*basis_vecs[tt,index]      
-    end
-    index+=1
-  end
-  res
 end

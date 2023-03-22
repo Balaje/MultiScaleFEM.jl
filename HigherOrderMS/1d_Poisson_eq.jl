@@ -15,15 +15,16 @@ qorder = 2
 patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
 
 # Compute MS bases
-basis_vec_ms = compute_ms_basis(domain, D, f, (q,p), (nf,nc), l, patch_indices_to_global_indices, qorder, [1,q*nf+1], [0.0,0.0]);
+fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
+basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
 
 # Solve the problem
-stima = assemble_stiffness_matrix(domain, D, q, nf, qorder);
+stima = assemble_stiffness_matrix(fine_scale_space, D)
+loadvec = assemble_load_vector(fine_scale_space, f)
 Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
-loadvec = assemble_load_vector(domain, f, q, nf, qorder);
 Fₘₛ = basis_vec_ms'*loadvec;
 sol = Kₘₛ\Fₘₛ
 
 # Obtain the solution in the fine scale for plotting
-sol_fine_scale = get_solution(sol, basis_vec_ms, nc, p);
+sol_fine_scale = basis_vec_ms*sol
 plt3 = plot(LinRange(domain[1], domain[2], q*nf+1), sol_fine_scale)
