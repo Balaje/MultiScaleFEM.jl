@@ -30,3 +30,21 @@ sol = Kₘₛ\Fₘₛ
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 sol_fine_scale = basis_vec_ms*sol
 plt3 = plot(nds_fine, sol_fine_scale)
+
+# Non-homogeneous boundary conditions
+fullnodes = 1:q*nf+1
+bnodes = [1,q*nf+1]
+freenodes = setdiff(fullnodes, bnodes)
+bvals = [1.0,1.0]
+gₕ = zeros(Float64, q*nf+1)
+gₕ[bnodes] = bvals
+
+basis_vec_corr = compute_ms_correctors(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices, gₕ)
+basis_vec = zero(basis_vec_ms)
+basis_vec[:, (p+2):(p+1)*nc-(p+2), :] = basis_vec_ms[:,(p+2):(p+1)*nc-(p+2)]
+basis_vec[:, vcat(1:(p+1), (p+1)*nc-(p):(p+1)*nc)] = basis_vec_corr;
+
+Kₘₛ1 = basis_vec'*stima*basis_vec;
+Fₘₛ1 = basis_vec'*loadvec;
+sol1 = Kₘₛ1\Fₘₛ1
+plot(nds_fine, basis_vec*sol1)
