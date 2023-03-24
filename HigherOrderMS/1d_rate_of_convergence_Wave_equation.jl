@@ -8,7 +8,7 @@ plt1 = plot();
 Problem data
 =#
 domain = (0.0,1.0)
-c²(x) = 4.0 # Smooth Diffusion coefficient
+c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
 f(x,t) = 0.0
 u₀(x) = 0.0
 u₁(x) = 4π*sin(2π*x[1])
