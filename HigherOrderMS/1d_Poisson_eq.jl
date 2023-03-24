@@ -2,10 +2,10 @@ include("HigherOrderMS.jl");
 
 domain = (0.0,1.0)
 
-D(x) = (2 + cos(2π*x[1]/2e-2))^-1
-f(x) = 1.0
+D(x) = 1.0
+f(x) = π^2*cos(π*x[1])
 
-nc = 2^1
+nc = 2^5
 nf = 2^16
 q = 1
 p = 1
@@ -29,22 +29,14 @@ sol = Kₘₛ\Fₘₛ
 # Plot
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 sol_fine_scale = basis_vec_ms*sol
-plt3 = plot(nds_fine, sol_fine_scale)
+plt3 = plot(nds_fine, sol_fine_scale, label="Homogeneous DBC")
 
-# Non-homogeneous boundary conditions
-fullnodes = 1:q*nf+1
-bnodes = [1,q*nf+1]
-freenodes = setdiff(fullnodes, bnodes)
-bvals = [1.0,1.0]
-gₕ = zeros(Float64, q*nf+1)
-gₕ[bnodes] = bvals
-
-basis_vec_corr = compute_ms_correctors(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices, gₕ)
-basis_vec = zero(basis_vec_ms)
-basis_vec[:, (p+2):(p+1)*nc-(p+2), :] = basis_vec_ms[:,(p+2):(p+1)*nc-(p+2)]
-basis_vec[:, vcat(1:(p+1), (p+1)*nc-(p):(p+1)*nc)] = basis_vec_corr;
-
-Kₘₛ1 = basis_vec'*stima*basis_vec;
-Fₘₛ1 = basis_vec'*loadvec;
-sol1 = Kₘₛ1\Fₘₛ1
-plot(nds_fine, basis_vec*sol1)
+# Non-homogeneous boundary condition [1.0,1.0]
+fullnodes = 1:q*nf+1;
+bnodes = [1,q*nf+1];
+bvals = [1.0,-1.0];
+freenodes = setdiff(fullnodes, bnodes);
+# "The boundary correction term" - needs to be computed once
+boundary_correction = (stima[freenodes,freenodes]\collect(stima[freenodes, bnodes]));
+sol_fine_scale_dbc = basis_vec_ms[freenodes,:]*sol - boundary_correction*bvals;
+plt4 = plot(nds_fine[freenodes], sol_fine_scale_dbc, label="Non-homogeneous DBC");
