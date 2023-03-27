@@ -1,14 +1,11 @@
 include("HigherOrderMS.jl");
 
-# Create empty plots
-plt = plot();
-plt1 = plot();
-
 #=
 Problem data
 =#
 domain = (0.0,1.0)
-c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
+c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e0))^-1
+#c²(x) = 4.0
 f(x,t) = 0.0
 u₀(x) = 0.0
 u₁(x) = 4π*sin(2π*x[1])
@@ -54,8 +51,11 @@ Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 
 ##### Now begin solving using the multiscale method #####
+# Create empty plots
 N = [1,2,4,8,16,32,64]
-p = 3
+plt = plot();
+plt1 = plot();
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space

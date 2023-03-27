@@ -8,7 +8,8 @@ plt1 = plot()
 Problem data
 =#
 domain = (0.0,1.0)
-A(x) = 1.0 # Smooth Diffusion coefficient
+# A(x) = (1.0 + 0.5*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
+A(x) = 1.0
 f(x,t) = 0.0
 u₀(x) = sin(π*x[1])
 
