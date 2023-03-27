@@ -4,21 +4,21 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e0))^-1
-#c²(x) = 4.0
+#c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e0))^-1
+c²(x) = 1.0
 f(x,t) = 0.0
 u₀(x) = 0.0
-u₁(x) = 4π*sin(2π*x[1])
-u(x,t) = sin(2π*x)*sin(4π*t) # Exact solution
+u₁(x) = π*sin(π*x[1])
+u(x,t) = sin(π*x)*sin(π*t) # Exact solution
 
 # Problem parameters - fine scale
-nf = 2^16
+nf = 2^15
 q = 1
 qorder = 4
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
-Δt = 10^-3
-tf = 1.125
+Δt = 10^-4
+tf = 1.5
 ntime = ceil(Int, tf/Δt)
 
 # Solve the fine scale problem for exact solution
@@ -29,9 +29,10 @@ fullnodes = 1:q*nf+1;
 bnodes = [1, q*nf+1];
 freenodes = setdiff(fullnodes, bnodes);
 function fₙϵ!(cache, tₙ::Float64)
-  fspace, freenodes = cache
-  F = assemble_load_vector(fspace, y->f(y,tₙ))
-  F[freenodes]
+  #fspace, freenodes = cache
+  #F = assemble_load_vector(fspace, y->f(y,tₙ))
+  #F[freenodes]
+  zeros(Float64, length(freenodes))
 end
 # Time marching
 let 
@@ -61,8 +62,9 @@ H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
   fspace, basis_vec_ms = cache
-  loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  basis_vec_ms'*loadvec
+  # loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
+  # basis_vec_ms'*loadvec
+  zeros(Float64, size(basis_vec_ms, 2))
 end   
 
 for l=[4,5,6,7,8]
