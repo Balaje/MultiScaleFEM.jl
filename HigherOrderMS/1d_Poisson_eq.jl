@@ -5,11 +5,11 @@ domain = (0.0,1.0)
 D(x) = 1.0
 f(x) = π^2*sin(π*x[1])
 
-nc = 2^1
+nc = 2^4
 nf = 2^15
 q = 1
 p = 1
-l = 4
+l = 1
 qorder = 2
 
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
@@ -87,9 +87,9 @@ u₁ = FEFunction(fine_scale_space.U, sol_fine_scale_dbc)
 u₂ = FEFunction(fine_scale_space.U, sol_fine_scale_dbc_2)
 
 dΩ = fine_scale_space.dΩ  
-l²e₁ = sum(∫((u₁-uₕ)*(u₁-uₕ))dΩ)
-h¹e₁ = sum(∫(∇(u₁-uₕ)⋅∇(u₁-uₕ))dΩ)
+l²e₁ = sqrt(sum(∫((u₁-uₕ)*(u₁-uₕ))dΩ))
+h¹e₁ = sqrt(sum(∫(∇(u₁-uₕ)⋅∇(u₁-uₕ))dΩ))
 @show l²e₁, h¹e₁
-l²e₂ = sum(∫((u₂-uₕ)*(u₂-uₕ))dΩ)
-h¹e₂ = sum(∫(∇(u₂-uₕ)⋅∇(u₂-uₕ))dΩ)
+l²e₂ = sqrt(sum(∫((u₂-uₕ)*(u₂-uₕ))dΩ))
+h¹e₂ = sqrt(sum(∫(∇(u₂-uₕ)⋅∇(u₂-uₕ))dΩ))
 @show l²e₂ , h¹e₂

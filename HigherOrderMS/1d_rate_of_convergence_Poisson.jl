@@ -10,8 +10,8 @@ Problem data
 domain = (0.0,1.0)
 D(x) = 1.0 # Smooth Diffusion coefficient
 # D(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
-f(x) = (π)^2*sin(π*x[1])
-bvals = [0.0,0.0];
+f(x) = (π)^2*cos(π*x[1])
+bvals = [1.0,-1.0];
 
 # Fine scale parameters
 q = 1
@@ -28,31 +28,35 @@ fullnodes = 1:q*nf+1;
 bnodes = [1, q*nf+1];
 freenodes = setdiff(fullnodes, bnodes);
 sol_ϵ = (stima[freenodes,freenodes])\(loadvec[freenodes]-stima[freenodes,bnodes]*bvals);
-U = TrialFESpace(fine_scale_space.U, 0.0)
-uₕ = FEFunction(U, vcat(0.0,sol_ϵ,0.0))
+U = fine_scale_space.U
+uₕ = FEFunction(U, vcat(bvals[1],sol_ϵ,bvals[2]))
 
 # Coarse scale parameters
-p = 1
+p = 2
 N = [1,2,4,8,16,32,64]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
-for l=[7,8]
+for l=[7,8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
     let
       # Compute the map between coarse and fine scale
-      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p))
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute MS bases
       basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
+      # Compute boundary contributions
+      Pₕug = compute_boundary_correction_matrix(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
+      boundary_contrib = apply_boundary_correction(Pₕug, bnodes, bvals, patch_indices_to_global_indices, p, nc, l, fine_scale_space);
       # Solve the problem
-      stima = assemble_stiffness_matrix(fine_scale_space, D)
-      loadvec = assemble_load_vector(fine_scale_space, f)
-      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
-      Fₘₛ = basis_vec_ms'*loadvec;
-      sol = Kₘₛ\Fₘₛ
-      sol_fine_scale = basis_vec_ms*sol
+      # stima = assemble_stiffness_matrix(fine_scale_space, D)
+      # loadvec = assemble_load_vector(fine_scale_space, f)
+      Kₘₛ = basis_vec_ms'*stima[:,freenodes]*basis_vec_ms[freenodes,:];
+      Fₘₛ = basis_vec_ms'*loadvec - basis_vec_ms'*(stima[:,bnodes]*bvals);
+      sol2 = Kₘₛ\Fₘₛ;
+      #Apply the boundary correction
+      sol_fine_scale = basis_vec_ms*sol2 + boundary_contrib
 
       # Compute the errors
       dΩ = Measure(get_triangulation(U), qorder)

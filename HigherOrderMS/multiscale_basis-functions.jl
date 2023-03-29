@@ -62,7 +62,7 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
     lmat_el = L[fn, gn] 
     lhs = -[stima_el lmat_el; lmat_el' spzeros(Float64, length(gn), length(gn))]
     # Boundary contributions of the LHS
-    rhs = collect([K[fn,bn] L[fn,gn]; (L[bn,gn])' spzeros(Float64, length(gn), length(gn))])
+    rhs = collect([K[fn,bn] L[fn,gn]; (zero(L[bn,gn]))' spzeros(Float64, length(gn), length(gn))])
     # Invert to compute the projection matrix
     boundary_correction[fn,(dims)*i-(dims-1):dims*i] = (lhs\rhs)[1:length(fn),:] 
   end
