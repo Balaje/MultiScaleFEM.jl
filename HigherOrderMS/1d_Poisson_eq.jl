@@ -5,7 +5,7 @@ domain = (0.0,1.0)
 D(x) = 1.0
 f(x) = π^2*sin(π*x[1])
 
-nc = 2^4
+nc = 2^1
 nf = 2^15
 q = 1
 p = 1
@@ -47,9 +47,11 @@ Fₘₛ = basis_vec_ms'*loadvec;
 sol = Kₘₛ\Fₘₛ;
 # "The boundary correction term". Needs to be computed once by inverting the full stiffness matrix
 boundary_correction = (stima[freenodes,freenodes]\collect(stima[freenodes, bnodes]));
-sol_fine_scale_dbc = basis_vec_ms[freenodes,:]*sol - boundary_correction*bvals;
+sol_fine_scale_dbc = zeros(Float64, q*nf+1)
+sol_fine_scale_dbc[freenodes] = basis_vec_ms[freenodes,:]*sol - boundary_correction*bvals;
+sol_fine_scale_dbc[bnodes] = bvals
 # Plot
-plt4 = plot(nds_fine[freenodes], sol_fine_scale_dbc, label="Non-homogeneous DBC");
+plt4 = plot(nds_fine, sol_fine_scale_dbc, label="Non-homogeneous DBC");
 
 #= 
 However inverting the whole stiffness matrix in Line 40 may not always be feasible.
@@ -59,7 +61,7 @@ The remedy is to incorporate the BC using only the patch problems on the boundar
 # Second Method for non-homogeneous boundary condition
 fullnodes = 1:q*nf+1;
 bnodes = [1,q*nf+1];
-bvals = bvals = ug.(nds_fine[bnodes]) .+ 1.0;
+bvals = bvals = ug.(nds_fine[bnodes]);
 freenodes = setdiff(fullnodes, bnodes);
 # Obtain the matrix which acts as the corrector. 
 # This involves inverting 2 small matrices on the patch of the boundary elements
@@ -74,3 +76,20 @@ sol2 = Kₘₛ\Fₘₛ;
 sol_fine_scale_dbc_2 = basis_vec_ms*sol2 + boundary_contrib
 # Plot
 plt5 = plot(nds_fine, sol_fine_scale_dbc_2, label="Non-homogeneous DBC");
+
+# Compute the error using the reference solution
+sol_ref = zeros(Float64, q*nf+1)
+sol_ref[freenodes] = stima[freenodes,freenodes]\(loadvec[freenodes] - stima[freenodes,bnodes]*bvals)
+sol_ref[bnodes] = bvals
+
+uₕ = FEFunction(fine_scale_space.U, sol_ref)
+u₁ = FEFunction(fine_scale_space.U, sol_fine_scale_dbc)
+u₂ = FEFunction(fine_scale_space.U, sol_fine_scale_dbc_2)
+
+dΩ = fine_scale_space.dΩ  
+l²e₁ = sum(∫((u₁-uₕ)*(u₁-uₕ))dΩ)
+h¹e₁ = sum(∫(∇(u₁-uₕ)⋅∇(u₁-uₕ))dΩ)
+@show l²e₁, h¹e₁
+l²e₂ = sum(∫((u₂-uₕ)*(u₂-uₕ))dΩ)
+h¹e₂ = sum(∫(∇(u₂-uₕ)⋅∇(u₂-uₕ))dΩ)
+@show l²e₂ , h¹e₂

@@ -46,7 +46,8 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
   # Begin solving the problem
   nf = fspace.nf
   q = fspace.q
-  dims = ((l+1)*(p+1)+2) # ( ((l+1)*(p+1) = No of patch elements) + (2 = Boundary contribution of stima))
+  start, last = max(1,1-l), min(nc,1+l)
+  dims = ((last-start+1)*(p+1)+2) # ( ((l+1)*(p+1) = No of patch elements) + (2 = Boundary contribution of stima))
   boundary_correction = spzeros(Float64, q*nf+1, dims*length(boundary_elems)) # 2 patch elements
   K, L, _ = get_saddle_point_problem(fspace, D, p, nc)
   # Begin solving 
@@ -75,7 +76,8 @@ function apply_boundary_correction(BC::SparseMatrixCSC{Float64,Int64}, bnodes::V
   n_boundary_elems = 1:length(boundary_elems)
   boundary_correction = zeros(Float64, q*nf+1) # Zero vector to store the result  
   _bv(bvals, i) = (i==1) ? [bvals[1], 0.0] : [0.0, bvals[2]]
-  dims = ((l+1)*(p+1)+2) # ( ((l+1)*(p+1) = No of patch elements) + (2 = Boundary contribution of stima))
+  start, last = max(1,1-l), min(nc,1+l)
+  dims = ((last-start+1)*(p+1)+2) # ( ((l+1)*(p+1) = No of patch elements) + (2 = Boundary contribution of stima))
   bvec_el = zeros(Float64, dims)
   # Compute the boundary correction
   for (t,i) in zip(boundary_elems,n_boundary_elems)
