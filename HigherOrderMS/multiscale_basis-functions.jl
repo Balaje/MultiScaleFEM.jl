@@ -34,9 +34,20 @@ function compute_ms_basis(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int
   basis_vec_ms
 end
 
+#=
+For applying non homogeneous boundary condition. Equuivalent to solving the following problem
+
+Find ̃Λᵧ ∈ H¹₀(Nˡ(K)), λᵧ ∈ Vₕᴾ(K) s.t
+  a(̃Λᵧ, v) + (λᵧ, v) = -a(gₕ, v)
+  (̃Λᵧ, μ) = 0
+for all v ∈ H¹₀(Nˡ(K)), μ ∈ Vₕᴾ(K) on the boundary elements only i.e, K ∩ ∂Ω ≠ ∅
+
+The function gₕ is defined as gₕ ∈ P₁(𝒯ₕ) with 
+  gₕ(z) = g(z) ∀ z ∈ Γd,
+  gₕ(z) = 0 ∀ z ∉ Γd.
+=#
 """
-For applying non homogeneous boundary condition
-(Need to check if it can be simplified further...)
+Compute the boundary  projection matrix
 """
 function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64,
   patch_indices_to_global_indices::Vector{AbstractVector{Int64}})
@@ -58,16 +69,17 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
     start = max(1,t-l)
     last = min(nc,t+l)
     gn = start*(p+1)-p:last*(p+1)    
-    stima_el = K[fn, fn]
-    lmat_el = L[fn, gn] 
-    lhs = -[stima_el lmat_el; lmat_el' spzeros(Float64, length(gn), length(gn))]
+    lhs = -[K[fn,fn] L[fn,gn]; L[fn,gn]' spzeros((last-start+1)*(p+1),(last-start+1)*(p+1))]
     # Boundary contributions of the LHS
-    rhs = collect([K[fn,bn] L[fn,gn]; (zero(L[bn,gn]))' spzeros(Float64, length(gn), length(gn))])
+    rhs = collect([K[fn,bn] zero(L[fn,gn]); (zero(L[bn,gn]))' spzeros((last-start+1)*(p+1), (last-start+1)*(p+1))])
     # Invert to compute the projection matrix
     boundary_correction[fn,(dims)*i-(dims-1):dims*i] = (lhs\rhs)[1:length(fn),:] 
   end
   boundary_correction
 end
+"""
+Apply the boundary projection matrix to the Dirichlet boundary condition
+"""
 function apply_boundary_correction(BC::SparseMatrixCSC{Float64,Int64}, bnodes::Vector{Int64}, bvals::Vector{Float64}, 
   patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p::Int64, nc::Int64, l::Int64, fspace::FineScaleSpace)
   nf = fspace.nf

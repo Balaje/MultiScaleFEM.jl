@@ -9,7 +9,7 @@ nc = 2^4
 nf = 2^15
 q = 1
 p = 1
-l = 1
+l = 7
 qorder = 2
 
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
