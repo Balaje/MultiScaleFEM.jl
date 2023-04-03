@@ -19,7 +19,7 @@ end
 
 struct ElemDist <: NearestNeighbors.Distances.Metric end
 function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::AbstractVector)
-  dist = x[1] - y[1]
+  dist = abs(x[1] - y[1])
   for i=1:lastindex(x), j=1:lastindex(y)
     dist = min(dist, abs(x[i]-y[j]))
   end
@@ -44,14 +44,22 @@ end
 # Local indices for solving the patch problems
 function get_patch_local_to_global_node_inds(fine_scale_space::FineScaleSpace, l::Int64, el::Int64)
   Q = get_patch_global_node_ids(fine_scale_space, l, el)
-  unique(mapreduce(permutedims, vcat, Q))    
+  sort(unique(mapreduce(permutedims, vcat, Q)))
 end
+
 function get_patch_local_node_ids(fine_scale_space::FineScaleSpace, l::Int64, el::Int64)
-  σ = get_patch_global_node_ids(fine_scale_space, l, el)
-  R = get_patch_local_to_global(fine_scale_space, l, el)
-  m = Broadcasting(Reindex(R)) 
-  lazy_map(m, σ)
+  σ = collect(get_patch_global_node_ids(fine_scale_space, l, el))
+  R = get_patch_local_to_global_node_inds(fine_scale_space, l, el)
+  for t=1:lastindex(σ)
+    for tt = 1:lastindex(R), ttt = 1:lastindex(σ[t])
+      if(σ[t][ttt] == R[tt])
+        σ[t][ttt] = tt
+      end
+    end
+  end
+  σ
 end
+
 function get_patch_cell_types(fine_scale_space::FineScaleSpace, l::Int64, el::Int64)
   U = fine_scale_space.U
   cell_type = get_cell_type(get_triangulation(U))
