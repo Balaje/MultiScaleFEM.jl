@@ -4,12 +4,11 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-#c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e0))^-1
-c²(x) = 1.0
-f(x,t) = 0.0
+c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
+#c²(x) = 1.0
+f(x,t) = sin.(π*x[1])*sin(t)
 u₀(x) = 0.0
-u₁(x) = π*sin(π*x[1])
-u(x,t) = sin(π*x)*sin(π*t) # Exact solution
+u₁(x) = 0.0
 
 # Problem parameters - fine scale
 nf = 2^15
@@ -17,7 +16,7 @@ q = 1
 qorder = 4
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
-Δt = 10^-4
+Δt = 10^-3
 tf = 1.5
 ntime = ceil(Int, tf/Δt)
 
@@ -29,10 +28,10 @@ fullnodes = 1:q*nf+1;
 bnodes = [1, q*nf+1];
 freenodes = setdiff(fullnodes, bnodes);
 function fₙϵ!(cache, tₙ::Float64)
-  #fspace, freenodes = cache
-  #F = assemble_load_vector(fspace, y->f(y,tₙ))
-  #F[freenodes]
-  zeros(Float64, length(freenodes))
+  fspace, freenodes = cache
+  F = assemble_load_vector(fspace, y->f(y,tₙ))
+  F[freenodes]
+  #zeros(Float64, length(freenodes))
 end
 # Time marching
 let 
@@ -44,6 +43,7 @@ let
   for i=1:ntime
     U₁, V₁ = CN!(cache, t, U₀, V₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!)
     U₀, V₀ = U₁, V₁
+    print("Done t\n")
     t += Δt
   end
   U = U₀ # Final time solution  
@@ -62,12 +62,12 @@ H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
   fspace, basis_vec_ms = cache
-  # loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  # basis_vec_ms'*loadvec
-  zeros(Float64, size(basis_vec_ms, 2))
+  loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
+  basis_vec_ms'*loadvec
+  #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[4,5,6,7,8]
+for l=[7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
