@@ -31,7 +31,13 @@ function get_patch_elem_inds(fine_scale_space::FineScaleSpace, l::Int64, el::Int
   tree = fine_scale_space.elemTree
   Ω = get_triangulation(U)
   σ = get_cell_node_ids(Ω)
-  inrange(tree, σ[el], l)
+  el_inds = inrange(tree, σ[el], 1) # Find patch of size 1
+  for _=2:l # Recursively do this for 2:l and collect the unique indices. 
+    X = [inrange(tree, i, 1) for i in σ[el_inds]]
+    el_inds = unique(vcat(X...))
+  end
+  sort(el_inds)
+  # There may be a better way to do this... Need to check.
 end
 function get_patch_global_node_ids(fine_scale_space::FineScaleSpace, l::Int64, el::Int64)
   R = get_patch_elem_inds(fine_scale_space, l, el)
