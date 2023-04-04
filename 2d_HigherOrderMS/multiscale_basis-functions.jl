@@ -12,7 +12,7 @@ function FineScaleSpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::Int64
   U = TestFESpace(model, reffe, conformity=:H1)
   Ω = get_triangulation(U)
   σ = get_cell_node_ids(Ω)
-  R = map(x->SVector(Tuple(x)), σ)
+  R = vec(map(x->SVector(Tuple(x)), σ))
   tree = BruteTree(R, ElemDist())
   FineScaleSpace(U, tree)
 end
