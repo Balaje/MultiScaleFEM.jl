@@ -39,10 +39,23 @@ Here $D_{\varepsilon}$ is a highly oscillatory coefficient. Traditional methods 
 
 The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. I use the standard finite element method on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to be sufficiently small to resolve the fine scale effects. Since the problem is solved locally, the fine-scale effects could be captured using reasonably large mesh on the patch. 
 
-The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. The diffusion coefficient here is a piecewise constant function on a very fine scale $(\epsilon = 2^{-7})$. 
+The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. 
 
-| Smooth Diffusion Coefficient | Oscillatory Coefficient | Random Coefficient | 
-| --- | --- | --- |
+| Smooth Diffusion Coefficient | Oscillatory Coefficient | 
+| --- | --- |
+| ![](./HigherOrderMS/Images/basis_el_1.png) | ![](./HigherOrderMS/Images/basis_el_1_osc.png)
+
+The smooth diffusion coefficient does not contain any oscillations and hence the multiscale bases are smooth. If the diffusion coefficient is oscillatory, then the information is captured by the multiscale bases function. The diffusion coefficient for the oscillatory case here is assumed to be
+
+$$
+D(x) = \left(1 + 0.8\cos\left(\frac{2\pi x}{2^{-5}}\right)\right)^{-1}
+$$
+
+whereas the constant diffusion is 
+
+$$
+D(x) = 1
+$$
 
 ### Poisson equation in 1D
 
@@ -85,13 +98,14 @@ In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x
 The script `HigherOrderMS/1d_wave_equation.jl` contains the code to solve the acoustic wave equation in 1D. The spatial part is handled using the multiscale finite element method and the temporal part is discretized using Crank Nicolson scheme. I check two different wave speeds
 
 $$
-D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = 4.0 + \left( \cos{\frac{2πx}{2^{-2}}} \right)
+D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}
 $$
 
 In both cases, I set the right hand side $f(x,t) = 0$, the initial conditions $u(x,0) = 0$, $u_t(x,0) = 4\pi \sin\left(2\pi x\right)$. For the smooth wave speed case, the exact solution is given by $u(x,t) = \sin\left(2\pi x\right) \sin\left(4\pi t\right)$. We observe that the multiscale method gives a good approximation to the exact solution (smooth wave speed).
 
 | Smooth wave speed | Oscillatory wave speed |
 | --- | --- |
+| ![](./HigherOrderMS/Images/WaveEquation/wave_eq_smooth.png) | ![](./HigherOrderMS/Images/WaveEquation/wave_eq_osc.png) |
 
 
 ### Rate of convergence of the multiscale method
@@ -266,7 +280,7 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 ![](./HigherOrderMS/Images/WaveEquation/highly_osc_wave_speed.png) |
 --- |
 
-I still seem to obtain optimal convergence, even for higly oscillatory wave speeds.
+I still seem to obtain optimal convergence, even for highly oscillatory wave speeds.
 
 `(p=1)` | `(p=2)` | `(p=3)` |
 --- | --- | --- |

@@ -7,7 +7,7 @@ domain = (0.0,1.0)
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
 c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-5))^-1
 f(x,t) = sin(π*x[1])*sin(t)
-u₁(x) = 0.0
+uₜ₀(x) = 0.0
 # f(x,t) = 0.0
 # c²(x) = 1.0
 u₀(x) = 0.0
@@ -39,7 +39,7 @@ end
 # Time marching
 let 
   U₀ = u₀.(nds_fine[freenodes])
-  V₀ = u₁.(nds_fine[freenodes])
+  V₀ = uₜ₀.(nds_fine[freenodes])
   global U = zero(U₀)
   cache = fine_scale_space, freenodes
   t = 0.0
@@ -85,7 +85,7 @@ for l=[5,6,7,8]
       # Time marching
       let 
         U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)
-        V₀ = setup_initial_condition(u₁, basis_vec_ms, fine_scale_space)
+        V₀ = setup_initial_condition(uₜ₀, basis_vec_ms, fine_scale_space)
         global U = zero(U₀)
         cache = fine_scale_space, basis_vec_ms
         t = 0.0
