@@ -4,11 +4,14 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
-#c²(x) = 1.0
-f(x,t) = sin.(π*x[1])*sin(t)
-u₀(x) = 0.0
+# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
+c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-5))^-1
+f(x,t) = sin(π*x[1])*sin(t)
 u₁(x) = 0.0
+# f(x,t) = 0.0
+# c²(x) = 1.0
+u₀(x) = 0.0
+# u₁(x) = π*sin(π*x[1])
 
 # Problem parameters - fine scale
 nf = 2^15
@@ -43,7 +46,7 @@ let
   for i=1:ntime
     U₁, V₁ = CN!(cache, t, U₀, V₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!)
     U₀, V₀ = U₁, V₁
-    print("Done t\n")
+    (i%100 == 0) && print("Done t = "*string(t)*"\n")
     t += Δt
   end
   U = U₀ # Final time solution  
@@ -67,7 +70,7 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[7,8]
+for l=[5,6,7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
