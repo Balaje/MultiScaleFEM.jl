@@ -20,7 +20,7 @@ qorder = 4
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
 Δt = 10^-3
-tf = 1.5
+tf = 7.5
 ntime = ceil(Int, tf/Δt)
 
 # Solve the fine scale problem for exact solution
