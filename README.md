@@ -309,6 +309,12 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
 
+ Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
+
+`(p=3)` | 
+--- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
+
 ## Localized Orthogonal Decomposition Method
 -------
 
