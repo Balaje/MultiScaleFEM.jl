@@ -256,7 +256,7 @@ with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
 
-Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
+Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
 
 `(p=1)` | `(p=2)` |
 --- | --- |
@@ -308,6 +308,12 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 | `(p=2)` | `(p=3)` |
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
+
+ Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
+
+`(p=3)` | 
+--- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
 
 ## Localized Orthogonal Decomposition Method
 -------
