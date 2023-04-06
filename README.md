@@ -256,7 +256,7 @@ with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
 
-Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
+Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
 
 `(p=1)` | `(p=2)` |
 --- | --- |
