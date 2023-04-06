@@ -39,10 +39,23 @@ Here $D_{\varepsilon}$ is a highly oscillatory coefficient. Traditional methods 
 
 The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. I use the standard finite element method on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to be sufficiently small to resolve the fine scale effects. Since the problem is solved locally, the fine-scale effects could be captured using reasonably large mesh on the patch. 
 
-The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. The diffusion coefficient here is a piecewise constant function on a very fine scale $(\epsilon = 2^{-7})$. 
+The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. 
 
-| ![Fine scale bases](./HigherOrderMS/Images/bases_el_1_random.png) |
-| --- |
+| Smooth Diffusion Coefficient | Oscillatory Coefficient | 
+| --- | --- |
+| ![](./HigherOrderMS/Images/basis_el_1.png) | ![](./HigherOrderMS/Images/basis_el_1_osc.png)
+
+The smooth diffusion coefficient does not contain any oscillations and hence the multiscale bases are smooth. If the diffusion coefficient is oscillatory, then the information is captured by the multiscale bases function. The diffusion coefficient for the oscillatory case here is assumed to be
+
+$$
+D(x) = \left(1 + 0.8\cos\left(\frac{2\pi x}{2^{-5}}\right)\right)^{-1}
+$$
+
+whereas the constant diffusion is 
+
+$$
+D(x) = 1
+$$
 
 ### Poisson equation in 1D
 
@@ -54,9 +67,13 @@ $$
 
 where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusion coefficient is constant at an interval of size $\epsilon$. We can observe that the multiscale method captures the exact solution accurately at small scales using relatively small elements `(N=8)` in the coarse space. The fine-scale mesh size was taken to be equal to $h = 2^{-15}$.
 
-| Smooth Diffusion Term | Oscillatory Diffusion Term | Random Diffusion Term |
-| --- | --- | --- |
-| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./HigherOrderMS/Images/sol_6_oscillatory.png) | ![Random Diffusion Coefficient](./HigherOrderMS/Images/sol_7_random.png) | 
+| Smooth Diffusion Term | Oscillatory Diffusion Term | 
+| --- | --- |
+| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_6_oscillatory.png) |
+
+Random Diffusion Term |
+--- |
+![Random Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_7_random.png) | 
 
 
 ### Heat equation in 1D
@@ -77,7 +94,7 @@ In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x
 
 | Smooth Diffusion Term | Oscillatory Diffusion Term |
 | --- | --- |
-| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/heat_eq_all_osc.png) |
+| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/HeatEquation/heat_eq_all.png) | ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/HeatEquation/heat_eq_all_osc.png) |
 
 
 ### Wave equation in 1D
@@ -85,22 +102,27 @@ In both cases, the right hand side $f(x,t) = 0$ and the initial condition $u_0(x
 The script `HigherOrderMS/1d_wave_equation.jl` contains the code to solve the acoustic wave equation in 1D. The spatial part is handled using the multiscale finite element method and the temporal part is discretized using Crank Nicolson scheme. I check two different wave speeds
 
 $$
-D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = 4.0 + \left( \cos{\frac{2πx}{2^{-2}}} \right)
+D_{\varepsilon}(x) = 4.0, \quad D_{\varepsilon}(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}
 $$
 
 In both cases, I set the right hand side $f(x,t) = 0$, the initial conditions $u(x,0) = 0$, $u_t(x,0) = 4\pi \sin\left(2\pi x\right)$. For the smooth wave speed case, the exact solution is given by $u(x,t) = \sin\left(2\pi x\right) \sin\left(4\pi t\right)$. We observe that the multiscale method gives a good approximation to the exact solution (smooth wave speed).
 
 | Smooth wave speed | Oscillatory wave speed |
 | --- | --- |
-| ![Smooth wave speed](./HigherOrderMS/Images/wave_eq_smooth.png) | ![Smooth wave speed](./HigherOrderMS/Images/wave_eq_oscillatory.png) |
+| ![](./HigherOrderMS/Images/WaveEquation/wave_eq_smooth.png) | ![](./HigherOrderMS/Images/WaveEquation/wave_eq_osc.png) |
+
 
 ### Rate of convergence of the multiscale method
 -------
 
-All the rate of convergence examples can be found inside the folder `HigherOrderMS/`. The script `HigherOrderMS/1d_rate_of_convergence_Poisson.jl` contains the code to study the convergence rates for the Poisson equation.
+All the rate of convergence examples can be found inside the folder `HigherOrderMS/`. 
 
-#### Smooth Diffusion Coefficients
--------
+#### Poisson Equation
+
+The script `HigherOrderMS/1d_rate_of_convergence_Poisson.jl` contains the code to study the convergence rates for the Poisson equation. To obtain the rate of convergence plots, we always assume that the exact solution is obtained by solving the problem using the traditional finite element method. This is because, in majority of the examples considered here, the exact solution is not known.
+
+##### Smooth Diffusion Coefficients
+
 The following figure shows the rate of convergence of the multiscale method for the lowest order case (`p=1` in the discontinuous space) and varying patch size, $l$. The example was run for a smooth diffusion coefficient. Following is the test example:
 
 $$
@@ -115,33 +137,32 @@ $$
 
 The corresponding exact solution is $u(x) = \sin(\pi x)$. 
 
-![](./HigherOrderMS/Images/ooc_1.png) | 
+![](./HigherOrderMS/Images/PoissonEquation/ooc_1.png) | 
 --- |
 
 We observe optimal convergence rates discussed in Maier, R., 2021 until the mesh size becomes too small. In that case a larger patch size (indicated by the parameter $l$) is required to obtain similar convergence rates for finer mesh. The growing part in the error is controlled by an $exp(-C_{dec} l)$ term and vanishes for higher value of $l$. 
 
-![](./HigherOrderMS/Images/ooc_3.png) | 
+![](./HigherOrderMS/Images/PoissonEquation/ooc_3.png) | 
 --- |
 
 This is in line with the observation made in Maier, R., 2021. Similar observations can be made for the higher-order cases as well, `(p=2)` and `(p=3)`. 
 
 `(p=2)` | `(p=3)` |
 --- | --- |
-![](./HigherOrderMS/Images/ooc_2.png) | ![](./HigherOrderMS/Images/ooc_10_p3.png) |
+![](./HigherOrderMS/Images/PoissonEquation/ooc_2.png) | ![](./HigherOrderMS/Images/PoissonEquation/ooc_10_p3.png) |
 
 We can solve the problem upto the coarse-mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-12}$ with the fine scale at $h=2^{-16}$. However, the method does not show convergence for very fine coarse-meshes unless the localization parameter is chosen high enough.
 
-![](./HigherOrderMS/Images/ooc_5.png) |
+![](./HigherOrderMS/Images/PoissonEquation/ooc_5.png) |
 --- |
 
-#### Oscillatory and Random Diffusion Coefficients
--------
+##### Oscillatory and Random Diffusion Coefficients
 
 Finally we can observe the same behaviour for the other choices of diffusion coefficients. The diffusion coefficients were chose identical to the ones discussed in the previous section. The right hand side data $f(x) = \frac{\pi^2}{2}\sin{\pi x}$ for the oscillatory case and $f(x) = \sin{5\pi x}$ for the random diffusion case.
 
 Oscillatory coefficient | Random coefficients |
 --- | --- |
-![](./HigherOrderMS/Images/ooc_6_oscillatory.png) | ![](./HigherOrderMS/Images/ooc_7_random_coeff.png) | 
+![](./HigherOrderMS/Images/PoissonEquation/ooc_6_oscillatory.png) | ![](./HigherOrderMS/Images/PoissonEquation/ooc_7_random_coeff.png) | 
 
 #### Time dependent problems
 -------
@@ -172,13 +193,13 @@ $$
 
 Constant coefficient | Oscillatory coefficient |
 --- | --- |
-![](./HigherOrderMS/Images/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/ooc_9_heat_eq_osc.png)
+![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_9_heat_eq_osc.png)
 
 Similar behavior can be seen for higher order methods also.
 
 `(p=2)` (Oscillatory coefficient) | `(p=3)` (Oscillatory coefficient) |
 --- | --- |
-![](./HigherOrderMS/Images/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/ooc_12_heat_eq_osc_p3.png) |
+![](./HigherOrderMS/Images/HeatEquation/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_12_heat_eq_osc_p3.png) |
 
 
 ##### **Wave Equation**
@@ -189,17 +210,104 @@ $$
 \begin{align*}
   u_{tt} - \left(c^2(x)u'(x,t)\right)' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
   u(x,0) = 0 &\quad x \in (0,1),\\
-  u_t(x,0) = 4\pi \sin(2\pi x) &\quad x \in (0,1),\\
+  u_t(x,0) = \pi \sin(\pi x) &\quad x \in (0,1),\\
   u(0,t) = u(1,t) =0 &\quad t \in (0,T),
 \end{align*}
 $$
 
-using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-4}$ and solve till final times $T = 1.0$ s, $T=1.5$ s and $T = 2.0$ s. For the numerical experiments, I assume that the wave speed $c(x) = 2.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-16}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-6}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1,2,3)`:
+using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-3}$ and solve till final times $T = 1.5$ s. Here I consider three wave speeds
 
-`(p=1)` | `(p=2)` | `(p=3)` |
---- | --- | --- |
-![](./HigherOrderMS/Images/ooc_13_wave_eq_p1_1.125s.png)| ![](./HigherOrderMS/Images/ooc_13_wave_eq_p2_1.125s.png)| ![](./HigherOrderMS/Images/ooc_13_wave_eq_p3_1.125s.png)|
+Constant Wave Speed | Smooth Wave Speed |
+--- | --- |
+![](./HigherOrderMS/Images/WaveEquation/constant_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/smooth_wave_speed.png) | 
 
+Oscillatory Wave Speed | 
+--- |
+![](./HigherOrderMS/Images/WaveEquation/oscillatory_wave_speed.png) |
+
+First, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-6}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1,2,3)`:
+
+`(p=1)` | `(p=2)` | 
+--- | --- | 
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_constant_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_constant_wave_speed.png)  | 
+
+`(p=3)` |
+--- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p3_constant_wave_speed.png)  | 
+
+I observe that for constant wave speed case, the method converges with the optimal convergence rates. I now solve the problem with the following data
+
+$$
+\begin{align*}
+  u_{tt} - \left(c^2(x)u'(x,t)\right)' = 0 &\quad (x,t) \in (0,1) \times (0,T),\\
+  u(x,0) = 0 &\quad x \in (0,1),\\
+  u_t(x,0) = \pi \sin(\pi x) &\quad x \in (0,1),\\
+  u(0,t) = u(1,t) =0 &\quad t \in (0,T),
+\end{align*}
+$$
+
+with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\pi x\right)\right)^{-1}$ (shown above). Again, I observe optimal convergence rates when I solve till $T=1.5$ s.
+
+`(p=1)` | `(p=2)` |
+--- | --- | 
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_smooth_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_smooth_wave_speed.png)  | 
+
+`(p=3)` |
+--- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
+
+Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
+
+`(p=1)` | `(p=2)` |
+--- | --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_oscillatory_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_oscillatory_wave_speed.png)  
+
+`(p=3)` |
+--- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p3_oscillatory_wave_speed.png)  | 
+
+However, if I consider this problem
+
+$$
+\begin{align*}
+  u_{tt} - \left(c^2(x)u'(x,t)\right)' = f(x,t) &\quad (x,t) \in (0,1) \times (0,T),\\
+  u(x,0) = 0 &\quad x \in (0,1),\\
+  u_t(x,0) = 0 &\quad x \in (0,1),\\
+  u(0,t) = u(1,t) =0 &\quad t \in (0,T),
+\end{align*}
+$$
+
+with 
+
+$$
+c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2^{-5}}\right)\right)^{-1}, \quad f(x,t) = \sin(\pi x)\sin(t),
+$$
+
+and solve the problem till $T=1.5$ s, we observe the following convergence rates.
+
+`(p=1)` | `(p=2)` 
+--- | --- 
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_osc_forcing.png) 
+
+| `(p=3)` |
+| --- |
+| ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing.png) | 
+
+To be extra sure, now I run the above problem with the same non-zero forcing and zero initial data, but with the wave speed
+
+$$
+c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2 \times 10^{-5}}\right)\right)^{-1}
+$$
+
+This gives a highly oscillatory wave-speed, which at a very fine scale looks like smooth function. I still seem to obtain optimal convergence, even for highly oscillatory wave speeds.
+
+ Wave Speed | `(p=1)` |
+--- | --- | 
+![](./HigherOrderMS/Images/WaveEquation/highly_osc_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_high_osc_forcing.png) |
+
+| `(p=2)` | `(p=3)` |
+--- | --- |
+ ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
 
 ## Localized Orthogonal Decomposition Method
 -------
@@ -207,8 +315,11 @@ using the multiscale method in space and Crank-Nicolson method in time. For the 
 The localized orthogonal decomposition method implementation can be found inside the `LOD/` folder. The program `LOD/main.jl` contains the code to check the rate of convergence of the LOD method. The file `LOD/1dFunctions.jl` contains the routines to compute the standard finite element basis along with the functions assemble the global matrices. The file `LOD/1dFunctionsMultiScale` contains the code to compute the multi-scale basis along with the function to compute the $L^2$ error of the multiscale-FEM solution. Running the code `LOD/main.jl`. The multiscale basis corresponding to $(H=0.25)$ and $\varepsilon=2^{-5}$ along with the finite element solution and the rate of convergence for various mesh-size is shown below:
 
 
-![](./LOD/basis.png) | ![](./LOD/solutions.png) | ![](./LOD/ooc_lod.png) | 
---- | --- | --- |
+![](./LOD/basis.png) | ![](./LOD/solutions.png) | 
+--- | --- | 
+
+![](./LOD/ooc_lod.png) | 
+--- |
 
 For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
 

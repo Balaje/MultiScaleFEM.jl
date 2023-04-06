@@ -6,7 +6,7 @@ domain = (0.0, 1.0)
 c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
 f(x,t) = 0.0
 u₀(x) = 0.0
-u₁(x) = 4π*sin(2π*x[1])
+uₜ₀(x) = 4π*sin(2π*x[1])
 u(x,t) = sin(2π*x)*sin(4π*t)
 
 # Problem parameters
@@ -40,7 +40,7 @@ tf = 1.125
 ntime = ceil(Int, tf/Δt)
 let 
   U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)
-  V₀ = setup_initial_condition(u₁, basis_vec_ms, fine_scale_space)
+  V₀ = setup_initial_condition(uₜ₀, basis_vec_ms, fine_scale_space)
   global U = zero(U₀)
   cache = fine_scale_space, basis_vec_ms
   t = 0.0
@@ -54,5 +54,5 @@ end
 U_fine_scale = basis_vec_ms*U
 
 # Plot
-plt1 = plot(nds_fine, U_fine_scale)
-#plot!(plt1, nds_fine, [u(x, tf) for x in nds_fine])
+plt1 = plot(nds_fine, U_fine_scale, label="Approx. Solution using MS Method", lc=:blue, lw=2)
+plot!(plt1, nds_fine, [u(x, tf) for x in nds_fine], label="Exact solution", lc=:red, lw=1)

@@ -2,10 +2,11 @@ include("HigherOrderMS.jl");
 
 domain = (0.0,1.0)
 
+# D(x) = (1.0 + 0.8*cos(2π*x[1]/2^-5))^-1
 D(x) = 1.0
 f(x) = π^2*sin(π*x[1])
 
-nc = 2^4
+nc = 2^2
 nf = 2^15
 q = 1
 p = 1
