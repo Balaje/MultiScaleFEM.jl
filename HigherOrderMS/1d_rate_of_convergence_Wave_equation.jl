@@ -4,8 +4,26 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
+## Oscillatory wave speed
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
-c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-5))^-1
+# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-5))^-1
+## Random wave speed
+Neps = 2^12
+nds_micro = LinRange(domain[1], domain[2], Neps+1)
+wave_speed_micro = 0.5 .+ 4.5*rand(Neps+1)
+function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
+  n = size(nds_micro, 1)
+  for i=1:n
+    if(nds_micro[i] ≤ x ≤ nds_micro[i+1])      
+      return diffusion_micro[i+1]
+    else
+      continue
+    end 
+  end
+end
+function c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro)
+  _D(x[1], nds_micro, diffusion_micro)
+end
 f(x,t) = sin(π*x[1])*sin(t)
 uₜ₀(x) = 0.0
 # f(x,t) = 0.0
@@ -20,7 +38,7 @@ qorder = 4
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
 Δt = 10^-3
-tf = 7.5
+tf = 1.5
 ntime = ceil(Int, tf/Δt)
 
 # Solve the fine scale problem for exact solution

@@ -301,7 +301,7 @@ $$
 
 This gives a highly oscillatory wave-speed, which at a very fine scale looks like smooth function. I still seem to obtain optimal convergence, even for highly oscillatory wave speeds.
 
- Wave Speed | `(p=1)` |
+ Highly oscillating Wave Speed | `(p=1)` |
 --- | --- | 
 ![](./HigherOrderMS/Images/WaveEquation/highly_osc_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_high_osc_forcing.png) |
 
@@ -314,6 +314,17 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 `(p=3)` | 
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
+
+Finally, I show the rate of convergence results for a random piecewise-constant in a on the scale $\epsilon = 2^{-12}$ with randomly chosen values in $[0.5,5]$. The choice of wave forcing and the initial conditions are the same as that of the well prepared case. I solve the problem till the final time reaches $T=1.5$\,s. I generally observe optimal convergence in all the cases.
+
+ Random Wave Speed | `(p=1)` |
+--- | --- | 
+![](./HigherOrderMS/Images/WaveEquation/random_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_random_forcing.png) |
+
+| `(p=2)` | `(p=3)` |
+--- | --- |
+ ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_random_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing.png) | 
+
 
 ## Localized Orthogonal Decomposition Method
 -------
