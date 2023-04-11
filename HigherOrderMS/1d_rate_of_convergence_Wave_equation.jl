@@ -77,7 +77,7 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 N = [1,2,4,8,16,32,64]
 plt = plot();
 plt1 = plot();
-p = 3;
+p = 1;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
