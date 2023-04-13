@@ -11,3 +11,4 @@ using StaticArrays
 using NearestNeighbors
 
 include("multiscale_basis-functions.jl")
+include("coarse_to_fine_map.jl")
