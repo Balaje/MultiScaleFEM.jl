@@ -32,21 +32,43 @@ U = TestFESpace(patch_model, reffe, conformity=:H1, dirichlet_tags="boundary")
 
 # coarse_to_fine_map for 1 level refinement
 let 
-  function check_elem(k, j)
-    (k%2^(j+1) == 1)
+  function source_to_target(A, B)
+    C = Matrix{Int64}(undef, size(A,1), size(A,2)*size(B,2))
+    fill!(C,0)
+    for i=1:lastindex(A,1), j=1:lastindex(A,2)
+      for k=1:lastindex(B,2)
+        C[i,k+(j-1)*size(B,2)] = B[A[i,j],k]     
+      end
+    end 
+    C
   end
-  j = 2
-  Nel = 2^(2j+1)
-  j_ref_1 = Vector{Vector{Int64}}(undef, Nel)
-  j_ref_1[1] = [1,2,3,2^(j+2)+1]
-  for k=2:Nel
-    tmp = sort(j_ref_1[k-1], rev=true)
-    kk = ceil(Int64, k/(2^(j+1)))
-    if((k % 2) == 0)
-      j_ref_1[k] = [tmp[2]+1; tmp[1]+1:tmp[1]+3] .+ check_elem(k,j)*kk^0*2^(j+2)
-    else
-      j_ref_1[k] = [tmp[end]+1:tmp[end]+3; tmp[1]+1] .+ check_elem(k,j)*kk^0*2^(j+2)
+  function refine_once(j::Int64)    
+    check_elem(k, j) = (k%2^(j+1) == 1)
+    num_cells = 2^(2*j+1)
+    ref_1 = Matrix{Int64}(undef, num_cells, 4)
+    ref_1[1,:] = [1,2,3,2^(j+2)+1]
+    for k=2:num_cells
+      tmp = sort(ref_1[k-1,:], rev=true)
+      kk = ceil(Int64, k/(2^(j+1)))
+      if((k % 2) == 0)
+        ref_1[k,:] = [tmp[2]+1; tmp[1]+1:tmp[1]+3] .+ check_elem(k,j)*kk^0*2^(j+2)
+      else
+        ref_1[k,:] = [tmp[end]+1:tmp[end]+3; tmp[1]+1] .+ check_elem(k,j)*kk^0*2^(j+2)
+      end
     end
+    ref_1
   end
-  display(j_ref_1)  
+  function coarse_to_fine_map(num_coarse_cells::Int64, num_fine_cells::Int64)        
+    j_coarse = ceil(Int64, 0.5*(log2(num_coarse_cells)-1))    
+    j_fine = ceil(Int64, 0.5*(log2(num_fine_cells)-1))
+    @show j_coarse, j_fine
+    all_j = j_coarse+1:j_fine
+    c_to_f_maps = [refine_once(j-1) for j in all_j]
+    c_to_f = source_to_target(c_to_f_maps[end-1], c_to_f_maps[end])
+    for l=lastindex(all_j)-1:-1:2
+      c_to_f = source_to_target(c_to_f_maps[l-1], c_to_f)
+    end
+    c_to_f
+  end  
+  global coarse_to_fine_maps = coarse_to_fine_map(2^1, 2^7)  
 end
