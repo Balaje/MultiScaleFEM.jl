@@ -29,3 +29,24 @@ reffe = ReferenceFE(lagrangian, Float64, q)
 U = TestFESpace(patch_model, reffe, conformity=:H1, dirichlet_tags="boundary")
 
 # include("eg3.jl");  writevtk(patch_model, "model") # Run this and visualize in Paraview
+
+# coarse_to_fine_map for 1 level refinement
+let 
+  function check_elem(k, j)
+    (k%2^(j+1) == 1)
+  end
+  j = 2
+  Nel = 2^(2j+1)
+  j_ref_1 = Vector{Vector{Int64}}(undef, Nel)
+  j_ref_1[1] = [1,2,3,2^(j+2)+1]
+  for k=2:Nel
+    tmp = sort(j_ref_1[k-1], rev=true)
+    kk = ceil(Int64, k/(2^(j+1)))
+    if((k % 2) == 0)
+      j_ref_1[k] = [tmp[2]+1; tmp[1]+1:tmp[1]+3] .+ check_elem(k,j)*kk^0*2^(j+2)
+    else
+      j_ref_1[k] = [tmp[end]+1:tmp[end]+3; tmp[1]+1] .+ check_elem(k,j)*kk^0*2^(j+2)
+    end
+  end
+  display(j_ref_1)  
+end
