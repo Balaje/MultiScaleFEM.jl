@@ -31,10 +31,14 @@ function get_coarse_to_fine_map(num_coarse_cells::Int64, num_fine_cells::Int64)
   j_fine = ceil(Int64, 0.5*(log2(num_fine_cells)-1))
   all_j = j_coarse+1:j_fine
   c_to_f_maps = [_refine_once(j-1) for j in all_j]
+  # If the fine scale is a 1-level refinement of coarse scale, its the only map
   (length(c_to_f_maps) == 1) && return c_to_f_maps[1]
+  # Else, iterate backwards by appending the fine-scale till we reach the desired coarse mesh
   c_to_f = _source_to_target(c_to_f_maps[end-1], c_to_f_maps[end])
+  c_to_f = reduce.(vcat, c_to_f)
   for l=lastindex(all_j)-1:-1:2
     c_to_f = _source_to_target(c_to_f_maps[l-1], c_to_f)
+    c_to_f = reduce.(vcat, c_to_f)
   end
   c_to_f
 end 

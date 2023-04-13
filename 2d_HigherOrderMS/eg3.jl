@@ -6,13 +6,15 @@ include("2d_HigherOrderMS.jl")
 domain = (0.0, 1.0, 0.0, 1.0)
 
 # Fine scale space description
-nf = 2^2
+nf = 2^3
 q = 1
-nc = 2^0
+nc = 2^1
 p = 1
 ms_space = MultiScaleFESpace(domain, q, p, nf, nc)
 
 num_coarse_cells = num_cells(get_triangulation(ms_space.UH))
 num_fine_cells = num_cells(get_triangulation(ms_space.Uh))
 
-coarse_to_fine_map = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
+coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
+σ = get_cell_node_ids(get_triangulation(ms_space.Uh))
+coarse_to_fine_node_ids = lazy_map(Broadcasting(Reindex(σ)), coarse_to_fine_elems)
