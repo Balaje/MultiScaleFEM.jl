@@ -34,7 +34,7 @@ function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::A
   dist+1
 end
 
-function get_patch_elem_inds(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
+function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
   U = ms_space.UH
   tree = ms_space.elemTree
   Ω = get_triangulation(U)
@@ -47,43 +47,16 @@ function get_patch_elem_inds(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
   sort(el_inds)
   # There may be a better way to do this... Need to check.
 end
-function get_patch_global_node_ids(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  R = get_patch_elem_inds(ms_space, l, el)
-  U = ms_space.UH
-  Ω = get_triangulation(U)
-  σ = get_cell_node_ids(Ω)
-  lazy_map(Broadcasting(Reindex(σ)), R)
+
+function get_patch_fine_elems(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elem)
+  ms_spaces = Gridap.Arrays.Fill(ms_space, num_coarse_cells)
+  ls = Gridap.Arrays.Fill(l, num_coarse_cells)
+  X = lazy_map(get_patch_coarse_elem, ms_spaces, ls, 1:num_coarse_cells)
+  Y = reduce.(vcat, lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), X))
+  sort.(Y)
 end
 
-# Local indices for solving the patch problems
-function get_patch_local_to_global_node_inds(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  Q = get_patch_global_node_ids(ms_space, l, el)
-  sort(unique(mapreduce(permutedims, vcat, Q)))
-end
-
-function get_patch_local_node_ids(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  σ = collect(get_patch_global_node_ids(ms_space, l, el))
-  R = get_patch_local_to_global_node_inds(ms_space, l, el)
-  for t=1:lastindex(σ)
-    for tt = 1:lastindex(R), ttt = 1:lastindex(σ[t])
-      if(σ[t][ttt] == R[tt])
-        σ[t][ttt] = tt
-      end
-    end
-  end
-  σ
-end
-
-function get_patch_cell_types(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  U = ms_space.UH
-  cell_type = get_cell_type(get_triangulation(U))
-  R = get_patch_elem_inds(ms_space, l, el)
-  lazy_map(Broadcasting(Reindex(cell_type)), R)
-end
-function get_patch_node_coordinates(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  U = ms_space.UH
-  Ω = get_triangulation(U)
-  C = get_node_coordinates(Ω)
-  R = get_patch_local_to_global_node_inds(ms_space, l, el)
-  C[R]
+function get_patch_cell_coordinates(node_coordinates, patch_fine_node_ids)
+  b = Broadcasting(Reindex(node_coordinates))
+  lazy_map(Broadcasting(b), patch_fine_node_ids)
 end
