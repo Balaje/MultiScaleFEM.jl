@@ -19,14 +19,11 @@
         * [Oscillatory wave-speed with not well-prepared data](#oscillatory-wave-speed-with-not-well-prepared-data)
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
-        * [Highly Oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
+        * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
         * [Random oscillatory wave-speed](#random-oscillatory-wave-speed)
         * [Random oscillatory wave-speed solved for large final time](#random-oscillatory-wave-speed-solved-for-large-final-time)
 - [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
 - [References](#references)
-
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
 
 ## Introduction
 
@@ -363,7 +360,7 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
 
-###### Highly Oscillatory wave-speed with well-prepared data solved for large final time
+###### Highly-oscillatory wave-speed with well-prepared data solved for large final time
 
 Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
 
