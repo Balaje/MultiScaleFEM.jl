@@ -1,15 +1,28 @@
 include("HigherOrderMS.jl");
 
-# Create empty plots
-plt = plot()
-plt1 = plot()
-
 #=
 Problem data
 =#
 domain = (0.0,1.0)
 # A(x) = (1.0 + 0.5*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
-A(x) = 1.0
+# A(x) = 1.0 # Constant diffusion coefficient
+# Random diffusion coefficient
+Neps = 2^12
+nds_micro = LinRange(domain[1], domain[2], Neps+1)
+diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
+function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
+  n = size(nds_micro, 1)
+  for i=1:n
+    if(nds_micro[i] ≤ x ≤ nds_micro[i+1])      
+      return diffusion_micro[i+1]
+    else
+      continue
+    end 
+  end
+end
+function A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro)
+  _D(x[1], nds_micro, diffusion_micro)
+end
 f(x,t) = 0.0
 u₀(x) = sin(π*x[1])
 
@@ -66,7 +79,10 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32,64]
-p = 1
+# Create empty plots
+plt = plot();
+plt1 = plot();
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -76,7 +92,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[7,8]
+for l=[5,6,7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))

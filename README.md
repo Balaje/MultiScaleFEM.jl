@@ -1,5 +1,30 @@
 # MultiscaleFEM.jl
 
+- [Introduction](#introduction)
+- [Higher order multiscale method](#higher-order-multiscale-method)
+  * [Poisson equation in 1D](#poisson-equation-in-1d)
+  * [Heat equation in 1D](#heat-equation-in-1d)
+  * [Wave equation in 1D](#wave-equation-in-1d)
+  * [Rate of convergence of the multiscale method](#rate-of-convergence-of-the-multiscale-method)
+    + [Poisson Equation](#poisson-equation)
+      - [Smooth Diffusion Coefficients](#smooth-diffusion-coefficients)
+      - [Oscillatory and Random Diffusion Coefficients](#oscillatory-and-random-diffusion-coefficients)
+    + [Time dependent problems](#time-dependent-problems)
+      - [Heat equation](#heat-equation)
+        * [Smooth and Oscillatory Diffusion coefficient](#smooth-and-oscillatory-diffusion-coefficient)
+        * [Random diffusion coefficient](#random-diffusion-coefficient)
+      - [Wave Equation](#wave-equation)
+        * [Constant wave speed](#constant-wave-speed)
+        * [Smooth and varying wave speed](#smooth-and-varying-wave-speed)
+        * [Oscillatory wave-speed with not well-prepared data](#oscillatory-wave-speed-with-not-well-prepared-data)
+        * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
+        * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
+        * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
+        * [Random oscillatory wave-speed](#random-oscillatory-wave-speed)
+        * [Random oscillatory wave-speed solved for large final time](#random-oscillatory-wave-speed-solved-for-large-final-time)
+- [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
+- [References](#references)
+
 ## Introduction
 
 This repository contains the source code to implement the Localized Orthogonal Decomposition method and the Higher order Multiscale Method to solve the Poisson problem
@@ -37,7 +62,7 @@ Here $D_{\varepsilon}$ is a highly oscillatory coefficient. Traditional methods 
 ## Higher order multiscale method
 -------
 
-The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ ouside the element. I use the standard finite element method on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to be sufficiently small to resolve the fine scale effects. Since the problem is solved locally, the fine-scale effects could be captured using reasonably large mesh on the patch. 
+The implementation is based on the paper by [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321). This method is local upto the patch of size $l$ outside the element. I use the standard finite element method on the patch to compute the projection of the $L^2$ functions on the coarse space. This mesh on the fine scale needs to be sufficiently small to resolve the fine scale effects. Since the problem is solved locally, the fine-scale effects could be captured using reasonably large mesh on the patch. 
 
 The new basis function then contains the fine scale information and can be used to find the numerical solution that contains the information on the fine scale. This needs to be computed once and can be used repeatedly, for example, to solve time dependent problems. For example, the following figure shows the multiscale basis function containing the fine scale information. 
 
@@ -167,7 +192,9 @@ Oscillatory coefficient | Random coefficients |
 #### Time dependent problems
 -------
 
-##### **Heat equation**
+##### Heat equation
+
+###### Smooth and Oscillatory Diffusion coefficient
 
 I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_Heat_Equation.jl)`.
 
@@ -201,8 +228,25 @@ Similar behavior can be seen for higher order methods also.
 --- | --- |
 ![](./HigherOrderMS/Images/HeatEquation/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_12_heat_eq_osc_p3.png) |
 
+###### Random diffusion coefficient
 
-##### **Wave Equation**
+Finally, I test the problem for random-coefficients which are piecewise-constant on the scale $\epsilon = 2^{-12}$. 
+
+`(p=1)` | `(p=2)` |
+--- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_p1_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_p2_random_coeff_t1.0.png) | 
+
+`(p=3)` | Random Diffusion Coefficient | 
+--- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_p3_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/random_coeff.png) |
+
+
+The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered in the next section.
+
+
+##### Wave Equation
+
+###### Constant wave speed
 
 I solve the following wave equation along with the prescribed initial and boundary conditions
 
@@ -235,7 +279,11 @@ First, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed 
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_constant_wave_speed.png)  | 
 
-I observe that for constant wave speed case, the method converges with the optimal convergence rates. I now solve the problem with the following data
+I observe that for constant wave speed case, the method converges with the optimal convergence rates. 
+
+###### Smooth and varying wave speed
+
+I now solve the problem with the following data
 
 $$
 \begin{align*}
@@ -256,7 +304,9 @@ with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
 
-Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
+###### Oscillatory wave-speed with not well-prepared data
+
+Now I solve the same problem keeping the initial and boundary data same as Example 2, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
 
 `(p=1)` | `(p=2)` |
 --- | --- |
@@ -265,6 +315,8 @@ Now I solve the same problem keeping the initial and boundary data same, but wit
 `(p=3)` |
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_oscillatory_wave_speed.png)  | 
+
+###### Oscillatory wave-speed with well-prepared data
 
 However, if I consider this problem
 
@@ -293,6 +345,10 @@ and solve the problem till $T=1.5$ s, we observe the following convergence rates
 | --- |
 | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing.png) | 
 
+This maybe due to the initial data being well-prepared (see [Abdulle, A. and Henning, P.](https://www.ams.org/journals/mcom/2017-86-304/S0025-5718-2016-03114-2/)).
+
+###### Highly-oscillatory wave-speed with well-prepared data
+
 To be extra sure, now I run the above problem with the same non-zero forcing and zero initial data, but with the wave speed
 
 $$
@@ -309,11 +365,15 @@ This gives a highly oscillatory wave-speed, which at a very fine scale looks lik
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
 
- Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
+###### Highly-oscillatory wave-speed with well-prepared data solved for large final time
+
+Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
 
 `(p=3)` | 
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
+
+###### Random oscillatory wave-speed
 
 Next, I show the rate of convergence results for a random piecewise-constant in a on the scale $\epsilon = 2^{-12}$ with randomly chosen values in $[0.5,5]$. The choice of wave forcing and the initial conditions are the same as that of the well prepared case. I solve the problem till the final time reaches $T=1.5$ s. I generally observe optimal convergence in all the cases.
 
@@ -323,7 +383,10 @@ Next, I show the rate of convergence results for a random piecewise-constant in 
 
 | `(p=2)` | `(p=3)` |
 --- | --- |
- ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_random_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing.png) | 
+ ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_random_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing.png) |
+
+
+###### Random oscillatory wave-speed solved for large final time
 
 Finally, I solve the problem with the random wave-speed till final time $T = 7.5$ s, and show the convergence rates for `p=1,3`. The rate of convergence seem optimal for `p=1`, but seems to slow down for the `p=3` case. The reference solution was obtained using the traditional finite element method on a very fine mesh $h=2^{-15}$ whereas the oscillations are on the scale $\epsilon = 2^{-12}$.
 
@@ -350,3 +413,4 @@ For more details on the method, refer to [Målqvist, A. et al](https://epubs.sia
 
 - Målqvist, A. and Peterseim, D., 2020. Numerical homogenization by localized orthogonal decomposition. Society for Industrial and Applied Mathematics.
 - Maier, R., 2021. A high-order approach to elliptic multiscale problems with general unstructured coefficients. SIAM Journal on Numerical Analysis, 59(2), pp.1067-1089.
+- Abdulle, A. and Henning, P., 2017. Localized orthogonal decomposition method for the wave equation with a continuum of scales. Mathematics of Computation, 86(304), pp.549-587.
