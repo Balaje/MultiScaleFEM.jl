@@ -232,11 +232,16 @@ Similar behavior can be seen for higher order methods also.
 
 Finally, I test the problem for random-coefficients which are piecewise-constant on the scale $\epsilon = 2^{-12}$. 
 
-`(p=1)` | `(p=3)` |
+`(p=1)` | `(p=2)` |
 --- | --- |
-![](./HigherOrderMS/Images/HeatEquation/ooc_p1_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_p2_random_coeff_t1.0.png) |
+![](./HigherOrderMS/Images/HeatEquation/ooc_p1_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_p2_random_coeff_t1.0.png) | 
 
-The method again shows optimal convergence for both `p=1` and `p=2`.
+`(p=3)` | Random Diffusion Coefficient | 
+--- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_p3_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/random_coeff.png) |
+
+
+The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered in the next section.
 
 
 ##### Wave Equation

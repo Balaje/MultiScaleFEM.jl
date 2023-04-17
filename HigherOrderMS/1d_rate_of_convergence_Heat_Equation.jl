@@ -9,7 +9,7 @@ domain = (0.0,1.0)
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.5 .+ 4.5*rand(Neps+1)
+diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -80,9 +80,9 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32,64]
 # Create empty plots
-plt = plot()
-plt1 = plot()
-p = 2
+plt = plot();
+plt1 = plot();
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
