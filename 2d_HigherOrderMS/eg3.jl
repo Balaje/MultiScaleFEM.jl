@@ -18,7 +18,7 @@ node_coordinates = get_node_coordinates(get_triangulation(ms_space.Uh))
 
 coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
 
-l = 1; # Patch size parameter
+l = 2; # Patch size parameter
 
 patch_coarse_models = get_patch_triangulation(ms_space, l, num_coarse_cells)
 patch_fine_models = get_patch_triangulation(ms_space, l, num_coarse_cells, coarse_to_fine_elems)
