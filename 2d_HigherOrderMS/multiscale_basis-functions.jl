@@ -60,3 +60,24 @@ function get_patch_cell_coordinates(node_coordinates, patch_fine_node_ids)
   b = Broadcasting(Reindex(node_coordinates))
   lazy_map(Broadcasting(b), patch_fine_node_ids)
 end
+
+function get_patch_local_cell_ids(patch_fine_elems, σ)
+  patch_fine_node_ids = collect(lazy_map(Broadcasting(Reindex(σ)), patch_fine_elems))
+  R = sort(unique(mapreduce(permutedims, vcat, patch_fine_node_ids)))
+  for t = 1:lastindex(patch_find_node_ids)
+    for tt = 1:lastindex(R), ttt = 1:lastindex(patch_fine_node_ids[t])
+      if(patch_fine_node_ids[t][ttt] == R[tt])
+        patch_fine_node_ids[t][ttt] = tt  
+      end
+    end 
+  end
+  patch_fine_node_ids
+end
+
+function get_patch_node_coordinates(cell_coordinates)
+  unique(reduce(vcat, cell_coordinates))
+end
+
+function get_patch_cell_type(cell_types, patch_elem_indices)
+  lazy_map(Broadcasting(Reindex(cell_types)), patch_elem_indices)
+end
