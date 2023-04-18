@@ -16,12 +16,12 @@
       - [Wave Equation](#wave-equation)
         * [Constant wave speed](#constant-wave-speed)
         * [Smooth and varying wave speed](#smooth-and-varying-wave-speed)
-        * [Oscillatory wave-speed without well-prepared data](#oscillatory-wave-speed-with-not-well-prepared-data)
+        * [Oscillatory wave-speed without well-prepared data](#oscillatory-wave-speed-without-well-prepared-data)
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
-        * [Random oscillatory wave-speed](#random-oscillatory-wave-speed)
-        * [Random oscillatory wave-speed solved for large final time](#random-oscillatory-wave-speed-solved-for-large-final-time)
+        * [Random oscillatory wave-speed](#random-wave-speed)
+        * [Random oscillatory wave-speed solved for large final time](#random-wave-speed-solved-for-large-final-time)
 - [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
 - [Implementation of the Higher Order Multiscale Method in two dimensions](#implementation-of-the-higher-order-multiscale-method-in-two-dimensions)
   * [The Coarse-To-Fine map](#the-coarse-to-fine-map)
@@ -378,7 +378,7 @@ Optimal convergence for the highly oscillatory case is observed even when we sol
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
 
-###### Random oscillatory wave-speed
+###### Random wave-speed
 
 Next, I show the rate of convergence results for a random piecewise-constant in a on the scale $\epsilon = 2^{-12}$ with randomly chosen values in $[0.5,5]$. The choice of wave forcing and the initial conditions are the same as that of the well prepared case. I solve the problem till the final time reaches $T=1.5$ s. I generally observe optimal convergence in all the cases.
 
@@ -391,7 +391,7 @@ Next, I show the rate of convergence results for a random piecewise-constant in 
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_random_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing.png) |
 
 
-###### Random oscillatory wave-speed solved for large final time
+###### Random wave-speed solved for large final time
 
 Finally, I solve the problem with the random wave-speed till final time $T = 7.5$ s, and show the convergence rates for `p=1,3`. The rate of convergence seem optimal for `p=1`, but seems to slow down for the `p=3` case. The reference solution was obtained using the traditional finite element method on a very fine mesh $h=2^{-15}$ whereas the oscillations are on the scale $\epsilon = 2^{-12}$.
 
@@ -483,8 +483,12 @@ extracts this information from the fine-scale discretization and returns the fin
 ![](./2d_HigherOrderMS/Images/2d_patch_trian.png) |
 The visualization was done using Paraview. In the figure, you can see the coarse scale discrezation on the background along with the coarse scale patch, whose edges are highlighted in Red and Green. The background Blue coloured triangles denote the fine-scale discretization within the patch. |
 
-`l=2` patch of coarse-scale elements 10,400 | `l=3` patch of coarse-scale elements 10,400 
---- | --- |
-![](./2d_HigherOrderMS/Images/2d_patch_trian_l2.png) | ![](./2d_HigherOrderMS/Images/2d_patch_trian_l3.png) |
+`l=2` patch of coarse-scale elements 10,400 | 
+--- | 
+![](./2d_HigherOrderMS/Images/2d_patch_trian_l2.png) | 
+
+`l=3` patch of coarse-scale elements 10,400 |
+--- |
+![](./2d_HigherOrderMS/Images/2d_patch_trian_l3.png) |
 
 The next step is to solve the saddle point problems on the meshes and then obtain the multiscale bases! 
