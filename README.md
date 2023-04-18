@@ -423,7 +423,7 @@ I began working on the 2D implementation of the higher-order multiscale method. 
 
 Implementation in 2D involves a bit of geometrical pre-processing, which involves extracting the patch of all the elements in the coarse space along with the fine-scale elements present inside the patch. The central assumption in obtaining this information is that the fine-scale discretization is obtained from a uniform refinement of the coarse scale elements. 
 
-At this stage, the current implementation has only the patch computations coded up. That too just for triangles! The complication here is the map between the coarse scale and fine scale map. This is just the indices of fine-scale elements inside each coarse-scale elements. For simple meshes involving simplices and hexahedrons, this map can be computed by exploiting an underlying pattern. Ideally, we need the underlying refinement strategy to obtain this map. I hard coded this inside the function 
+At this stage, the current implementation has only the patch computations coded up. That too just for triangles! The complication here is the map between the coarse scale and fine scale map. For simple meshes involving simplices and hexahedrons, this map can be computed by exploiting an underlying pattern. Ideally, we need the underlying refinement strategy to obtain this map. I hard coded this inside the function 
 
 ```julia
 get_coarse_to_fine_map(num_coarse_cells::Int64, num_fine_cells::Int64)
@@ -433,7 +433,7 @@ which relies on two other function to obtain this map. This interface is subject
 
 ### Patch information
 
-Obtaining the patch on the coarse scale is relatively straightforward. We can define a metric that defines the "distance" between the elements do a `KDTree` search to obtain the indices of all the elements within the distance. The amazing `NearestNeighbors.jl` package contains the interface to implement `KDTree` searching. The definition of the metric is as follows
+Obtaining the patch on the coarse scale is relatively straightforward. We can define a metric that defines the "distance" between the elements and then search the `KDTree` built using the connectivity matrix of the fine scale mesh. The amazing `NearestNeighbors.jl` package contains the interface to implement `KDTree` searching. The definition of the metric is as follows
 
 ```julia
 struct ElemDist <: NearestNeighbors.Distances.Metric end
@@ -446,7 +446,7 @@ function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::A
 end
 ```
 
-The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter    $l$ in multiscale methods. We then search until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
+The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter $l$ in multiscale methods. We then search the KD-Tree until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
 
 ```julia
 function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
@@ -470,18 +470,18 @@ This gives the indices of the coarse-scale elements present in the patch. The fu
 function get_patch_triangulation(ms_spaces::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64)
 ```
 
-extracts the patch elements and then returns the element-patch wise discrete models. Then, the next step, which is the trickiest, is to obtain the fine scale discretization on the patch. A quick glance would just involve collecting the coarse scale elements and then applying the coarse-to-fine map. However, to construct the discrete models in Gridap, we need the local ordering along with the nodal coordinates. The function 
+extracts the patch elements and then returns the element-patch wise discrete models. Then, the next step, which is the trickiest, is to obtain the fine scale discretization on the patch. A quick glance would just tell us that collecting the coarse scale elements and then applying the coarse-to-fine map will do it. However, to construct the discrete models in Gridap, we need the local ordering along with the nodal coordinates, which we do not have directly. I wrote this function 
 
 ```julia
 function get_patch_triangulation(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elems)
 ```
 
-extracts this information from the fine-scale discretization and returns the fine-scale version of the element-patch wise discrete models. I show the results below:
+which extracts this information from the fine-scale discretization and returns the fine-scale version of the element-patch wise discrete models. I show the results below:
 
 `l=1` patch of coarse scale elements 1, 10, 400, 405 |
 --- |
 ![](./2d_HigherOrderMS/Images/2d_patch_trian.png) |
-The visualization was done using Paraview. In the figure, you can see the coarse scale discrezation on the background along with the coarse scale patch, whose edges are highlighted in Red and Green. The background Blue coloured triangles denote the fine-scale discretization within the patch. |
+The visualization was done using Paraview. In the figure, you can see the coarse scale discrezation in the background along with the coarse scale patch, whose edges are highlighted in Red and Green. The background Blue coloured triangles denote the fine-scale discretization within the patch. |
 
 `l=2` patch of coarse-scale elements 10,400 | 
 --- | 
