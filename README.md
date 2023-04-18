@@ -410,9 +410,75 @@ For more details on the method, refer to [Målqvist, A. et al](https://epubs.sia
 
 ## Implementation in 2D
 
+### The Coarse-To-Fine map
+
 Implementation in 2D involves a bit of geometrical pre-processing, which involves extracting the patch of all the elements in the coarse space along with the fine-scale elements present inside the patch. The central assumption in obtaining this information is that the fine-scale discretization is obtained from a uniform refinement of the coarse scale elements. 
 
 At this stage, the current implementation has only the patch computations coded up. That too just for triangles! The complication here is the map between the coarse scale and fine scale map. This is just the indices of fine-scale elements inside each coarse-scale elements. For simple meshes involving simplices and hexahedrons, this map can be computed by exploiting an underlying pattern. Ideally, we need the underlying refinement strategy to obtain this map. I hard coded this inside the function 
+
+```julia
+get_coarse_to_fine_map(num_coarse_cells::Int64, num_fine_cells::Int64)
+```
+
+which relies on two other function to obtain this map. This interface is subject to change in the future.
+
+### Patch information
+
+Obtaining the patch on the coarse scale is relatively straightforward. We can define a metric that defines the "distance" between the elements do a `KDTree` search to obtain the indices of all the elements within the distance. The amazing `NearestNeighbors.jl` package contains the interface to implement `KDTree` searching. The definition of the metric is as follows
+
+```julia
+struct ElemDist <: NearestNeighbors.Distances.Metric end
+function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::AbstractVector)
+  dist = abs(x[1] - y[1])
+  for i=1:lastindex(x), j=1:lastindex(y)
+    dist = min(dist, abs(x[i]-y[j]))
+  end
+  dist+1
+end
+```
+
+The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter    $l$ in multiscale methods. We then do a `KDTree` search until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
+
+```julia
+function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
+  U = ms_space.UH
+  tree = ms_space.elemTree
+  Ω = get_triangulation(U)
+  σ = get_cell_node_ids(Ω)
+  el_inds = inrange(tree, σ[el], 1) # Find patch of size 1
+  for _=2:l # Recursively do this for 2:l and collect the unique indices. 
+    X = [inrange(tree, i, 1) for i in σ[el_inds]]
+    el_inds = unique(vcat(X...))
+  end
+  sort(el_inds)
+  # There may be a better way to do this... Need to check.
+end
+```
+
+This gives the indices of the coarse-scale elements present in the patch. The function 
+
+```julia
+function get_patch_triangulation(ms_spaces::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64)
+```
+
+extracts the patch elements and then returns the element-patch wise discrete models. Then, the next step, which is the trickiest, is to obtain the fine scale discretization on the patch. A quick glance would just involve collecting the coarse scale elements and then applying the coarse-to-fine map. However, to construct the discrete models in Gridap, we need the local ordering along with the nodal coordinates. The function 
+
+```julia
+function get_patch_triangulation(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elems)
+```
+
+extracts this information from the fine-scale discretization and returns the fine-scale version of the element-patch wise discrete models. I show the results below:
+
+`l=1` patch of coarse scale elements 1, 10, 400, 405 |
+--- |
+![](./2d_HigherOrderMS/Images/2d_patch_trian.png) |
+The visualization was done using Paraview. In the figure, you can see the coarse scale discrezation on the background along with the coarse scale patch, whose edges are highlighted in Red and Green. The background Blue coloured triangles denote the fine-scale discretization within the patch. |
+
+`l=2` patch of coarse-scale elements 10,400 | `l=3` patch of coarse-scale elements 10,400 
+--- | --- |
+![](./2d_HigherOrderMS/Images/2d_patch_trian_l2.png) | ![](./2d_HigherOrderMS/Images/2d_patch_trian_l3.png) |
+
+The next step is to solve the saddle point problems on the meshes and then obtain the multiscale bases! 
 
 ## References
 
