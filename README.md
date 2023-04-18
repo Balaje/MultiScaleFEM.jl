@@ -16,14 +16,19 @@
       - [Wave Equation](#wave-equation)
         * [Constant wave speed](#constant-wave-speed)
         * [Smooth and varying wave speed](#smooth-and-varying-wave-speed)
-        * [Oscillatory wave-speed with not well-prepared data](#oscillatory-wave-speed-with-not-well-prepared-data)
+        * [Oscillatory wave-speed without well-prepared data](#oscillatory-wave-speed-with-not-well-prepared-data)
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
         * [Random oscillatory wave-speed](#random-oscillatory-wave-speed)
         * [Random oscillatory wave-speed solved for large final time](#random-oscillatory-wave-speed-solved-for-large-final-time)
 - [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
+- [Implementation of the Higher Order Multiscale Method in two dimensions](#implementation-of-the-higher-order-multiscale-method-in-two-dimensions)
+  * [The Coarse-To-Fine map](#the-coarse-to-fine-map)
+  * [Patch information](#patch-information)
 - [References](#references)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 ## Introduction
 
@@ -304,7 +309,7 @@ with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left
 --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
 
-###### Oscillatory wave-speed with not well-prepared data
+###### Oscillatory wave-speed without well-prepared data
 
 Now I solve the same problem keeping the initial and boundary data same as Example 2, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
 
@@ -408,7 +413,9 @@ The localized orthogonal decomposition method implementation can be found inside
 
 For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
 
-## Implementation in 2D
+## Implementation of the Higher Order Multiscale Method in two dimensions
+
+I began working on the 2D implementation of the higher-order multiscale method. The code is found in `2d_HigherOrderMS/` within the repository.
 
 ### The Coarse-To-Fine map
 
@@ -437,7 +444,7 @@ function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::A
 end
 ```
 
-The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter    $l$ in multiscale methods. We then do a `KDTree` search until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
+The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter    $l$ in multiscale methods. We then search until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
 
 ```julia
 function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
