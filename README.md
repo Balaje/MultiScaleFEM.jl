@@ -492,3 +492,9 @@ The visualization was done using Paraview. In the figure, you can see the coarse
 ![](./2d_HigherOrderMS/Images/2d_patch_trian_l3.png) |
 
 The next step is to solve the saddle point problems on the meshes and then obtain the multiscale bases! 
+
+## References
+
+- Målqvist, A. and Peterseim, D., 2020. Numerical homogenization by localized orthogonal decomposition. Society for Industrial and Applied Mathematics.
+- Maier, R., 2021. A high-order approach to elliptic multiscale problems with general unstructured coefficients. SIAM Journal on Numerical Analysis, 59(2), pp.1067-1089.
+- Abdulle, A. and Henning, P., 2017. Localized orthogonal decomposition method for the wave equation with a continuum of scales. Mathematics of Computation, 86(304), pp.549-587.
