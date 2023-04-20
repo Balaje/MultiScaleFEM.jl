@@ -99,11 +99,3 @@ function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{F
   Lₘₛ = basis_vec_ms'*loadvec
   Mₘₛ\Lₘₛ
 end 
-
-# Test out this one also - Will be removed later
-function setup_initial_condition(u₀::Vector{Float64}, basis_vec_ms::SparseMatrixCSC{Float64,Int64}, fspace::FineScaleSpace)
-  massma = assemble_mass_matrix(fspace, x->1.0)
-  Mₘₛ = basis_vec_ms'*massma*basis_vec_ms  
-  Lₘₛ = basis_vec_ms'*massma*u₀
-  Mₘₛ\Lₘₛ
-end 

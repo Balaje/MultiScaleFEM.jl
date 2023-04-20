@@ -4,8 +4,6 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-# A(x) = (1.0 + 0.5*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
-# A(x) = 1.0 # Constant diffusion coefficient
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
@@ -20,11 +18,13 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-#f(x,t) = 0.0
-#u₀(x) = sin(π*x[1])
-f(x,t) = sin(π*x[1])
-u₀(x) = 0.0
+# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x) = (0.5 + 0.25*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
+A(x) = 1.0 # Constant diffusion coefficient
+f(x,t) = 0.0
+u₀(x) = sin(π*x[1])
+# f(x,t) = sin(π*x[1])
+# u₀(x) = 0.0
 
 # Problem parameters
 nf = 2^16
@@ -32,7 +32,7 @@ q = 1
 qorder = 4
 # Temporal parameters
 Δt = 10^-3
-tf = 1.0
+tf = 0.5
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -52,7 +52,7 @@ end
 # Time marching
 let 
   U₀ = u₀.(nds_fine[freenodes])
-  global U = zero(U₀)  
+  global Uex = zero(U₀)  
   t = 0.0
   # Starting BDF steps (1...k-1) 
   fcache = fine_scale_space, freenodes
@@ -72,10 +72,10 @@ let
     U₀[:,1] = U₁
     t += Δt
   end
-  U = U₀[:,1] # Final time solution
+  Uex = U₀[:,1] # Final time solution
 end
 Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
-uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
+uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32,64]
@@ -100,7 +100,7 @@ for l=[7,8]
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute the multiscale basis
-      basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      global basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
@@ -151,3 +151,14 @@ end
 
 plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
 plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+
+# Plot the rates along with the diffusion coefficient
+plt2 = plot(plt, plt1, layout=(1,2))
+plt3 = plot(nds_fine, A.(nds_fine), lw=2, label="A(x)")
+plt5 = plot(plt3, plt2, layout=(2,1))
+
+# Switch variables to global and plot
+plt4 = plot(nds_fine, basis_vec_ms*U, label="Multiscale solution", lw=2)
+plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
+
+plt6 = plot(plt, plt1, plt3, plt4, layout=(2,2))
