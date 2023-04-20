@@ -9,7 +9,7 @@ domain = (0.0,1.0)
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
+diffusion_micro = 0.5 .+ 4.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -20,11 +20,11 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-function A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro)
-  _D(x[1], nds_micro, diffusion_micro)
-end
-f(x,t) = 0.0
-u₀(x) = sin(π*x[1])
+A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+#f(x,t) = 0.0
+#u₀(x) = sin(π*x[1])
+f(x,t) = sin(π*x[1])
+u₀(x) = 0.0
 
 # Problem parameters
 nf = 2^16
@@ -92,7 +92,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[5,6,7,8]
+for l=[7,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
