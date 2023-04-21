@@ -22,13 +22,13 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 # A(x) = (0.5 + 0.25*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
-# A(x) = 1.0 # Constant diffusion coefficient
-# f(x,t) = 0.0
-# u₀(x) = sin(π*x[1])
-f(x,t) = sin(π*x[1])
-u₀(x) = 0.0
+A(x) = 1.0 # Constant diffusion coefficient
+f(x,t) = 0.0
+u₀(x) = sin(π*x[1])
+# f(x,t) = sin(π*x[1])
+# u₀(x) = 0.0
 
 # Problem parameters
 nf = 2^15
@@ -40,7 +40,7 @@ tf = 0.5
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
-# Solve the fine scale problem once for exact solution
+# Solve the fine scale problem onfce for exact solution
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 stima = assemble_stiffness_matrix(fine_scale_space, A)
@@ -96,7 +96,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[7,8,9]
+for l=[9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -112,6 +112,7 @@ for l=[7,8,9]
       let 
         # Project initial condition onto the multiscale space
         U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)  
+        # U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space, A)
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 

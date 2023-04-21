@@ -99,3 +99,15 @@ function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{F
   Lₘₛ = basis_vec_ms'*loadvec
   Mₘₛ\Lₘₛ
 end 
+
+function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{Float64,Int64}, fspace::FineScaleSpace, A::Function)
+  stima = assemble_stiffness_matrix(fspace, A)
+  # loadvec = assemble_load_vector(fspace, u₀)
+  Ω = get_triangulation(fspace.U)
+  dΩ = Measure(Ω, 6)
+  U0(v) = ∫((∇(u₀))⊙(∇(v))*A)dΩ
+  loadvec = assemble_vector(U0, fspace.assem, fspace.U)
+  Mₘₛ = basis_vec_ms'*stima*basis_vec_ms  
+  Lₘₛ = basis_vec_ms'*loadvec
+  Mₘₛ\Lₘₛ
+end 
