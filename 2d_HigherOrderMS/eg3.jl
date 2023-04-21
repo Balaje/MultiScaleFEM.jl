@@ -18,13 +18,14 @@ node_coordinates = get_node_coordinates(get_triangulation(ms_space.Uh))
 
 coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
 
-l = 2; # Patch size parameter
+l = 1; # Patch size parameter
 
 patch_coarse_models = get_patch_triangulation(ms_space, l, num_coarse_cells)
 patch_fine_models = get_patch_triangulation(ms_space, l, num_coarse_cells, coarse_to_fine_elems)
 
+p = 3; q = 1;
+patch_coarse_spaces = lazy_map(build_patch_coarse_spaces, patch_coarse_models, Gridap.Arrays.Fill(p, num_coarse_cells));
+patch_fine_spaces = lazy_map(build_patch_fine_spaces, patch_fine_models, Gridap.Arrays.Fill(q, num_fine_cells));
 
-function save_models(patch_coarse_models, patch_fine_models, i)
-  writevtk(patch_coarse_models[i], "2d_HigherOrderMS\\"*string(i)*"-th_coarse_model")
-  writevtk(patch_fine_models[i], "2d_HigherOrderMS\\"*string(i)*"-th_fine_model")
-end
+A(x) = 1.0
+patch_stima = lazy_map(assemble_stima, patch_fine_spaces, Gridap.Arrays.Fill(A, num_coarse_cells), Gridap.Arrays.Fill(4, num_coarse_cells));
