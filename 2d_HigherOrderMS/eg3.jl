@@ -21,10 +21,13 @@ coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
 
 patch_coarse_models = get_patch_triangulation(ms_space, num_coarse_cells, CoarseScale())
 patch_fine_models = get_patch_triangulation(ms_space, num_coarse_cells, FineScale())
+elem_wise_models = get_patch_triangulation(ms_space, num_coarse_cells, FineScaleElemWise())
 
-p = 3; q = 1;
-patch_coarse_spaces = lazy_map(build_patch_coarse_spaces, patch_coarse_models, Gridap.Arrays.Fill(p, num_coarse_cells));
 patch_fine_spaces = lazy_map(build_patch_fine_spaces, patch_fine_models, Gridap.Arrays.Fill(q, num_fine_cells));
+patch_coarse_trian = lazy_map(Triangulation, patch_coarse_models)
 
 A(x) = 1.0
 patch_stima = lazy_map(assemble_stima, patch_fine_spaces, Gridap.Arrays.Fill(A, num_coarse_cells), Gridap.Arrays.Fill(4, num_coarse_cells));
+
+patch_local_node_ids = get_elem_data(ms_space)[3]
+# patch_lmat = lazy_map(assemble_rect_matrix, patch_coarse_trian, patch_fine_spaces, Gridap.Arrays.Fill(p,num_coarse_cells), patch_local_node_ids)
