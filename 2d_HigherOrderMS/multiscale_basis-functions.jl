@@ -6,8 +6,12 @@ struct MultiScaleFESpace <: FESpace
   UH::FESpace
   Uh::FESpace
   elemTree::BruteTree
+  patch_coords::Tuple{Any,Any}
+  patch_global_ids::Tuple{Any,Any}
+  patch_local_ids::Tuple{Any,Any}
+  patch_cell_types::Tuple{Any,Any}
 end
-function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::Int64, p::Int64, nf::Int64, nc::Int64)
+function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::Int64, p::Int64, nf::Int64, nc::Int64, l::Int64)
   # Fine Scale Space
   model_h = simplexify(CartesianDiscreteModel(domain, (nf,nf)))
   reffe_h = ReferenceFE(lagrangian, Float64, q)
@@ -21,9 +25,41 @@ function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::In
   σ = get_cell_node_ids(Ω)
   R = vec(map(x->SVector(Tuple(x)), σ))
   tree = BruteTree(R, ElemDist())
+  
+  ####
+  # Get the data structures required to build the discrete DiscreteModels
+  ####
+  num_coarse_cells = num_cells(get_triangulation(UH))
+  num_fine_cells = num_cells(get_triangulation(Uh))
+
+  # 1) Get the element indices inside the patch on the coarse and fine scales
+  coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
+  patch_coarse_elems = lazy_map(get_patch_coarse_elem, Gridap.Arrays.Fill(UH, num_coarse_cells),
+      Gridap.Arrays.Fill(tree, num_coarse_cells), Gridap.Arrays.Fill(l, num_coarse_cells), 1:num_coarse_cells)
+  patch_fine_elems = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
+
+  # 2) Get the maps required to build the discrete models
+  σ_coarse = get_cell_node_ids(get_triangulation(UH))
+  node_coordinates_coarse = get_node_coordinates(get_triangulation(UH))
+  cell_types_coarse = get_cell_type(get_triangulation(UH))
+  σ_fine = get_cell_node_ids(get_triangulation(Uh))
+  node_coordinates_fine = get_node_coordinates(get_triangulation(Uh))
+  cell_types_fine = get_cell_type(get_triangulation(Uh))
+
+  patch_coarse_coords, patch_coarse_global_ids, patch_coarse_local_ids, patch_coarse_cell_types = _patch_model_data(σ_coarse, node_coordinates_coarse, cell_types_coarse, patch_coarse_elems, num_coarse_cells)
+  patch_fine_coords, patch_fine_global_ids, patch_fine_local_ids, patch_fine_cell_types = _patch_model_data(σ_fine, node_coordinates_fine, cell_types_fine, patch_fine_elems, num_coarse_cells)
+
+  patch_coords = (patch_coarse_coords, patch_fine_coords)
+  patch_global_ids = (patch_coarse_global_ids, patch_fine_global_ids)
+  patch_local_ids = (patch_coarse_local_ids, patch_fine_local_ids)
+  patch_cell_types = (patch_coarse_cell_types, patch_fine_cell_types)
+
   # Return the Object
-  MultiScaleFESpace(UH, Uh, tree)
+  MultiScaleFESpace(UH, Uh, tree, patch_coords, patch_global_ids, patch_local_ids, patch_cell_types)
 end
+
+get_coarse_data(ms_space::MultiScaleFESpace) = (ms_space.patch_coords[1], ms_space.patch_global_ids[1], ms_space.patch_local_ids[1], ms_space.patch_cell_types[1])
+get_fine_data(ms_space::MultiScaleFESpace) = (ms_space.patch_coords[2], ms_space.patch_global_ids[2], ms_space.patch_local_ids[2], ms_space.patch_cell_types[2])
 
 struct ElemDist <: NearestNeighbors.Distances.Metric end
 function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::AbstractVector)
@@ -34,10 +70,9 @@ function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::A
   dist+1
 end
 
-function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  U = ms_space.UH
-  tree = ms_space.elemTree
-  Ω = get_triangulation(U)
+# function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
+function get_patch_coarse_elem(coarse_space::FESpace, tree::BruteTree, l::Int64, el::Int64)  
+  Ω = get_triangulation(coarse_space)
   σ = get_cell_node_ids(Ω)
   el_inds = inrange(tree, σ[el], 1) # Find patch of size 1
   for _=2:l # Recursively do this for 2:l and collect the unique indices. 
@@ -48,11 +83,8 @@ function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
   # There may be a better way to do this... Need to check.
 end
 
-function get_patch_fine_elems(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elem)
-  ms_spaces = Gridap.Arrays.Fill(ms_space, num_coarse_cells)
-  ls = Gridap.Arrays.Fill(l, num_coarse_cells)
-  X = lazy_map(get_patch_coarse_elem, ms_spaces, ls, 1:num_coarse_cells)
-  Y = reduce.(vcat, lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), X))
+function get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elem)
+  Y = reduce.(vcat, lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), patch_coarse_elems))
   sort.(Y)
 end
 
@@ -60,7 +92,7 @@ function get_patch_global_node_ids(patch_fine_elems, σ)
   collect(lazy_map(Broadcasting(Reindex(σ)), patch_fine_elems))
 end
 
-function get_patch_local_cell_ids(patch_fine_elems, σ)
+function get_patch_local_node_ids(patch_fine_elems, σ)
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
   R = sort(unique(mapreduce(permutedims, vcat, patch_fine_node_ids)))
   for t = 1:lastindex(patch_fine_node_ids)
@@ -82,16 +114,10 @@ function get_patch_cell_type(cell_types, patch_elem_indices)
   lazy_map(Broadcasting(Reindex(cell_types)), patch_elem_indices)
 end
 
-function get_patch_triangulation(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elems)
-  node_coordinates = get_node_coordinates(get_triangulation(ms_space.Uh))
-  σ = get_cell_node_ids(get_triangulation(ms_space.Uh))
-  cell_types = get_cell_type(get_triangulation(ms_space.Uh))
-
-  patch_fine_elems = get_patch_fine_elems(ms_space, l, num_coarse_cells, coarse_to_fine_elems) # Get the indices of the fine-scale elements inside the patch
-  patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ) # Get the global numbering of the nodes inside the patch to get the coordinates
-  patch_fine_local_node_ids = Table.(lazy_map(get_patch_local_cell_ids, patch_fine_elems, Gridap.Arrays.Fill(σ,num_coarse_cells))) # Get the local numbering of the nodes inside the patch to build the triangulation
-  patch_node_coordinates = lazy_map(get_patch_node_coordinates, Gridap.Arrays.Fill(node_coordinates, num_coarse_cells), patch_fine_node_ids) # Get the node coordinates in the patch
-  patch_cell_types = get_patch_cell_type(cell_types, patch_fine_elems) # Get the cell types in the patch
+struct FineScale end
+function get_patch_triangulation(ms_space::MultiScaleFESpace, num_coarse_cells::Int64, ::FineScale)
+  # Get the fine-scale (patch-local) coordinates, (patch-local) cell-ids and (patch-local) cell_types
+  patch_node_coordinates, _, patch_fine_local_node_ids, patch_cell_types = get_fine_data(ms_space)
   
   # Construct the grids from the node coordinates and the connectivity
   patch_grids = lazy_map(UnstructuredGrid, patch_node_coordinates, patch_fine_local_node_ids, Gridap.Arrays.Fill(get_reffes(get_triangulation(ms_space.Uh)), num_coarse_cells), patch_cell_types)
@@ -101,20 +127,22 @@ function get_patch_triangulation(ms_space::MultiScaleFESpace, l::Int64, num_coar
   lazy_map(DiscreteModel, patch_grids, patch_grids_topology, patch_face_labelling)
 end
 
-function get_patch_triangulation(ms_spaces::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64)
-  node_coordinates = get_node_coordinates(get_triangulation(ms_space.UH))
-  σ = get_cell_node_ids(get_triangulation(ms_space.UH))
-  cell_types = get_cell_type(get_triangulation(ms_space.UH))
-
-  patch_coarse_elems = lazy_map(get_patch_coarse_elem, Gridap.Arrays.Fill(ms_spaces, num_coarse_cells), Gridap.Arrays.Fill(l, num_coarse_cells), 1:num_coarse_cells)
-  patch_coarse_node_ids = collect(lazy_map(Broadcasting(Reindex(σ)), patch_coarse_elems))
-  patch_coarse_local_ids = Table.(lazy_map(get_patch_local_cell_ids, patch_coarse_elems, Gridap.Arrays.Fill(σ,num_coarse_cells)))
-  patch_node_coordinates = lazy_map(get_patch_node_coordinates, Gridap.Arrays.Fill(node_coordinates, num_coarse_cells), patch_coarse_node_ids)
-  patch_cell_types = get_patch_cell_type(cell_types, patch_coarse_elems)
-
-  patch_grids = lazy_map(UnstructuredGrid, patch_node_coordinates, patch_coarse_local_ids, Gridap.Arrays.Fill(get_reffes(get_triangulation(ms_space.Uh)), num_coarse_cells), patch_cell_types)
+struct CoarseScale end
+function get_patch_triangulation(ms_space::MultiScaleFESpace, num_coarse_cells::Int64, ::CoarseScale)
+  # Get the coarse-scale (patch-local) coordinates, (patch-local) cell-ids and (patch-local) cell_types
+  patch_node_coordinates, _, patch_coarse_local_node_ids, patch_cell_types = get_coarse_data(ms_space)
+  
+  patch_grids = lazy_map(UnstructuredGrid, patch_node_coordinates, patch_coarse_local_node_ids, Gridap.Arrays.Fill(get_reffes(get_triangulation(ms_space.UH)), num_coarse_cells), patch_cell_types)
   patch_grids_topology = lazy_map(GridTopology, patch_grids)
   patch_face_labelling = lazy_map(FaceLabeling, patch_grids_topology)
   # Construct the DiscreteModels for the Triangulation
   lazy_map(DiscreteModel, patch_grids, patch_grids_topology, patch_face_labelling)
+end
+
+function _patch_model_data(σ, nodes, cell_types, elems, num_coarse_cells)
+  ids = collect(lazy_map(Broadcasting(Reindex(σ)), elems))
+  local_ids = Table.(lazy_map(get_patch_local_node_ids, elems, Gridap.Arrays.Fill(σ,num_coarse_cells)))
+  node_coords = lazy_map(get_patch_node_coordinates, Gridap.Arrays.Fill(nodes, num_coarse_cells), ids)
+  cell_types = get_patch_cell_type(cell_types, elems)
+  node_coords, ids, local_ids, cell_types
 end

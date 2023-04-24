@@ -10,7 +10,8 @@ nf = 2^7
 q = 1
 nc = 2^4
 p = 1
-ms_space = MultiScaleFESpace(domain, q, p, nf, nc)
+l = 1; # Patch size parameter
+ms_space = MultiScaleFESpace(domain, q, p, nf, nc, l)
 
 num_coarse_cells = num_cells(get_triangulation(ms_space.UH))
 num_fine_cells = num_cells(get_triangulation(ms_space.Uh))
@@ -18,10 +19,8 @@ node_coordinates = get_node_coordinates(get_triangulation(ms_space.Uh))
 
 coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
 
-l = 1; # Patch size parameter
-
-patch_coarse_models = get_patch_triangulation(ms_space, l, num_coarse_cells)
-patch_fine_models = get_patch_triangulation(ms_space, l, num_coarse_cells, coarse_to_fine_elems)
+patch_coarse_models = get_patch_triangulation(ms_space, num_coarse_cells, CoarseScale())
+patch_fine_models = get_patch_triangulation(ms_space, num_coarse_cells, FineScale())
 
 p = 3; q = 1;
 patch_coarse_spaces = lazy_map(build_patch_coarse_spaces, patch_coarse_models, Gridap.Arrays.Fill(p, num_coarse_cells));
