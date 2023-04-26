@@ -100,16 +100,16 @@ end
 
 function get_patch_local_node_ids(patch_fine_elems, σ)
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
-  R = sort(unique(mapreduce(permutedims, vcat, patch_fine_node_ids)))
-  for t = 1:lastindex(patch_fine_node_ids)
-    for tt = 1:lastindex(R), ttt = 1:lastindex(patch_fine_node_ids[t])
-      if(patch_fine_node_ids[t][ttt] == R[tt])
-        patch_fine_node_ids[t][ttt] = tt  
-      end
-    end 
-  end
-  patch_fine_node_ids
+  unique_patch_fine_node_ids = lazy_map(get_unique_node_ids, patch_fine_node_ids)
+  global_to_local = lazy_map(get_local_node_ids, unique_patch_fine_node_ids)
+  lazy_map(convert_global_to_local_node_ids, global_to_local, patch_fine_node_ids)
 end
+
+# Function to obtain the unique node ids
+get_unique_node_ids(X) = sort(unique(mapreduce(permutedims, vcat, X)))
+# Build the dictionary that maps the global node indices to local
+get_local_node_ids(X) = Dict(X[i] => i for i in 1:length(X))
+convert_global_to_local_node_ids(d, global_node_ids) = lazy_map(Broadcasting(global_node_ids), d)
 
 function get_patch_node_coordinates(node_coordinates, patch_fine_node_ids)
   R = sort(unique(mapreduce(permutedims, vcat, patch_fine_node_ids)))
