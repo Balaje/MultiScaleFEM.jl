@@ -16,16 +16,16 @@ function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::In
   # Fine Scale Space
   model_h = simplexify(CartesianDiscreteModel(domain, (nf,nf)))
   reffe_h = ReferenceFE(lagrangian, Float64, q)
-  Uh = TestFESpace(model_h, reffe_h, conformity=:H1)
+  global Uh = TestFESpace(model_h, reffe_h, conformity=:H1)
   # Coarse Scale Space
   model_H = simplexify(CartesianDiscreteModel(domain, (nc,nc)))
   reffe_H = ReferenceFE(lagrangian, Float64, p)
-  UH = TestFESpace(model_H, reffe_H, conformity=:L2)
+  global UH = TestFESpace(model_H, reffe_H, conformity=:L2)
   # Store the tree of the coarse mesh for obtaining the patch
   Ω = get_triangulation(UH)
   σ = get_cell_node_ids(Ω)
   R = vec(map(x->SVector(Tuple(x)), σ))
-  tree = BruteTree(R, ElemDist())
+  global tree = BruteTree(R, ElemDist())
   
   ####
   # Get the data structures required to build the discrete DiscreteModels
@@ -89,27 +89,21 @@ function get_patch_coarse_elem(coarse_space::FESpace, tree::BruteTree, l::Int64,
   # There may be a better way to do this... Need to check.
 end
 
-function get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elem)
-  Y = reduce.(vcat, lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), patch_coarse_elems))
-  sort.(Y)
-end
+get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elem) = reduce.(vcat, lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), patch_coarse_elems))
 
-function get_patch_global_node_ids(patch_fine_elems, σ)
-  collect(lazy_map(Broadcasting(Reindex(σ)), patch_fine_elems))
-end
+get_patch_global_node_ids(patch_fine_elems, σ) = lazy_map(Broadcasting(Reindex(σ)), patch_fine_elems)
 
 function get_patch_local_node_ids(patch_fine_elems, σ)
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
   unique_patch_fine_node_ids = lazy_map(get_unique_node_ids, patch_fine_node_ids)
   global_to_local = lazy_map(get_local_node_ids, unique_patch_fine_node_ids)
-  lazy_map(convert_global_to_local_node_ids, global_to_local, patch_fine_node_ids)
+  X = lazy_map(convert_global_to_local_node_ids, patch_fine_node_ids, global_to_local)
+  lazy_map(Table, X)
 end
 
-# Function to obtain the unique node ids
-get_unique_node_ids(X) = sort(unique(mapreduce(permutedims, vcat, X)))
-# Build the dictionary that maps the global node indices to local
-get_local_node_ids(X) = Dict(X[i] => i for i in 1:length(X))
-convert_global_to_local_node_ids(d, global_node_ids) = lazy_map(Broadcasting(global_node_ids), d)
+get_unique_node_ids(X) = sort(unique(mapreduce(permutedims, vcat, X))); # Function to obtain the unique node ids
+get_local_node_ids(X) = Pair.(X, Int32(1):Int32(length(X))); # Function to obtain the pair describing the global-local ids
+convert_global_to_local_node_ids(v, d) = replace.(v, d...); # Function to replace the global with the local values
 
 function get_patch_node_coordinates(node_coordinates, patch_fine_node_ids)
   R = sort(unique(mapreduce(permutedims, vcat, patch_fine_node_ids)))
@@ -159,7 +153,8 @@ end
 
 function _patch_model_data(σ, nodes, cell_types, elems, num_coarse_cells)
   ids = collect(lazy_map(Broadcasting(Reindex(σ)), elems))
-  local_ids = Table.(lazy_map(get_patch_local_node_ids, elems, Gridap.Arrays.Fill(σ,num_coarse_cells)))
+  # local_ids = Table.(lazy_map(get_patch_local_node_ids, elems, Gridap.Arrays.Fill(σ,num_coarse_cells)))
+  local_ids = get_patch_local_node_ids(elems, σ)
   node_coords = lazy_map(get_patch_node_coordinates, Gridap.Arrays.Fill(nodes, num_coarse_cells), ids)
   cell_types = get_patch_cell_type(cell_types, elems)
   node_coords, ids, local_ids, cell_types
