@@ -9,6 +9,7 @@ using Gridap.CellData
 
 using StaticArrays
 using NearestNeighbors
+using SparseArrays
 
 include("multiscale_basis-functions.jl")
 include("coarse_to_fine_map.jl")

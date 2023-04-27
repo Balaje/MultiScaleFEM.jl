@@ -4,7 +4,7 @@
 
 function build_patch_fine_spaces(model::DiscreteModel, q::Int64)
   ref_space = ReferenceFE(lagrangian, Float64, q)
-  FESpace(model, ref_space, conformity=:H1, dirichlet_tags="boundary")
+  FESpace(model, ref_space, conformity=:H1)
 end
 
 function assemble_stima(fine_space::FESpace, A::Function, qorder::Int64)
@@ -15,11 +15,11 @@ function assemble_stima(fine_space::FESpace, A::Function, qorder::Int64)
 end
 
 function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64, patch_local_cell_ids)
-  patch_local_node_ids = unique(mapreduce(permutedims, vcat, patch_local_cell_ids))
+  patch_local_node_ids = get_unique_node_ids(patch_local_cell_ids)
   num_patch_coarse_cells = num_cells(coarse_trian)
   Ω = get_triangulation(fine_space)
   dΩ = Measure(Ω, 4)
-  L = spzeros(Float64, num_free_dofs(fine_space), num_patch_coarse_cells*3*p)  
+  L = spzeros(Float64, num_nodes(Ω), num_patch_coarse_cells*3*p)  
   n_monomials = Int64((p+1)*(p+2)*0.5)
   index = 1
   coarse_cell_coords = get_cell_coordinates(coarse_trian)
@@ -58,3 +58,5 @@ function poly_exps(p::Int64)
   end
   reduce(vcat, exps)
 end
+
+saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
