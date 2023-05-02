@@ -7,18 +7,28 @@ function build_patch_fine_spaces(model::DiscreteModel, q::Int64)
   FESpace(model, ref_space, conformity=:H1)
 end
 
-function assemble_stima(fine_space::FESpace, A::Function, qorder::Int64)
+function get_boundary_indices(model::DiscreteModel)
+  fl = get_face_labeling(model)
+  findnz(sparse(get_face_tag(fl, "boundary", 0)))[1]
+end
+
+function get_interior_indices(model::DiscreteModel)
+  fl = get_face_labeling(model)
+  findnz(sparse(get_face_tag(fl, "interior", 0)))[1]
+end
+
+function assemble_stima(fine_space::FESpace, A::Function, qorder::Int64, interior_dofs)
   Ω = get_triangulation(fine_space)
   dΩ = Measure(Ω, qorder)
   a(u,v) = ∫( A*∇(u) ⊙ ∇(v) )dΩ
-  assemble_matrix(a, fine_space, fine_space)
+  stima = assemble_matrix(a, fine_space, fine_space)  
+  stima[interior_dofs, interior_dofs]
 end
 
-function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64, patch_local_cell_ids)
-  patch_local_node_ids = get_unique_node_ids(patch_local_cell_ids)
+function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64, interior_dofs, patch_local_node_ids)
   num_patch_coarse_cells = num_cells(coarse_trian)
   Ω = get_triangulation(fine_space)
-  dΩ = Measure(Ω, 4)
+  dΩ = Measure(Ω, p+1)
   L = spzeros(Float64, num_nodes(Ω), num_patch_coarse_cells*3*p)  
   n_monomials = Int64((p+1)*(p+2)*0.5)
   index = 1
@@ -26,17 +36,17 @@ function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, 
   centroids = lazy_map(x->sum(x)/3, coarse_cell_coords)
   diameters = lazy_map(x->max(norm(x[1]-x[2]), norm(x[2]-x[3]), norm(x[3]-x[1])), coarse_cell_coords)
   αβ = poly_exps(p)
-  for i=1:num_patch_coarse_cells 
+  for i=1:num_patch_coarse_cells
     centroid = centroids[i]   
     diameter = diameters[i]    
     for j=1:n_monomials
       b = x->coarse_scale_bases(x, centroid, diameter, αβ[j])    
       lh(v) = ∫(b*v)dΩ
-      L[patch_local_node_ids,index] += assemble_vector(lh, fine_space)[patch_local_node_ids]
+      L[patch_local_node_ids[i],index] += assemble_vector(lh, fine_space)[patch_local_node_ids[i]]
       index = index+1
     end
   end
-  L
+  L[interior_dofs, :]
 end
 
 ### Scaled monomial bases at each coarse triangles

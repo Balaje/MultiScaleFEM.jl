@@ -51,9 +51,11 @@ function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::In
   patch_fine_coords, patch_fine_global_ids, patch_fine_local_ids, patch_fine_cell_types = _patch_model_data(σ_fine, node_coordinates_fine, cell_types_fine, patch_fine_elems, num_coarse_cells)
 
   # Las
-  elem_fine = get_patch_fine_elems([i for i in 1:num_coarse_cells], coarse_to_fine_elems)
-  elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
-  elem_local_node_ids = get_patch_local_to_global_map(patch_fine_elems, σ_fine, elem_fine)
+  #elem_fine = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
+  elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), patch_coarse_elems)  
+  elem_global_node_ids = [lazy_map(Broadcasting(Reindex(σ_fine)), ef) for ef in elem_fine]
+  #display(elem_global_node_ids[1])
+  elem_local_node_ids = get_local_to_global_map(patch_fine_global_ids, elem_global_node_ids)
   elem_coarse_to_fine = (elem_global_node_ids, elem_local_node_ids)
 
   patch_coords = (patch_coarse_coords, patch_fine_coords)
@@ -107,17 +109,32 @@ function get_patch_local_node_ids(patch_fine_elems, σ)
   lazy_map(Table, X)
 end
 
-function get_patch_local_to_global_map(patch_fine_elems, σ, coarse_elems)
-  patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
-  unique_patch_fine_node_ids = lazy_map(get_unique_node_ids, patch_fine_node_ids)
-  global_to_local = lazy_map(get_local_node_ids, unique_patch_fine_node_ids)
-  coarse_elems_node_ids = lazy_map(Broadcasting(Reindex(σ)), coarse_elems)
-  lazy_map(convert_global_to_local_node_ids, coarse_elems_node_ids, global_to_local)
+function get_local_to_global_map(patch_global_node_ids, elem_global_node_ids)
+  unique_patch_global_node_ids = lazy_map(get_unique_node_ids, patch_global_node_ids)
+  global_to_local = lazy_map(get_local_node_ids, unique_patch_global_node_ids)
+  #convert_global_to_local_node_ids(elem_global_node_ids[1][2], global_to_local[1])
+  lazy_map(convert_patch_global_to_local, elem_global_node_ids, global_to_local)
+  #[lazy_map(convert_global_to_local_node_ids, el, global_to_local) for el_i=el, el=elem_global_node_ids]
 end
 
 get_unique_node_ids(X) = sort(unique(mapreduce(permutedims, vcat, X))); # Function to obtain the unique node ids
-get_local_node_ids(X) = Pair.(X, Int32(1):Int32(length(X))); # Function to obtain the pair describing the global-local ids
-convert_global_to_local_node_ids(v, d) = replace.(v, d...); # Function to replace the global with the local values
+get_local_node_ids(X) = Dict(zip(X, Int32(1):Int32(length(X)))); # Function to obtain the pair describing the global-local ids
+function convert_global_to_local_node_ids(v, d)   
+  w = zero.(v)
+  for i in 1:lastindex(v)
+    for j in 1:lastindex(v[i])
+      w[i][j] = get(d, v[i][j], v[i][j])
+    end
+  end
+  w
+end
+function convert_patch_global_to_local(v, d)
+  w = [zero.(vi) for vi in v]
+  for i in 1:lastindex(w)
+    w[i] = convert_global_to_local_node_ids(v[i], d)
+  end
+  w
+end
 
 function get_patch_node_coordinates(node_coordinates, patch_fine_node_ids)
   R = get_unique_node_ids(patch_fine_node_ids)
