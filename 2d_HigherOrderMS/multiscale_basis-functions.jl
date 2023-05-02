@@ -11,6 +11,7 @@ struct MultiScaleFESpace <: FESpace
   patch_local_ids::Tuple{Any,Any}
   patch_cell_types::Tuple{Any,Any}
   coarse_to_fine::Tuple{Any,Any}
+  patch_global_local_map
 end
 function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::Int64, p::Int64, nf::Int64, nc::Int64, l::Int64)
   # Fine Scale Space
@@ -50,12 +51,12 @@ function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::In
   patch_coarse_coords, patch_coarse_global_ids, patch_coarse_local_ids, patch_coarse_cell_types = _patch_model_data(σ_coarse, node_coordinates_coarse, cell_types_coarse, patch_coarse_elems, num_coarse_cells)
   patch_fine_coords, patch_fine_global_ids, patch_fine_local_ids, patch_fine_cell_types = _patch_model_data(σ_fine, node_coordinates_fine, cell_types_fine, patch_fine_elems, num_coarse_cells)
 
-  # Las
-  #elem_fine = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
+  global_to_local_map = get_patch_wise_global_to_local_map(patch_fine_elems, σ_fine)
+
+  # Lastly, obtain the global-local map on each elements
   elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), patch_coarse_elems)  
   elem_global_node_ids = [lazy_map(Broadcasting(Reindex(σ_fine)), ef) for ef in elem_fine]
-  #display(elem_global_node_ids[1])
-  elem_local_node_ids = get_local_to_global_map(patch_fine_global_ids, elem_global_node_ids)
+  elem_local_node_ids = get_local_to_global_map(patch_fine_elems, σ_fine, elem_global_node_ids)
   elem_coarse_to_fine = (elem_global_node_ids, elem_local_node_ids)
 
   patch_coords = (patch_coarse_coords, patch_fine_coords)
@@ -64,7 +65,7 @@ function MultiScaleFESpace(domain::Tuple{Float64,Float64,Float64,Float64}, q::In
   patch_cell_types = (patch_coarse_cell_types, patch_fine_cell_types)
 
   # Return the Object
-  MultiScaleFESpace(UH, Uh, tree, patch_coords, patch_global_ids, patch_local_ids, patch_cell_types, elem_coarse_to_fine)
+  MultiScaleFESpace(UH, Uh, tree, patch_coords, patch_global_ids, patch_local_ids, patch_cell_types, elem_coarse_to_fine, global_to_local_map)
 end
 
 get_coarse_data(ms_space::MultiScaleFESpace) = (ms_space.patch_coords[1], ms_space.patch_global_ids[1], ms_space.patch_local_ids[1], ms_space.patch_cell_types[1])
@@ -103,18 +104,21 @@ get_patch_global_node_ids(patch_fine_elems, σ) = lazy_map(Broadcasting(Reindex(
 
 function get_patch_local_node_ids(patch_fine_elems, σ)
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
-  unique_patch_fine_node_ids = lazy_map(get_unique_node_ids, patch_fine_node_ids)
-  global_to_local = lazy_map(get_local_node_ids, unique_patch_fine_node_ids)
+  global_to_local = get_patch_wise_global_to_local_map(patch_fine_elems, σ)
   X = lazy_map(convert_global_to_local_node_ids, patch_fine_node_ids, global_to_local)
   lazy_map(Table, X)
 end
 
-function get_local_to_global_map(patch_global_node_ids, elem_global_node_ids)
-  unique_patch_global_node_ids = lazy_map(get_unique_node_ids, patch_global_node_ids)
-  global_to_local = lazy_map(get_local_node_ids, unique_patch_global_node_ids)
-  #convert_global_to_local_node_ids(elem_global_node_ids[1][2], global_to_local[1])
+#function get_local_to_global_map(patch_global_node_ids, elem_global_node_ids)
+function get_local_to_global_map(patch_fine_elems, σ, elem_global_node_ids)
+  global_to_local = get_patch_wise_global_to_local_map(patch_fine_elems, σ)
   lazy_map(convert_patch_global_to_local, elem_global_node_ids, global_to_local)
-  #[lazy_map(convert_global_to_local_node_ids, el, global_to_local) for el_i=el, el=elem_global_node_ids]
+end
+
+function get_patch_wise_global_to_local_map(patch_fine_elems, σ)
+  patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ)
+  unique_patch_fine_node_ids = lazy_map(get_unique_node_ids, patch_fine_node_ids)
+  lazy_map(get_local_node_ids, unique_patch_fine_node_ids)
 end
 
 get_unique_node_ids(X) = sort(unique(mapreduce(permutedims, vcat, X))); # Function to obtain the unique node ids
