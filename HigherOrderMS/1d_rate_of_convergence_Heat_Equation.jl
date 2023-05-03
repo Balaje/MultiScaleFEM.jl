@@ -23,11 +23,11 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
   end
 end
 # A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-# A(x) = (0.5 + 0.25*cos(2π*x[1]/2e-2))^-1 # Smooth Diffusion coefficient
-A(x) = 1.0 # Constant diffusion coefficient
+A(x) = (0.5 + 0.25*cos(2π*x[1]/2e0))^-1 # Smooth Diffusion coefficient
+# A(x) = 1.0 # Constant diffusion coefficient
 f(x,t) = 0.0
 u₀(x) = sin(π*x[1])
-# f(x,t) = sin(π*x[1])
+# f(x,t) = sin(π*x[1])*sin(π*t)
 # u₀(x) = 0.0
 
 # Problem parameters
@@ -96,7 +96,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[9]
+for l=[7,8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))

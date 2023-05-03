@@ -248,6 +248,73 @@ Finally, I test the problem for random-coefficients which are piecewise-constant
 
 The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered in the next section.
 
+We perform a few more tests for the heat equation. Consider the following problem 
+
+$$
+\begin{align*}
+  u_t - (A(x)u_x(x,t))_x = f(x,t) &\quad (x,t) \in (0,1) \times (0,T),\\
+  u(x,0) = u_0(x) &\quad x \in (0,1),\\
+  u(0,t) = u(1,t) =0 &\quad t \in (0,T),
+\end{align*}
+$$
+
+I take the diffusion coefficient 
+
+$$ 
+A(x) = \text{rand}\left(0.5,1, \epsilon = 2^{-12}\right)
+$$
+
+and solve the problem using the multiscale method using `p=3`. I take the coarse mesh size $H=2^{-1}, 2^{-2}, 2^{-3}, \cdots 2^{-7}$ with the background fine scale discretization set at $h = 2^{-15}$. I use the 4th order Backward Difference Formula (BDF-4) to discretize the temporal direction. I take the time step size $\Delta t = 10^{-3}$ and solve till final time $T=0.5$ s. I consider the following cases:
+
+1. **Case 1**
+    $$
+    f(x,t) = \sin (\pi x) \sin(\pi t), \quad u_0(x) = 0.
+    $$
+
+    We observe that the convergence rates are suboptimal for the higher order multiscale method `(p=3)` as $H \to 0$. However, the rate seems to be optimal for the first two mesh sizes. 
+
+    `(p=3)` |
+    --- |
+    ![](./HigherOrderMS/Images/HeatEquation/ooc_p3_random_coeff_t0.5_u0_0_f.png) |
+
+    ``` julia
+    L²Error = [6.904026225412479e-5, 9.994602736284981e-7, 3.897034713700309e-8, 3.802574439053447e-9, 9.080179587634707e-10, 1.3381403737114586e-10, 4.2318825691302157e-11, 3.8970415993978335e-11]
+
+    log.(L²Error[2:end] ./ L²Error[1:end - 1]) ./ log(0.5) = [6.110144910356789, 4.680700536317692, 3.357328387207551, 2.0661837538612366, 2.7624913657642014, 1.66085796597924, 0.1189202627442888]
+    ```
+
+2. **Case 2**
+    $$
+    f(x,t) = 0, \quad u_0(x) = \sin (\pi x).
+    $$
+
+    Again, we observe that the convergence rates are suboptimal for the higher order multiscale method `(p=3)` as $H \to 0$. However, the rate seems to be suboptimal earlier than observed in **Case 1**.
+
+    `(p=3)` |
+    --- |
+    ![](./HigherOrderMS/Images/HeatEquation/ooc_p3_random_coeff_t0.5_f_0_u0_sin_pi_x.png) |
+
+    The rate of convergence and the error magnitudes are as follows:   
+
+    ```julia
+    L²Error = [1.7875148956715388e-5, 3.524163429947011e-7, 2.3963586522072257e-8, 7.319979871768478e-9, 1.219071871938366e-9, 1.7618198430902445e-10, 4.3432779965066374e-11, 2.448469254518588e-11]
+
+    log.(L²Error[2:end] ./ L²Error[1:end - 1]) ./ log(0.5) = [5.664530624433729, 3.8783650784416164, 1.7109322594020788, 2.586056497047787, 2.79064487191708, 2.0202102051473467, 0.8269042168959881]
+    ```
+
+3. **Case 3**
+
+    However, the rate becomes optimal if I take a smooth diffusion coefficient or piecewise constant coefficients at a much coarser scale. Here I assume $f(x,t) = 0, \quad u_0(x) = \sin (\pi x)$.
+
+    `(p=3)` Smooth Coefficient |
+    --- |
+    ![](./HigherOrderMS/Images/HeatEquation/ooc_p3_smooth_coeff_t0.5_f_0_u0_sin_pi_x.png) |
+
+    ``` julia
+    L²Error = [1.0825524118533765e-8, 7.334129301856646e-10, 1.1287478539913153e-11, 2.1202768627351573e-13, 4.777345078223101e-15, 2.403254052690372e-14, 1.4162339474999647e-14, 2.3721930180271398e-14]
+
+    log.(L²Error[2:end] ./ L²Error[1:end - 1]) ./ log(0.5) = [3.8836673633874934, 6.021830551287917, 5.73432677243487, 5.471899762295737, -2.3307081719004294, 0.7629295629348244, -0.744161798592859]
+    ```
 
 ##### Wave Equation
 
