@@ -6,11 +6,11 @@ include("2d_HigherOrderMS.jl")
 domain = (0.0, 1.0, 0.0, 1.0)
 
 # Fine scale space description
-nf = 2^7
+nf = 2^8
 q = 1
-nc = 2^2
+nc = 2^1
 p = 1
-l = 1 # Patch size parameter
+l = 3 # Patch size parameter
 ms_space = MultiScaleFESpace(domain, q, p, nf, nc, l);
 
 num_coarse_cells = num_cells(ms_space.Ωc);
@@ -31,7 +31,8 @@ patch_global_boundary_dofs = lazy_map(convert_dofs, patch_local_boundary_dofs, p
 
 
 ## Get all the full systems
-D = CellField(rand(num_cells(get_triangulation(ms_space.Uh))), get_triangulation(ms_space.Uh));
+# D = CellField(rand(num_cells(get_triangulation(ms_space.Uh))), get_triangulation(ms_space.Uh));
+D = CellField(1.0, get_triangulation(ms_space.Uh));
 elem_global_node_ids = get_elem_data(ms_space);
 elem_local_unique_node_ids = lazy_map(get_unique_node_ids, elem_global_node_ids) |> collect;
 full_stima = assemble_stima(ms_space.Uh, D, 4);
@@ -57,3 +58,18 @@ function visualize_basis_vector(fespace::FESpace, basis_vec_ms, inds)
     writevtk(get_triangulation(fespace), "multiscale-bases-"*string(i), cellfields=["Λᵐˢ"=>bi])
   end
 end
+
+## Solve the Poisson equation using multiscale method
+f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]);
+dΩ = Measure(get_triangulation(ms_space.Uh), 4);
+lh(v) = ∫(f*v)dΩ;
+full_loadvec = assemble_vector(lh, ms_space.Uh);
+
+Kₘₛ = basis_vec_ms'*full_stima*basis_vec_ms;
+Fₘₛ = basis_vec_ms'*full_loadvec;
+sol = Kₘₛ\Fₘₛ;
+
+full_sol = basis_vec_ms*sol;
+
+uH = FEFunction(ms_space.Uh, full_sol);
+writevtk(get_triangulation(ms_space.Uh), "sol_ms", cellfields=["u(x)"=>uH])
