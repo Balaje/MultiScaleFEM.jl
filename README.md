@@ -614,10 +614,10 @@ Multiscale Bases Function `(p=1)` with a random Diffusion Coefficient |
 For the discontinuous $L^2$-functions `(p=1)`, I took the scaled monomials 
 
 $$
-\bm{M} = \left\{1, \frac{x-x_D}{h_D}, \frac{y-y_D}{h_D}\right\}
+\mathcal{M} = 1, \frac{x-x_D}{h_D}, \frac{y-y_D}{h_D}
 $$
 
-upto order $p$ on each triangles. Each triangle in the patch has 3 multiscale bases, obtained by projecting the function onto $H^1_0(N^l(K_i))$. The domain $N^l(K_i)$ denotes the $l$-sized patch of the element $K_i$ in the coarse mesh. The above picture shows the projection of the first scaled monomial $\bm{M}_i (x,y)= 1$ onto $H^1_0(N^1(K_1))$ (left) and $H^1_0(N^1(K_1))$ (right). Here $K_1$ and $K_2$ are the first two triangles in the coarse space. The diffusion coefficient in the problem is a random field constant on each element on the fine scale. The fine scale mesh is a triangulation with $32768$ elements. The coarse mesh is also a regular triangulation with much fewer, $32$ elements. The meshes are shown below. The oscillations seem to appear in the multiscale bases, which is the desired outcome of the projection. Please note, however, the code is still under developement and runs slow.
+upto order $p$ on each triangles. Each triangle in the patch has 3 multiscale bases, obtained by projecting the function onto $H^1_0(N^l(K_i))$. The domain $N^l(K_i)$ denotes the $l$-sized patch of the element $K_i$ in the coarse mesh. The above picture shows the projection of the first scaled monomial $\mathcal{M}_i (x,y)= 1$ onto $H^1_0(N^1(K_1))$ (left) and $H^1_0(N^1(K_1))$ (right). Here $K_1$ and $K_2$ are the first two triangles in the coarse space. The diffusion coefficient in the problem is a random field constant on each element on the fine scale. The fine scale mesh is a triangulation with $32768$ elements. The coarse mesh is also a regular triangulation with much fewer, $32$ elements. The meshes are shown below. The oscillations seem to appear in the multiscale bases, which is the desired outcome of the projection. Please note, however, the code is still under developement and runs slow.
 
 $l=1$ patch of the second element $K_2$ in the coarse scale (blue) along with the fine scale mesh (red)|
 --- |
