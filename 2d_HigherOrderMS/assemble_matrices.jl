@@ -17,7 +17,11 @@ function get_interior_indices(model::DiscreteModel)
   findnz(sparse(get_face_tag(fl, "interior", 0)))[1]
 end
 
-function assemble_stima(fine_space::FESpace, A::Function, qorder::Int64)
+function get_full_indices(model::DiscreteModel)
+  1:num_dofs()
+end
+
+function assemble_stima(fine_space::FESpace, A, qorder::Int64)
   Ω = get_triangulation(fine_space)
   dΩ = Measure(Ω, qorder)
   a(u,v) = ∫( A*∇(u) ⊙ ∇(v) )dΩ
@@ -95,3 +99,23 @@ function poly_exps(p::Int64)
 end
 
 saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
+
+function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrixCSC{Float64,Int64}, rhsmat::SparseMatrixCSC{Float64,Int64}, interior_dofs, p::Int64)  
+  n_fine_dofs = size(lmat, 1)
+  n_coarse_dofs = size(lmat, 2)
+  num_coarse_cells = size(interior_dofs, 1)
+  coarse_dofs = [3p*i-3p+1:3p*i for i in 1:num_coarse_cells]
+  basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)
+  patch_stima = lazy_map(getindex, Gridap.Arrays.Fill(stima, num_coarse_cells), interior_dofs, interior_dofs);
+  patch_lmat = lazy_map(getindex, Gridap.Arrays.Fill(lmat, num_coarse_cells), interior_dofs, coarse_dofs);
+  patch_rhs = lazy_map(getindex, Gridap.Arrays.Fill(rhsmat, num_coarse_cells), coarse_dofs, coarse_dofs);
+  for i=1:num_coarse_cells
+    LHS = saddle_point_system(patch_stima[i], patch_lmat[i])
+    RHS = [zeros(Float64, size(interior_dofs[i],1), size(coarse_dofs[i],1)); collect(patch_rhs[i])]
+    sol = LHS\RHS
+    for j=1:lastindex(coarse_dofs[i])
+      basis_vec_ms[interior_dofs[i], coarse_dofs[i][j]] = sol[1:length(interior_dofs[i]), j]
+    end
+  end
+  basis_vec_ms
+end
