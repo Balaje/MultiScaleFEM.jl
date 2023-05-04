@@ -40,5 +40,5 @@ function get_coarse_to_fine_map(num_coarse_cells::Int64, num_fine_cells::Int64)
     c_to_f = _source_to_target(c_to_f_maps[l-1], c_to_f)
     c_to_f = reduce.(vcat, c_to_f)
   end
-  c_to_f
+  collect(c_to_f)
 end 
