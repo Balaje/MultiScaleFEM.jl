@@ -2,32 +2,40 @@
 # Contains the interfaces to build the coarse scale fespaces and the saddle point matrices
 ##### ###### ###### ###### ###### ###### ###### ###### ###### ####### ####### ####### ####### #
 
-function build_patch_fine_spaces(model::DiscreteModel, q::Int64)
-  ref_space = ReferenceFE(lagrangian, Float64, q)
-  FESpace(model, ref_space, conformity=:H1)
-end
-
-function get_boundary_indices(model::DiscreteModel)
-  fl = get_face_labeling(model)
-  findnz(sparse(get_face_tag(fl, "boundary", 0)))[1]
-end
-
-function get_interior_indices(model::DiscreteModel)
-  fl = get_face_labeling(model)
-  findnz(sparse(get_face_tag(fl, "interior", 0)))[1]
-end
-
-function get_full_indices(model::DiscreteModel)
-  1:num_dofs()
-end
-
-function assemble_stima(fine_space::FESpace, A, qorder::Int64)
-  Ω = get_triangulation(fine_space)
+"""
+Function to assemble the standard stiffness matrix given the diffusion coefficient A(x)
+"""
+function assemble_stima(fespace::FESpace, A, qorder::Int64)
+  Ω = get_triangulation(fespace)
   dΩ = Measure(Ω, qorder)
   a(u,v) = ∫( A*∇(u) ⊙ ∇(v) )dΩ
-  assemble_matrix(a, fine_space, fine_space)  
+  assemble_matrix(a, fespace, fespace)  
 end
 
+"""
+Function to assemble the standard mass matrix given the reaction coefficient A(x)
+"""
+function assemble_massma(fespace::FESpace, A, qorder::Int64)
+  Ω = get_triangulation(fespace)
+  dΩ = Measure(Ω, qorder)
+  a(u,v) = ∫( A*(u)⋅(v) )dΩ
+  assemble_matrix(a, fespace, fespace)  
+end
+
+
+"""
+Function to assemble the standard load vector given the load f(x)
+"""
+function assemble_loadvec(fespace::FESpace, f, qorder::Int64)
+  Ω = get_triangulation(fespace)
+  dΩ = Measure(Ω, qorder)
+  l(v) = ∫( f*v )dΩ
+  assemble_vector(l, fespace)
+end
+
+"""
+Function to assemble the full rectangular matrix in the saddle point system
+"""
 function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64, patch_local_node_ids)
   num_patch_coarse_cells = num_cells(coarse_trian)
   Ω = get_triangulation(fine_space)
@@ -52,6 +60,9 @@ function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, 
   L
 end
 
+"""
+Function to assemble the inner-product of the L² functions.
+"""
 function assemble_rhs_matrix(coarse_trian::Triangulation, p::Int64)
   num_patch_coarse_cells = num_cells(coarse_trian)
   Q = CellQuadrature(coarse_trian, 2p)
@@ -82,7 +93,10 @@ function assemble_rhs_matrix(coarse_trian::Triangulation, p::Int64)
   L
 end
 
-### Scaled monomial bases at each coarse triangles
+"""
+Scaled monomial bases at each coarse triangles. 
+Acts as the L² functions in the higher order MS Method
+"""
 function ℳ(x::Point, centroid::Point, dia::Float64, αβ::Tuple{Int64,Int64})
   ((x[1] - centroid[1])/dia)^αβ[1]*((x[2] - centroid[2])/dia)^αβ[2]
 end
@@ -98,24 +112,7 @@ function poly_exps(p::Int64)
   reduce(vcat, exps)
 end
 
+"""
+Function to get the saddle point system given the stiffness and the rectangular matrix
+"""
 saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
-
-function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrixCSC{Float64,Int64}, rhsmat::SparseMatrixCSC{Float64,Int64}, interior_dofs, p::Int64)  
-  n_fine_dofs = size(lmat, 1)
-  n_coarse_dofs = size(lmat, 2)
-  num_coarse_cells = size(interior_dofs, 1)
-  coarse_dofs = [3p*i-3p+1:3p*i for i in 1:num_coarse_cells]
-  basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)
-  patch_stima = lazy_map(getindex, Gridap.Arrays.Fill(stima, num_coarse_cells), interior_dofs, interior_dofs);
-  patch_lmat = lazy_map(getindex, Gridap.Arrays.Fill(lmat, num_coarse_cells), interior_dofs, coarse_dofs);
-  patch_rhs = lazy_map(getindex, Gridap.Arrays.Fill(rhsmat, num_coarse_cells), coarse_dofs, coarse_dofs);
-  for i=1:num_coarse_cells
-    LHS = saddle_point_system(patch_stima[i], patch_lmat[i])
-    RHS = [zeros(Float64, size(interior_dofs[i],1), size(coarse_dofs[i],1)); collect(patch_rhs[i])]
-    sol = LHS\RHS
-    for j=1:lastindex(coarse_dofs[i])
-      basis_vec_ms[interior_dofs[i], coarse_dofs[i][j]] = sol[1:length(interior_dofs[i]), j]
-    end
-  end
-  basis_vec_ms
-end

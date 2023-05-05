@@ -11,6 +11,6 @@ using StaticArrays
 using NearestNeighbors
 using SparseArrays
 
-include("multiscale_basis-functions.jl")
-include("coarse_to_fine_map.jl")
 include("assemble_matrices.jl")
+include("coarse_to_fine_map.jl")
+include("multiscale_basis-functions.jl")
