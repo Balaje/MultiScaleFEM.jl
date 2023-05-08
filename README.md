@@ -13,6 +13,7 @@
       - [Heat equation](#heat-equation)
         * [Smooth and Oscillatory Diffusion coefficient](#smooth-and-oscillatory-diffusion-coefficient)
         * [Random diffusion coefficient](#random-diffusion-coefficient)
+        * [Some more tests for random diffusion coefficients](#some-more-tests-for-random-diffusion-coefficients)
       - [Wave Equation](#wave-equation)
         * [Constant wave speed](#constant-wave-speed)
         * [Smooth and varying wave speed](#smooth-and-varying-wave-speed)
@@ -20,8 +21,8 @@
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
-        * [Random oscillatory wave-speed](#random-wave-speed)
-        * [Random oscillatory wave-speed solved for large final time](#random-wave-speed-solved-for-large-final-time)
+        * [Random wave-speed](#random-wave-speed)
+        * [Random wave-speed solved for large final time](#random-wave-speed-solved-for-large-final-time)
 - [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
 - [Implementation of the Higher Order Multiscale Method in two dimensions](#implementation-of-the-higher-order-multiscale-method-in-two-dimensions)
   * [The Coarse-To-Fine map](#the-coarse-to-fine-map)
@@ -29,6 +30,7 @@
 - [References](#references)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 
 ## Introduction
 
@@ -248,6 +250,8 @@ Finally, I test the problem for random-coefficients which are piecewise-constant
 
 The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered in the next section.
 
+###### Some more tests for random diffusion coefficients
+
 We perform a few more tests for the heat equation. Consider the following problem 
 
 $$
@@ -266,10 +270,7 @@ $$
 
 and solve the problem using the multiscale method using `p=3`. I take the coarse mesh size $H=2^{-1}, 2^{-2}, 2^{-3}, \cdots 2^{-7}$ with the background fine scale discretization set at $h = 2^{-15}$. I use the 4th order Backward Difference Formula (BDF-4) to discretize the temporal direction. I take the time step size $\Delta t = 10^{-3}$ and solve till final time $T=0.5$ s. I consider the following cases:
 
-1. **Case 1**
-    $$
-    f(x,t) = \sin (\pi x) \sin(\pi t), \quad u_0(x) = 0.
-    $$
+1. **Case 1:** $f(x,t) = \sin (\pi x) \sin(\pi t), \, u_0(x) = 0.$
 
     We observe that the convergence rates are suboptimal for the higher order multiscale method `(p=3)` as $H \to 0$. However, the rate seems to be optimal for the first two mesh sizes. 
 
@@ -298,10 +299,7 @@ and solve the problem using the multiscale method using `p=3`. I take the coarse
     0.1189202627442888]
     ```
 
-2. **Case 2**
-    $$
-    f(x,t) = 0, \quad u_0(x) = \sin (\pi x).
-    $$
+2. **Case 2:** $f(x,t) = 0, \, u_0(x) = \sin (\pi x).$
 
     Again, we observe that the convergence rates are suboptimal for the higher order multiscale method `(p=3)` as $H \to 0$. However, the rate seems to be suboptimal earlier than observed in **Case 1**.
 
