@@ -88,7 +88,7 @@ function assemble_rhs_matrix(coarse_trian::Triangulation, p::Int64)
         L[index+j-1, index+k-1] += Qweights[q]*bj(Qpoints[q])*bk(Qpoints[q])
       end
     end
-    index += 3p
+    index += n_monomials
   end
   L
 end

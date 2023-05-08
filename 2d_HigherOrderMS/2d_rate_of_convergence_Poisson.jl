@@ -42,7 +42,7 @@ for l = [3,4]
       println("Built the MultiScaleTriangulation...")
 
       D = CellField(A, Ωms.Ωf)
-      Ums = MultiScaleFESpace(Ωms, q, p, D, 4);
+      Ums = MultiScaleFESpace(Ωms, q, p, D, 4)
       println("Built the MultiScaleFESpace...")
 
       Fϵ = assemble_loadvec(Ums.Uh, f, 4);
