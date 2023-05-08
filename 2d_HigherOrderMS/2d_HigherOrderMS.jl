@@ -10,6 +10,7 @@ using Gridap.CellData
 using StaticArrays
 using NearestNeighbors
 using SparseArrays
+using Plots
 
 include("assemble_matrices.jl")
 include("coarse_to_fine_map.jl")
