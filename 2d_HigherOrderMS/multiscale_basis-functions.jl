@@ -313,7 +313,8 @@ function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64},
   n_fine_dofs = size(lmat, 1)
   n_coarse_dofs = size(lmat, 2)
   num_coarse_cells = size(interior_dofs, 1)
-  coarse_dofs = [3p*i-3p+1:3p*i for i in 1:num_coarse_cells]
+  n_monomials = Int64((p+1)*(p+2)*0.5)
+  coarse_dofs = [n_monomials*i-n_monomials+1:n_monomials*i for i in 1:num_coarse_cells]
   basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)
   patch_stima = map(getindex, lazy_fill(stima, num_coarse_cells), interior_dofs, interior_dofs);
   patch_lmat = map(getindex, lazy_fill(lmat, num_coarse_cells), interior_dofs, coarse_dofs);

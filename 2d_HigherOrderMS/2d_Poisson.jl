@@ -9,18 +9,18 @@ domain = (0.0, 1.0, 0.0, 1.0)
 nf = 2^8
 q = 1
 nc = 2^2
-p = 1
+p = 3
 l = 1 # Patch size parameter
 
 Ωms = MultiScaleTriangulation(domain, nf, nc, l);
 
-A = CellField(1.0, Ωms.Ωf);
-Ums = MultiScaleFESpace(Ωms, q, p, A, 4);
+D = CellField(1.0, Ωms.Ωf);
+Ums = MultiScaleFESpace(Ωms, q, p, D, 4);
 
 # Solve the Poisson equation using multiscale method
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]);
 Fϵ = assemble_loadvec(Ums.Uh, f, 4);
-Kϵ = assemble_stima(Ums.Uh, A, 4);
+Kϵ = assemble_stima(Ums.Uh, D, 4);
 
 # Use the new bases to transform the matrix and vector to the multiscale space.
 basis_vec_ms = Ums.basis_vec_ms
