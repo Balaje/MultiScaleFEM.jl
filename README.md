@@ -27,9 +27,12 @@
 - [Implementation of the Higher Order Multiscale Method in two dimensions](#implementation-of-the-higher-order-multiscale-method-in-two-dimensions)
   * [The Coarse-To-Fine map](#the-coarse-to-fine-map)
   * [Patch information](#patch-information)
+  * [The Multiscale bases](#the-multiscale-bases)
+  * [Solution to the multiscale method](#solution-to-the-multiscale-method)
 - [References](#references)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 
 
 ## Introduction
@@ -88,6 +91,8 @@ whereas the constant diffusion is
 $$
 D(x) = 1
 $$
+
+Most of the current implementation relies on [Gridap.jl](https://github.com/gridap/Gridap.jl) for computing the fine scale stiffness matrix, load vector, the $L^2$-and $H^1$-error etc. I then employ a suitable $L^2$-bases to construct the remaining part of the saddle point system and then obtain the bases. 
 
 ### Poisson equation in 1D
 
@@ -525,13 +530,11 @@ For more details on the method, refer to [Målqvist, A. et al](https://epubs.sia
 
 ## Implementation of the Higher Order Multiscale Method in two dimensions
 
-I began working on the 2D implementation of the higher-order multiscale method. The code is found in `2d_HigherOrderMS/` within the repository. 
-
-**Please note that the current implementation can change a lot, since its mostly Work in Progress.**
+:construction: The code is found in `2d_HigherOrderMS/` within the repository. **Please note that the current implementation can change a lot, since its mostly Work in Progress.** :construction:
 
 ### The Coarse-To-Fine map
 
-Implementation in 2D involves a bit of geometrical pre-processing, which involves extracting the patch of all the elements in the coarse space along with the fine-scale elements present inside the patch. The central assumption in obtaining this information is that the fine-scale discretization is obtained from a uniform refinement of the coarse scale elements. 
+Implementation in 2D involves a bit of geometrical pre-processing, which involves extracting the patch of all the elements in the coarse space along with the fine-scale elements present inside the patch. The central assumption in obtaining this information is that the fine-scale discretization is obtained from a uniform refinement of the coarse scale elements. Again, the implementation relies on [Gridap.jl](https://github.com/gridap/Gridap.jl) for computing the mesh connectivity, stiffness matrix, load vector, the $L^2$-and $H^1$-error etc., basically anything associated with the traditional finite element method. The patch computation is new and a brief discussion is provided below.
 
 At this stage, the current implementation has only the patch computations coded up. That too just for triangles! The complication here is the map between the coarse scale and fine scale map. For simple meshes involving simplices and hexahedrons, this map can be computed by exploiting an underlying pattern. Ideally, we need the underlying refinement strategy to obtain this map. I hard coded this inside the function 
 
@@ -543,7 +546,7 @@ which relies on two other function to obtain this map. This interface is subject
 
 ### Patch information
 
-Obtaining the patch on the coarse scale is relatively straightforward. We can define a metric that defines the "distance" between the elements and then search the `KDTree` built using the connectivity matrix of the fine scale mesh. The amazing `NearestNeighbors.jl` package contains the interface to implement `KDTree` searching. The definition of the metric is as follows
+Obtaining the patch on the coarse scale is relatively straightforward. We can define a metric that defines the "distance" between the elements and then search the `BruteTree` built using the connectivity matrix of the fine scale mesh. The `NearestNeighbors.jl` package contains the interface to implement Brute Tree searching quite easily. This is not ideal, but it will have to do for now. The definition of the metric is as follows
 
 ```julia
 struct ElemDist <: NearestNeighbors.Distances.Metric end
@@ -556,37 +559,9 @@ function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::A
 end
 ```
 
-The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter $l$ in multiscale methods. We then search the KD-Tree until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
+The method `evaluate` is extended to a user-defined DataType named `ElemDist` which accepts two vectors which are the local-to-global map of the elements in the fine-scale discretization, i.e., two rows of the finite element connectivity matrix. The method returns the distance between the elements which is defined as the minimum difference between all the elements of the input vectors. The result is an integer which is nothing but the patch size parameter $l$ in multiscale methods. We then search the Brute Tree until we find all elements in the coarse-scale such that `ElemDist` is less than or equal to $l$:
 
-```julia
-function get_patch_coarse_elem(ms_space::MultiScaleFESpace, l::Int64, el::Int64)
-  U = ms_space.UH
-  tree = ms_space.elemTree
-  Ω = get_triangulation(U)
-  σ = get_cell_node_ids(Ω)
-  el_inds = inrange(tree, σ[el], 1) # Find patch of size 1
-  for _=2:l # Recursively do this for 2:l and collect the unique indices. 
-    X = [inrange(tree, i, 1) for i in σ[el_inds]]
-    el_inds = unique(vcat(X...))
-  end
-  sort(el_inds)
-  # There may be a better way to do this... Need to check.
-end
-```
-
-This gives the indices of the coarse-scale elements present in the patch. The function 
-
-```julia
-function get_patch_triangulation(ms_spaces::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64)
-```
-
-extracts the patch elements and then returns the element-patch wise discrete models. Then, the next step, which is the trickiest, is to obtain the fine scale discretization on the patch. A quick glance would just tell us that collecting the coarse scale elements and then applying the coarse-to-fine map will do it. However, to construct the discrete models in Gridap, we need the local ordering along with the nodal coordinates, which we do not have directly. I wrote this function 
-
-```julia
-function get_patch_triangulation(ms_space::MultiScaleFESpace, l::Int64, num_coarse_cells::Int64, coarse_to_fine_elems)
-```
-
-which extracts this information from the fine-scale discretization and returns the fine-scale version of the element-patch wise discrete models. I show the results below:
+We then extract the patch elements and then compute the element-patch wise `DiscreteModel`. Then, the next step, which is the trickiest, is to obtain the fine scale discretization on the patch. A quick glance would just tell us that collecting the coarse scale elements and then applying the coarse-to-fine map will do it. But this does not give us information about which fine scale nodes lie on the boundary of the coarse-scale patch. However, to construct the discrete models in Gridap, we need the local ordering along with the nodal coordinates, which we do not have directly. I build a dictionary that contains this local-to-global mapping and then obtain the fine-scale `DiscreteModel`. Then I extract the local boundary and interior from the `DiscreteModel` and then convert back to indices in the global sense.
 
 `l=1` patch of coarse scale elements 1, 10, 400, 405 |
 --- |
@@ -620,6 +595,31 @@ upto order $p$ on each triangles. Each triangle in the patch has 3 multiscale ba
 $l=1$ patch of the second element $K_2$ in the coarse scale (blue) along with the fine scale mesh (red)|
 --- |
 ![](./2d_HigherOrderMS/Images/2d_patch_2_bg_fine.png) |
+
+### Solution to the multiscale method
+
+Once the basis-functions are computed, we can use the method to solve the Poisson problem. Below, I show the rate of convergence of the lowest order multiscale method `(p=0)` along with the solution profile. I use the example 
+
+$$
+\begin{align}
+  -\nabla\cdot(A\nabla u(x,y)) &= f(x,y) \quad \text{in}\; \Omega = [0,1]^2\\
+  u(x,y) &= 0 \quad \text{on} \; \partial\Omega
+\end{align}
+$$
+
+with $A(x,y) = 1.0$ and $f(x,y) = 2\pi^2\sin(\pi x)\sin(\pi y)$. To obtain the convergence rates, I use the reference solution computed using the traditional finite element method at $h=2^{-7}$ which is also the fine scale discretization parameter. I take the coarse space discretization $H = 2^{0}, 2^{-1}, 2^{-2}, 2^{-3}, 2^{-4}$ and then compute the $L^2$- and $H^1$-errors.
+
+Poisson Equation Solution |
+--- |
+![](./2d_HigherOrderMS/Images/2d_solution_A1.0.png) |
+
+
+Convergence rates | |
+--- | --- |
+![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p0_A_1.0.png) | ![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p1_A_1.0.png) | 
+
+
+The rates of convergence seem to be optimal as most of the rates are parallel to the reference lines. The slow-down in the convergence rates is expected in the higher order method due to the presence of growth term associated with the patch size (See [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321)). Also, the fine scale parameter $h=2^{-7}$ may not be fine enough to provide meaningful convergence as $H\to 0$ and higher values of `p`. **More tests are required to test the method for higher values of `p`.**
 
 ## References
 

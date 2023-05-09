@@ -26,16 +26,16 @@ function get_reference_solution(domain::Tuple, nf::Int64, q::Int64, A, f)
   uh
 end
 
-nf = 2^7
+nf = 2^9
 q = 1
 uh = get_reference_solution(domain, nf, q, A, f);
 
-p = 0
-N = [2^0, 2^1, 2^2, 2^3]
+p = 1
+N = [2^0, 2^1, 2^2, 2^3, 2^4]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
-for l = [5,6]
+for l = [3,4,5,6]
   for (nc,itr) in zip(N, 1:lastindex(N))
     let 
       Ωms = MultiScaleTriangulation(domain, nf, nc, l);
