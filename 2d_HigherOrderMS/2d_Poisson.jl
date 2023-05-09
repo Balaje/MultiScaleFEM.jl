@@ -9,7 +9,7 @@ domain = (0.0, 1.0, 0.0, 1.0)
 nf = 2^7
 q = 1
 nc = 2^1
-p = 3
+p = 1
 l = 3 # Patch size parameter
 
 Ωms = MultiScaleTriangulation(domain, nf, nc, l);

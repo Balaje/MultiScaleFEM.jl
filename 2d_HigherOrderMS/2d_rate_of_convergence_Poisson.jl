@@ -26,12 +26,12 @@ function get_reference_solution(domain::Tuple, nf::Int64, q::Int64, A, f)
   uh
 end
 
-nf = 2^9
+nf = 2^7
 q = 1
 uh = get_reference_solution(domain, nf, q, A, f);
 
-p = 3
-N = [2^0, 2^1, 2^2, 2^3, 2^4]
+p = 0
+N = [2^0, 2^1, 2^2, 2^3]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
