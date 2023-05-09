@@ -6,11 +6,11 @@ include("2d_HigherOrderMS.jl")
 domain = (0.0, 1.0, 0.0, 1.0)
 
 # Fine scale space description
-nf = 2^7
+nf = 2^8
 q = 1
-nc = 2^1
+nc = 2^2
 p = 1
-l = 3 # Patch size parameter
+l = 5 # Patch size parameter
 
 Ωms = MultiScaleTriangulation(domain, nf, nc, l);
 
@@ -35,8 +35,7 @@ ums = basis_vec_ms*sol;
 uH = FEFunction(Ums.Uh, ums);
 function visualize_basis_vector(fespace::FESpace, basis_vec_ms, inds)
   for i in inds
-    bi = FEFunction(fespace, basis_vec_ms[:,3p*i-3p+1])
-    writevtk(Triangulation(Ωms.patch_models_coarse[i]), "./2d_HigherOrderMS/coarse_patch-"*string(i))
+    bi = FEFunction(fespace, basis_vec_ms[:,3p*i-3p+1])    
     writevtk(get_triangulation(fespace), "./2d_HigherOrderMS/multiscale-bases-"*string(i), cellfields=["Λᵐˢ"=>bi])
   end
 end

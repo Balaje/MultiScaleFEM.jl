@@ -11,6 +11,7 @@ using StaticArrays
 using NearestNeighbors
 using SparseArrays
 using Plots
+using SplitApplyCombine
 
 include("assemble_matrices.jl")
 include("coarse_to_fine_map.jl")
