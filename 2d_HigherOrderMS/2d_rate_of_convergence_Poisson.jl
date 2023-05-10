@@ -21,7 +21,7 @@ function get_reference_solution(domain::Tuple, nf::Int64, q::Int64, A, f)
   op = AffineFEOperator(a,b,U,V0)
   uϵ = solve(op)
   uh = zeros(Float64, num_free_dofs(U)+num_dirichlet_dofs(U))
-  freedofs = get_local_indices(model, "interior")
+  freedofs = findnz(sparsevec(get_face_tag(get_face_labeling(model), "interior", 0)))[1]
   uh[freedofs] = get_free_dof_values(uϵ)
   uh
 end
@@ -35,7 +35,7 @@ N = [2^0, 2^1, 2^2, 2^3, 2^4]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
-for l = [3,4,5,6]
+for l = [3,4]
   for (nc,itr) in zip(N, 1:lastindex(N))
     let 
       Ωms = MultiScaleTriangulation(domain, nf, nc, l);

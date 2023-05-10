@@ -1,16 +1,16 @@
 ###### ######## ######## ######## ######## ######## # 
 # Program to test the multiscale basis computation  #
 ###### ######## ######## ######## ######## ######## # 
-include("2d_HigherOrderMS.jl")
+include("2d_HigherOrderMS.jl");
 
-domain = (0.0, 1.0, 0.0, 1.0)
+domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-nf = 2^8
-q = 1
-nc = 2^2
-p = 1
-l = 5 # Patch size parameter
+nf = 2^9;
+q = 1;
+nc = 2^4;
+p = 1;
+l = 5; # Patch size parameter
 
 Ωms = MultiScaleTriangulation(domain, nf, nc, l);
 
@@ -23,7 +23,7 @@ Fϵ = assemble_loadvec(Ums.Uh, f, 4);
 Kϵ = assemble_stima(Ums.Uh, D, 4);
 
 # Use the new bases to transform the matrix and vector to the multiscale space.
-basis_vec_ms = Ums.basis_vec_ms
+basis_vec_ms = Ums.basis_vec_ms;
 Kₘₛ = basis_vec_ms'*Kϵ*basis_vec_ms;
 Fₘₛ = basis_vec_ms'*Fϵ;
 sol = Kₘₛ\Fₘₛ;

@@ -48,14 +48,14 @@ Function that returns the indices of the fine-scale elements present inside the 
 function get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elem) 
   X = lazy_map(Broadcasting(Reindex(coarse_to_fine_elem)), patch_coarse_elems)
   collect_all_elems(X) = vec(combinedims(X))
-  map(collect_all_elems, X)
+  lazy_map(collect_all_elems, X)
 end
 
 """
 Function to obtain the global node (in the fine scale) indices of each patch.
 Takes the indices of the fine scale elements in the patch and applies the connectivity matrix of the fine scale elements.
 """
-get_patch_global_node_ids(patch_fine_elems, σ_fine) = map(Broadcasting(Reindex(σ_fine)), patch_fine_elems)
+get_patch_global_node_ids(patch_fine_elems, σ_fine) = lazy_map(Broadcasting(Reindex(σ_fine)), patch_fine_elems)
 
 get_unique_node_ids(x) = unique(combinedims(x))
 
@@ -109,7 +109,7 @@ function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
   # 1) Get the element indices inside the patch on the coarse and fine scales
   coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
 
-  patch_coarse_elems = map(get_patch_coarse_elem, 
+  patch_coarse_elems = lazy_map(get_patch_coarse_elem, 
     lazy_fill(Ωc, num_coarse_cells), 
     lazy_fill(tree, num_coarse_cells), 
     lazy_fill(l, num_coarse_cells), 
@@ -118,13 +118,13 @@ function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
   patch_fine_elems = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
 
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ_fine)
-  interior_global = map(get_interior_indices_direct, patch_fine_node_ids)
-  boundary_global = map(get_boundary_indices_direct, patch_fine_node_ids)
+  interior_global = lazy_map(get_interior_indices_direct, patch_fine_node_ids)
+  boundary_global = lazy_map(get_boundary_indices_direct, patch_fine_node_ids)
   interior_boundary_global = (interior_global, boundary_global)
 
   # Lastly, obtain the global-local map on each elements
-  elem_fine = map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
-  elem_global_node_ids = map(Broadcasting(Reindex(σ_fine)), elem_fine)
+  elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
+  elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
 
   # Return the Object
   MultiScaleTriangulation(Ωc, Ωf, interior_boundary_global, elem_global_node_ids)
@@ -162,7 +162,7 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A:
   Ωf = Ωms.Ωf
   Ωc = Ωms.Ωc
   elem_global_node_ids = Ωms.local_to_global_map
-  elem_global_unique_node_ids = map(get_unique_node_ids, elem_global_node_ids)
+  elem_global_unique_node_ids = lazy_map(get_unique_node_ids, elem_global_node_ids)
   # Build the background fine-scale FESpace of order q
   reffe = ReferenceFE(lagrangian, Float64, q)
   Uh = TestFESpace(Ωf, reffe, conformity=:H1)
@@ -193,16 +193,18 @@ function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64},
   n_monomials = Int64((p+1)*(p+2)*0.5)
   coarse_dofs = [n_monomials*i-n_monomials+1:n_monomials*i for i in 1:num_coarse_cells]
   basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)
+  X = array_cache(interior_dofs)
   for i=1:num_coarse_cells
-    println("Done "*string(i))
-    patch_stima = stima[interior_dofs[i], interior_dofs[i]]
-    patch_lmat = lmat[interior_dofs[i], coarse_dofs[i]]
-    patch_rhs = rhsmat[coarse_dofs[i], coarse_dofs[i]]
+    I = getindex!(X, interior_dofs, i)
+    J = coarse_dofs[i]
+    patch_stima = stima[I, I]
+    patch_lmat = lmat[I, J]
+    patch_rhs = rhsmat[J, J]
     LHS = saddle_point_system(patch_stima, patch_lmat)
-    RHS = [zeros(Float64, size(interior_dofs[i],1), size(coarse_dofs[i],1)); collect(patch_rhs)]
+    RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]
     sol = LHS\RHS
-    for j=1:lastindex(coarse_dofs[i])
-      basis_vec_ms[interior_dofs[i], coarse_dofs[i][j]] = sol[1:length(interior_dofs[i]), j]
+    for j=1:lastindex(J)
+      basis_vec_ms[I, J[j]] = sol[1:length(I), j]
     end
   end
   basis_vec_ms
@@ -210,22 +212,10 @@ end
 
 function get_boundary_indices_direct(σ)
   c = groupcount(combinedims(σ))
-  bnodes = Vector{Int64}()
-  for (ci,cv) in zip(c.indices,c.values)
-    if((cv == 1) || (cv == 2) || (cv == 3))
-      push!(bnodes, ci)
-    end
-  end
-  bnodes
+  [k for (k,v) in zip(c.indices,c.values) if (v==1) || (v==2) || (v==3)]
 end
 
 function get_interior_indices_direct(σ)
   c = groupcount(combinedims(σ))
-  inodes = Vector{Int64}()
-  for (ci,cv) in zip(c.indices,c.values)
-    if(cv == 6)
-      push!(inodes, ci)
-    end
-  end
-  inodes
+  [k for (k,v) in zip(c.indices,c.values) if (v==6)]
 end

@@ -619,7 +619,7 @@ Convergence rates | |
 ![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p0_A_1.0.png) | ![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p1_A_1.0.png) | 
 
 
-The rates of convergence seem to be optimal as most of the rates are parallel to the reference lines. The slow-down in the convergence rates is expected in the higher order method due to the presence of growth term associated with the patch size (See [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321)). Also, the fine scale parameter $h=2^{-7}$ may not be fine enough to provide meaningful convergence as $H\to 0$ and higher values of `p`. **More tests are required to test the method for higher values of `p`.**
+The rates of convergence seem to be optimal as most of the rates are parallel to the reference lines. The slow-down in the convergence rates is expected in the higher order method due to the presence of growth term associated with the patch size (See [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321)). For the `p=1` case in the above figure, a much smaller find scale parameter needs to be used, in this case, $h=2^{-9}$. We again observe optimal convergence in both $L^2$- and $H^1$-errors.
 
 ## References
 

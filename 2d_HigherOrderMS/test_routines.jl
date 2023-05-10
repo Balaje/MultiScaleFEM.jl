@@ -7,9 +7,9 @@ domain = (0.0, 1.0, 0.0, 1.0)
 # Fine scale space description
 nf = 2^9
 q = 1
-nc = 2^0
+nc = 2^4
 p = 1
-l = 1 # Patch size parameter
+l = 3 # Patch size parameter
 
 model_h = simplexify(CartesianDiscreteModel(domain, (nf,nf)));
 Ωf = Triangulation(model_h);
@@ -17,7 +17,7 @@ model_h = simplexify(CartesianDiscreteModel(domain, (nf,nf)));
 model_H = simplexify(CartesianDiscreteModel(domain, (nc,nc)));
 Ωc = Triangulation(model_H);
 σ_coarse = get_cell_node_ids(Ωc);
-R = vec(map(x->SVector(Tuple(x)), σ));
+R = vec(map(x->SVector(Tuple(x)), σ_coarse));
 tree = BruteTree(R, ElemDist());
 num_coarse_cells = num_cells(Ωc);
 num_fine_cells = num_cells(Ωf);
@@ -44,8 +44,8 @@ patch_fine_elems = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems
 patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ_fine);
 #@btime get_patch_global_node_ids($patch_fine_elems, $σ_fine);
 
-interior_global = map(get_interior_indices_direct, patch_fine_node_ids);
-boundary_global = map(get_boundary_indices_direct, patch_fine_node_ids);
+interior_global = lazy_map(get_interior_indices_direct, patch_fine_node_ids);
+boundary_global = lazy_map(get_boundary_indices_direct, patch_fine_node_ids);
 #@btime map(get_interior_indices_direct, $patch_fine_node_ids);
 #@btime map(get_boundary_indices_direct, $patch_fine_node_ids);
 interior_boundary_global = (interior_global, boundary_global);
