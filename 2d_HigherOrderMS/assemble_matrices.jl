@@ -48,12 +48,13 @@ function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, 
   diameters = lazy_map(x->max(norm(x[1]-x[2]), norm(x[2]-x[3]), norm(x[3]-x[1])), coarse_cell_coords)
   αβ = poly_exps(p)
   for i=1:num_patch_coarse_cells
+    node_ids = patch_local_node_ids[i]
     centroid = centroids[i]   
     diameter = diameters[i]    
     for j=1:n_monomials
       b = x->ℳ(x, centroid, diameter, αβ[j])    
       lh(v) = ∫(b*v)dΩ
-      L[patch_local_node_ids[i],index] += assemble_vector(lh, fine_space)[patch_local_node_ids[i]]
+      L[node_ids,index] += assemble_vector(lh, fine_space)[node_ids]
       index = index+1
     end
   end
@@ -116,3 +117,62 @@ end
 Function to get the saddle point system given the stiffness and the rectangular matrix
 """
 saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
+
+
+function assemble_ms_matrix!(global_matrix, elem_matrices, p, KorM)
+  fill!(global_matrix,0.0)
+  num_coarse_cells = size(elem_matrices,1)
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  patch_coarse_dof = lazy_map(Broadcasting(elem_to_dof), 1:num_coarse_cells)  
+  B = collect(elem_matrices)
+  for i=1:num_coarse_cells, j=1:num_coarse_cells
+    global_matrix[patch_coarse_dof[i], patch_coarse_dof[j]] += B[i]'*KorM*B[j]
+  end
+  global_matrix
+end
+function assemble_ms_load!(global_load, elem_vectors, p, F)
+  fill!(global_load,0.0);
+  num_coarse_cells = size(elem_vectors,1);
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  patch_coarse_dof = lazy_map(Broadcasting(elem_to_dof), 1:num_coarse_cells)  
+  B = collect(elem_vectors)
+  for i=1:num_coarse_cells
+    global_load[patch_coarse_dof[i]] += B[i]'*F    
+  end
+  global_load
+end
+
+function assemble_ms_matrix(elem_matrices, p, KorM)
+  num_coarse_cells = size(elem_matrices, 1)
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  global_matrix = zeros(Float64, num_coarse_cells*n_monomials, num_coarse_cells*n_monomials)
+  assemble_ms_matrix!(global_matrix, elem_matrices, p, KorM)
+end
+
+function assemble_ms_load(elem_vecs, p, F)
+  num_coarse_cells = size(elem_vecs, 1)
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  global_vec = zeros(Float64, num_coarse_cells*n_monomials)  
+  assemble_ms_load!(global_vec, elem_vecs, p, F)
+end
+
+function get_fine_scale!(res, elem_vecs, p, solms)
+  fill!(res,0.0)
+  num_coarse_cells = size(elem_vecs, 1)
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  patch_coarse_dof = lazy_map(Broadcasting(elem_to_dof), 1:num_coarse_cells)  
+  for i=1:num_coarse_cells
+    res .+= elem_vecs[i]*solms[patch_coarse_dof[i]]
+  end
+  display(res)
+  res
+end
+
+function get_fine_scale(elem_vecs, p, solms)
+  res = zeros(Float64, size(elem_vecs[1],1))
+  get_fine_scale!(res, elem_vecs, p, solms)
+  res
+end

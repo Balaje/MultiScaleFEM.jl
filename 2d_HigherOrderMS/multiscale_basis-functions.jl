@@ -127,14 +127,14 @@ function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
   elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
 
   # Return the Object
-  MultiScaleTriangulation(Ωc, Ωf, interior_boundary_global, elem_global_node_ids)
+  MultiScaleTriangulation(Ωc, Ωf, interior_boundary_global, (elem_global_node_ids, patch_coarse_elems))
 end
 
 
 struct MultiScaleFESpace <: FESpace
   Ω::MultiScaleTriangulation
   Uh::FESpace
-  basis_vec_ms::SparseMatrixCSC{Float64,Int64}
+  basis_vec_ms
 end
 
 """
@@ -161,7 +161,7 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A:
   # Extract the necessay data from the Triangulation
   Ωf = Ωms.Ωf
   Ωc = Ωms.Ωc
-  elem_global_node_ids = Ωms.local_to_global_map
+  elem_global_node_ids = Ωms.local_to_global_map[1]
   elem_global_unique_node_ids = lazy_map(get_unique_node_ids, elem_global_node_ids)
   # Build the background fine-scale FESpace of order q
   reffe = ReferenceFE(lagrangian, Float64, q)
@@ -171,10 +171,20 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A:
   L = assemble_rect_matrix(Ωc, Uh, p, elem_global_unique_node_ids);
   Λ = assemble_rhs_matrix(Ωc, p)
 
-  interior_global, _ = Ωms.interior_boundary_global # Since we have zero boundary conditions
+  interior_global_dofs = Ωms.interior_boundary_global[1] # Since we have zero boundary conditions, we extract only the interior nodes
+
+  num_coarse_cells = num_cells(Ωc)
+  n_monomials = Int((p+1)*(p+2)*0.5)
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
 
   # Obtain the basis functions
-  basis_vec_ms = get_ms_bases(K, L, Λ, interior_global, p); 
+  basis_vec_ms = lazy_map(get_ms_bases, 
+    lazy_fill(K, num_coarse_cells), 
+    lazy_fill(L, num_coarse_cells), 
+    lazy_fill(Λ, num_coarse_cells), 
+    interior_global_dofs, 
+    coarse_dofs);
 
   MultiScaleFESpace(Ωms, Uh, basis_vec_ms)
 end
@@ -182,51 +192,16 @@ end
 """
 Function to obtain the multiscale bases functions
 """
+
 function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, 
   lmat::SparseMatrixCSC{Float64,Int64}, 
   rhsmat::SparseMatrixCSC{Float64,Int64}, 
   interior_dofs, 
-  p::Int64)    
+  coarse_dofs)
   n_fine_dofs = size(lmat, 1)
-  n_coarse_dofs = size(lmat, 2)
-  num_coarse_cells = size(interior_dofs, 1)
-  n_monomials = Int64((p+1)*(p+2)*0.5)
-  coarse_dofs = [n_monomials*i-n_monomials+1:n_monomials*i for i in 1:num_coarse_cells]
-  basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)
-  X = array_cache(interior_dofs)
-  for i=1:num_coarse_cells
-    I = getindex!(X, interior_dofs, i)
-    J = coarse_dofs[i]
-    patch_stima = stima[I, I]
-    patch_lmat = lmat[I, J]
-    patch_rhs = rhsmat[J, J]
-    LHS = saddle_point_system(patch_stima, patch_lmat)
-    RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]
-    sol = LHS\RHS
-    for j=1:lastindex(J)
-      basis_vec_ms[I, J[j]] = sol[1:length(I), j]
-    end
-  end
-  basis_vec_ms
-end
-
-function bases_cache(Ω::MultiScaleTriangulation, p::Int64)
-  n_fine_dofs = num_nodes(Ω.Ωf)
-  n_monomials = Int64((p+1)*(p+2)*0.5)
-  interior_dofs_cache = array_cache(Ω.interior_boundary_global[1])
-  basis_cache = zeros(Float64, n_fine_dofs, n_monomials)
-  interior_dofs_cache, basis_cache
-end
-
-function get_ms_bases!(cache, stima::SparseMatrixCSC{Float64, Int64}, 
-  lmat::SparseMatrixCSC{Float64,Int64}, 
-  rhsmat::SparseMatrixCSC{Float64,Int64}, 
-  interior_dofs, 
-  p::Int64, el::Int64)
-  interior_dofs_cache, basis_vec_ms = cache
-  n_monomials = Int64((p+1)*(p+2)*0.5)
-  coarse_dofs = n_monomials*el-n_monomials+1:n_monomials*el
-  I = getindex!(interior_dofs_cache, interior_dofs, el)
+  n_coarse_dofs = length(coarse_dofs)
+  basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)    
+  I = interior_dofs
   J = coarse_dofs
   patch_stima = stima[I, I]
   patch_lmat = lmat[I, J]
@@ -240,9 +215,6 @@ function get_ms_bases!(cache, stima::SparseMatrixCSC{Float64, Int64},
   end    
   basis_vec_ms
 end
-
-get_matrix_proj(K::SparseMatrixCSC{Float64, Int64}, B::Matrix{Float64}) =  B'*K*B
-get_vector_proj(K::SparseMatrixCSC{Float64, Int64}, B::Matrix{Float64}) = B'*K
 
 function get_boundary_indices_direct(σ)
   c = groupcount(combinedims(σ))
