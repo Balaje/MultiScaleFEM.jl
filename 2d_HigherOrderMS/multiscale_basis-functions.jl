@@ -210,6 +210,40 @@ function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64},
   basis_vec_ms
 end
 
+function bases_cache(Ω::MultiScaleTriangulation, p::Int64)
+  n_fine_dofs = num_nodes(Ω.Ωf)
+  n_monomials = Int64((p+1)*(p+2)*0.5)
+  interior_dofs_cache = array_cache(Ω.interior_boundary_global[1])
+  basis_cache = zeros(Float64, n_fine_dofs, n_monomials)
+  interior_dofs_cache, basis_cache
+end
+
+function get_ms_bases!(cache, stima::SparseMatrixCSC{Float64, Int64}, 
+  lmat::SparseMatrixCSC{Float64,Int64}, 
+  rhsmat::SparseMatrixCSC{Float64,Int64}, 
+  interior_dofs, 
+  p::Int64, el::Int64)
+  interior_dofs_cache, basis_vec_ms = cache
+  n_monomials = Int64((p+1)*(p+2)*0.5)
+  coarse_dofs = n_monomials*el-n_monomials+1:n_monomials*el
+  I = getindex!(interior_dofs_cache, interior_dofs, el)
+  J = coarse_dofs
+  patch_stima = stima[I, I]
+  patch_lmat = lmat[I, J]
+  patch_rhs = rhsmat[J, J]
+  LHS = saddle_point_system(patch_stima, patch_lmat)  
+  RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]      
+  luA = lu(LHS)  
+  ldiv!(luA, RHS)  
+  for j=1:lastindex(J), i=1:lastindex(I)        
+    basis_vec_ms[I[i],j] = RHS[i,j]        
+  end    
+  basis_vec_ms
+end
+
+get_matrix_proj(K::SparseMatrixCSC{Float64, Int64}, B::Matrix{Float64}) =  B'*K*B
+get_vector_proj(K::SparseMatrixCSC{Float64, Int64}, B::Matrix{Float64}) = B'*K
+
 function get_boundary_indices_direct(σ)
   c = groupcount(combinedims(σ))
   [k for (k,v) in zip(c.indices,c.values) if (v==1) || (v==2) || (v==3)]

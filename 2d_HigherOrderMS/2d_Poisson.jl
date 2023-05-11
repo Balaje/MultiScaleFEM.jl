@@ -6,11 +6,11 @@ include("2d_HigherOrderMS.jl");
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-nf = 2^9;
+nf = 2^8;
 q = 1;
 nc = 2^4;
 p = 1;
-l = 5; # Patch size parameter
+l = 3; # Patch size parameter
 
 Ωms = MultiScaleTriangulation(domain, nf, nc, l);
 
