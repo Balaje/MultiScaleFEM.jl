@@ -26,7 +26,7 @@ function get_reference_solution(domain::Tuple, nf::Int64, q::Int64, A, f)
   uh
 end
 
-nf = 2^9
+nf = 2^7
 q = 1
 uh = get_reference_solution(domain, nf, q, A, f);
 
