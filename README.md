@@ -104,13 +104,9 @@ $$
 
 where $\epsilon = 2^{-12}$ denotes the scale of the randomness, i.e, the diffusion coefficient is constant at an interval of size $\epsilon$. We can observe that the multiscale method captures the exact solution accurately at small scales using relatively small elements `(N=8)` in the coarse space. The fine-scale mesh size was taken to be equal to $h = 2^{-15}$.
 
-| Smooth Diffusion Term | Oscillatory Diffusion Term | 
-| --- | --- |
-| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_6_oscillatory.png) |
-
-Random Diffusion Term |
---- |
-![Random Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_7_random.png) | 
+| Smooth Diffusion Term | Oscillatory Diffusion Term | Random Diffusion Term |
+| --- | --- | --- |
+| ![Smooth Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_5_smooth.png) | ![Oscillatory Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_6_oscillatory.png) | ![Random Diffusion Coefficient](./HigherOrderMS/Images/PoissonEquation/sol_7_random.png) | 
 
 
 ### Heat equation in 1D
@@ -206,7 +202,7 @@ Oscillatory coefficient | Random coefficients |
 
 ##### Heat equation
 
-###### Smooth and Oscillatory Diffusion coefficient
+###### Smooth Diffusion coefficient
 
 I solve the following parabolic initial boundary value problem using the multiscale method `(HigherOrderMS/rate_of_convergence_Heat_Equation.jl)`.
 
@@ -218,27 +214,42 @@ $$
 \end{align*}
 $$
 
-I take $h = 2^{-16}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-3}$ and solve till final time $T = 1.0$. I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h$. I compute the rate of convergence for the smooth diffusion coefficient 
+I take $h = 2^{-16}$ and $H = 2^0, 2^{-1}, \cdots, 2^{-7}$. In the temporal direction, I set $\Delta t = 10^{-3}$ and solve till final time $T = 1.0$. I use the fourth order backward difference formula for discretizing the temporal part. The exact solution was taken to be the standard finite element solution on a mesh whose size is $h=2^{-15}$. I compute the rate of convergence for the smooth diffusion coefficient 
 
 $$
 A(x) = 1.0,
 $$
 
-and the oscillatory coefficient
+
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p2.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p3.png) |
+
+Testing with the non-constant smooth diffusion coefficient:
 
 $$
-A(x) = \left(2 + \cos{\frac{2\pi x}{2^{-6}}}\right)^{-1} .
+A(x) = \left(2 + \cos \left(\frac{2π x}{2^{-1}}\right) \right)^{-1}
 $$
 
-Constant coefficient | Oscillatory coefficient |
---- | --- |
-![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_9_heat_eq_osc.png)
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p1_smooth.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p2_smooth.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p3_smooth.png) |
 
-Similar behavior can be seen for higher order methods also.
+The convergence seems to be optimal in all cases.
 
-`(p=2)` (Oscillatory coefficient) | `(p=3)` (Oscillatory coefficient) |
---- | --- |
-![](./HigherOrderMS/Images/HeatEquation/ooc_11_heat_eq_osc_p2.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_12_heat_eq_osc_p3.png) |
+###### Oscillatory Diffusion coefficient
+
+I test the above initial boundary value problem with the following oscillatory diffusion coefficient:
+
+$$
+A(x) = \left(2 + \cos \left(\frac{2π x}{2^{-6}}\right) \right)^{-1}
+$$
+
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p1_osc.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p2_osc.png) | ![](./HigherOrderMS/Images/HeatEquation/ooc_8_heat_eq_p3_osc.png) |
+
+In case of `p=1`, the method seems to show optimal convergence rates for most values of $H$, but for `p=2,3` the convergence rates deteriorate significantly. Not sure if this is expected for the highly oscillatory case. Let us now proceed to random coefficients.
 
 ###### Random diffusion coefficient
 
@@ -253,7 +264,7 @@ Finally, I test the problem for random-coefficients which are piecewise-constant
 ![](./HigherOrderMS/Images/HeatEquation/ooc_p3_random_coeff_t1.0.png) | ![](./HigherOrderMS/Images/HeatEquation/random_coeff.png) |
 
 
-The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered in the next section.
+The method again shows optimal convergence for `p=1` but seem to slightly deteriorate for `p=2,3` as the mesh-size decreases. This can be seen in the case of the wave equation as well, which will be covered later.
 
 ###### Some more tests for random diffusion coefficients
 
@@ -332,41 +343,10 @@ and solve the problem using the multiscale method using `p=3`. I take the coarse
     2.586056497047787, 
     2.79064487191708, 
     2.0202102051473467, 
-    0.8269042168959881]
-    ```
-
-3. **Case 3**
-
-    However, the rate becomes optimal if I take a smooth diffusion coefficient or piecewise constant coefficients at a much coarser scale. Here I assume $f(x,t) = 0, \quad u_0(x) = \sin (\pi x)$.
-
-    `(p=3)` Smooth Coefficient |
-    --- |
-    ![](./HigherOrderMS/Images/HeatEquation/ooc_p3_smooth_coeff_t0.5_f_0_u0_sin_pi_x.png) |
-
-    ``` julia
-    L²Error = 
-    [1.0825524118533765e-8, 
-    7.334129301856646e-10, 
-    1.1287478539913153e-11, 
-    2.1202768627351573e-13, 
-    4.777345078223101e-15, 
-    2.403254052690372e-14, 
-    1.4162339474999647e-14, 
-    2.3721930180271398e-14]
-
-    log.(L²Error[2:end] ./ L²Error[1:end - 1]) ./ log(0.5) = 
-    [3.8836673633874934, 
-    6.021830551287917, 
-    5.73432677243487, 
-    5.471899762295737,
-    -2.3307081719004294, 
-    0.7629295629348244,
-    -0.744161798592859]
+    0.8269042168959881]    
     ```
 
 ##### Wave Equation
-
-###### Constant wave speed
 
 I solve the following wave equation along with the prescribed initial and boundary conditions
 
@@ -381,29 +361,19 @@ $$
 
 using the multiscale method in space and Crank-Nicolson method in time. For the temporal discretization, I assume $\Delta t = 10^{-3}$ and solve till final times $T = 1.5$ s. Here I consider three wave speeds
 
-Constant Wave Speed | Smooth Wave Speed |
---- | --- |
-![](./HigherOrderMS/Images/WaveEquation/constant_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/smooth_wave_speed.png) | 
+Constant Wave Speed | Smooth Wave Speed | Oscillatory Wave Speed | 
+--- | --- | --- |
+![](./HigherOrderMS/Images/WaveEquation/constant_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/smooth_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/oscillatory_wave_speed.png) |
 
-Oscillatory Wave Speed | 
---- |
-![](./HigherOrderMS/Images/WaveEquation/oscillatory_wave_speed.png) |
+###### Smooth Wave-speeds
 
 First, I assume that the wave speed $c(x) = 1.0$. The exact solution is assumed to be the numerical solution obtained using the standard finite element method on a fine mesh of size $h=2^{-15}$. I take the coarse mesh size $H = 2^0, 2^{-1}, \cdots, 2^{-6}$ to study the convergence rates. Following plots show the rate of convergence of the multiscale method in space for `(p=1,2,3)`:
 
-`(p=1)` | `(p=2)` | 
---- | --- | 
-![](./HigherOrderMS/Images/WaveEquation/ooc_p1_constant_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_constant_wave_speed.png)  | 
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_constant_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_constant_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_constant_wave_speed.png)  | 
 
-`(p=3)` |
---- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p3_constant_wave_speed.png)  | 
-
-I observe that for constant wave speed case, the method converges with the optimal convergence rates. 
-
-###### Smooth and varying wave speed
-
-I now solve the problem with the following data
+I observe that for constant wave speed case, the method converges with the optimal convergence rates. I now solve the problem with the following data
 
 $$
 \begin{align*}
@@ -414,27 +384,19 @@ $$
 \end{align*}
 $$
 
-with a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\pi x\right)\right)^{-1}$ (shown above). Again, I observe optimal convergence rates when I solve till $T=1.5$ s.
+Now I use a smooth, but non-constant wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\pi x\right)\right)^{-1}$ (shown above). Again, I observe optimal convergence rates when I solve till $T=1.5$ s.
 
-`(p=1)` | `(p=2)` |
---- | --- | 
-![](./HigherOrderMS/Images/WaveEquation/ooc_p1_smooth_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_smooth_wave_speed.png)  | 
-
-`(p=3)` |
---- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_smooth_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_smooth_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_smooth_wave_speed.png)  | 
 
 ###### Oscillatory wave-speed without well-prepared data
 
-Now I solve the same problem keeping the initial and boundary data same as Example 2, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
+Now I solve the same problem keeping the initial and boundary data same, but with an oscillatory wave speed $c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2\times 10^{-2}}\right)\right)^{-1}$. Here I observe that the method does not show any convergence. This may be due to the initial data not being "well-prepared", which is an assumption to obtain optimal convergence rates. 
 
-`(p=1)` | `(p=2)` |
---- | --- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p1_oscillatory_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_oscillatory_wave_speed.png)  
-
-`(p=3)` |
---- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p3_oscillatory_wave_speed.png)  | 
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_oscillatory_wave_speed.png)  | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_oscillatory_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_oscillatory_wave_speed.png)  | 
 
 ###### Oscillatory wave-speed with well-prepared data
 
@@ -457,15 +419,9 @@ $$
 
 and solve the problem till $T=1.5$ s, we observe the following convergence rates.
 
-`(p=1)` | `(p=2)` 
---- | --- 
-![](./HigherOrderMS/Images/WaveEquation/ooc_p1_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_osc_forcing.png) 
-
-| `(p=3)` |
-| --- |
-| ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing.png) | 
-
-This maybe due to the initial data being well-prepared (see [Abdulle, A. and Henning, P.](https://www.ams.org/journals/mcom/2017-86-304/S0025-5718-2016-03114-2/)).
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- |  --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing.png) | 
 
 ###### Highly-oscillatory wave-speed with well-prepared data
 
@@ -477,17 +433,13 @@ $$
 
 This gives a highly oscillatory wave-speed, which at a very fine scale looks like smooth function. I still seem to obtain optimal convergence, even for highly oscillatory wave speeds.
 
- Highly oscillating Wave Speed | `(p=1)` |
---- | --- | 
-![](./HigherOrderMS/Images/WaveEquation/highly_osc_wave_speed.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_high_osc_forcing.png) |
-
-| `(p=2)` | `(p=3)` |
---- | --- |
- ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
+`(p=1)` | `(p=2)` | `(p=3)` |
+--- | --- | --- |
+![](./HigherOrderMS/Images/WaveEquation/ooc_p1_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
 
 ###### Highly-oscillatory wave-speed with well-prepared data solved for large final time
 
-Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the above problem with `p=3` at $T=7.5$ s. 
+Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the problem with the highly oscillatory coefficient with `p=3` at $T=7.5$ s. 
 
 `(p=3)` | 
 --- |
@@ -520,11 +472,8 @@ Finally, I solve the problem with the random wave-speed till final time $T = 7.5
 The localized orthogonal decomposition method implementation can be found inside the `LOD/` folder. The program `LOD/main.jl` contains the code to check the rate of convergence of the LOD method. The file `LOD/1dFunctions.jl` contains the routines to compute the standard finite element basis along with the functions assemble the global matrices. The file `LOD/1dFunctionsMultiScale` contains the code to compute the multi-scale basis along with the function to compute the $L^2$ error of the multiscale-FEM solution. Running the code `LOD/main.jl`. The multiscale basis corresponding to $(H=0.25)$ and $\varepsilon=2^{-5}$ along with the finite element solution and the rate of convergence for various mesh-size is shown below:
 
 
-![](./LOD/basis.png) | ![](./LOD/solutions.png) | 
---- | --- | 
-
-![](./LOD/ooc_lod.png) | 
---- |
+![](./LOD/basis.png) | ![](./LOD/solutions.png) | ![](./LOD/ooc_lod.png) | 
+--- | --- | --- |
 
 For more details on the method, refer to [Målqvist, A. et al](https://epubs.siam.org/doi/book/10.1137/1.9781611976458).
 

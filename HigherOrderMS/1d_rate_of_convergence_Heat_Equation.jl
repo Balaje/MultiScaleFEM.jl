@@ -23,7 +23,8 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
   end
 end
 # A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-A(x) = (0.5 + 0.25*cos(2π*x[1]/2e0))^-1 # Smooth Diffusion coefficient
+# A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
+A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
 f(x,t) = 0.0
 u₀(x) = sin(π*x[1])
@@ -33,10 +34,10 @@ u₀(x) = sin(π*x[1])
 # Problem parameters
 nf = 2^15
 q = 1
-qorder = 4
+qorder = 11
 # Temporal parameters
 Δt = 10^-3
-tf = 0.5
+tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -154,8 +155,8 @@ for l=[7,8,9]
   scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
 
-plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
 # Plot the rates along with the diffusion coefficient
 plt2 = plot(plt, plt1, layout=(1,2))

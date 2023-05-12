@@ -32,8 +32,8 @@ U = fine_scale_space.U
 uₕ = FEFunction(U, vcat(bvals[1],sol_ϵ,bvals[2]))
 
 # Coarse scale parameters
-p = 2
-N = [1,2,4,8,16,32,64]
+p = 1
+N = [1,2,4,8,16,32,64,128,256,512]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 

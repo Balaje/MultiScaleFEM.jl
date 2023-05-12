@@ -4,9 +4,6 @@ include("HigherOrderMS.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-## Oscillatory wave speed
-# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
-# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-5))^-1
 ## Random wave speed
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
@@ -21,15 +18,18 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-function c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro)
-  _D(x[1], nds_micro, diffusion_micro)
-end
-f(x,t) = sin(π*x[1])*sin(t)
-uₜ₀(x) = 0.0
-# f(x,t) = 0.0
+# c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
+## Oscillatory wave speed
+# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
+c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
+## Constant wave speed
 # c²(x) = 1.0
 u₀(x) = 0.0
-# u₁(x) = π*sin(π*x[1])
+# uₜ₀(x) = π*sin(π*x[1])
+uₜ₀(x) = 0.0
+
+# f(x,t) = 0.0
+f(x,t) = sin(π*x[1])*sin(t)
 
 # Problem parameters - fine scale
 nf = 2^15
@@ -77,7 +77,7 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 N = [1,2,4,8,16,32,64]
 plt = plot();
 plt1 = plot();
-p = 1;
+p = 3
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -133,5 +133,5 @@ for l=[5,6,7,8]
   scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
 
-plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);

@@ -167,7 +167,6 @@ function get_fine_scale!(res, elem_vecs, p, solms)
   for i=1:num_coarse_cells
     res .+= elem_vecs[i]*solms[patch_coarse_dof[i]]
   end
-  display(res)
   res
 end
 
