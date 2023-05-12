@@ -11,12 +11,12 @@
       - [Oscillatory and Random Diffusion Coefficients](#oscillatory-and-random-diffusion-coefficients)
     + [Time dependent problems](#time-dependent-problems)
       - [Heat equation](#heat-equation)
-        * [Smooth and Oscillatory Diffusion coefficient](#smooth-and-oscillatory-diffusion-coefficient)
+        * [Smooth Diffusion coefficient](#smooth-diffusion-coefficient)
+        * [Oscillatory Diffusion coefficient](#oscillatory-diffusion-coefficient)
         * [Random diffusion coefficient](#random-diffusion-coefficient)
         * [Some more tests for random diffusion coefficients](#some-more-tests-for-random-diffusion-coefficients)
       - [Wave Equation](#wave-equation)
-        * [Constant wave speed](#constant-wave-speed)
-        * [Smooth and varying wave speed](#smooth-and-varying-wave-speed)
+        * [Smooth Wave-speeds](#smooth-wave-speeds)
         * [Oscillatory wave-speed without well-prepared data](#oscillatory-wave-speed-without-well-prepared-data)
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
         * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
@@ -30,10 +30,6 @@
   * [The Multiscale bases](#the-multiscale-bases)
   * [Solution to the multiscale method](#solution-to-the-multiscale-method)
 - [References](#references)
-
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
-
 
 ## Introduction
 
