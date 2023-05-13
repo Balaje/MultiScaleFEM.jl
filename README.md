@@ -1,5 +1,8 @@
 # MultiscaleFEM.jl
 
+## Summary
+
+- [Summary](#summary)
 - [Introduction](#introduction)
 - [Higher order multiscale method](#higher-order-multiscale-method)
   * [Poisson equation in 1D](#poisson-equation-in-1d)
@@ -30,6 +33,38 @@
   * [The Multiscale bases](#the-multiscale-bases)
   * [Solution to the multiscale method](#solution-to-the-multiscale-method)
 - [References](#references)
+
+## Summary
+
+Key: 
+ - :heavy_check_mark: Optimal convergence
+ - :heavy_multiplication_x: No convergence whatsoever.
+ - :question: Optimal convergence for a few mesh points, but then slows down.
+
+**Poisson Equation**
+
+Method | `p=1` | `p=2` | `p=3` |
+ --- | --- | --- | --- |
+Constant/Smooth Coefficient | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+Oscillatory Coefficient | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+Random Coefficient | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+
+**Heat Equation**
+
+Method | `p=1` | `p=2` | `p=3` |
+ --- | --- | --- | --- |
+Constant/Smooth Coefficient | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+Oscillatory Coefficient | :heavy_check_mark: | :question: | :question: |
+Random Coefficient | :heavy_check_mark: | :question: | :question: |
+
+**Wave Equation**
+
+Method | `p=1` | `p=2` | `p=3` |
+ --- | --- | --- | --- |
+Constant/Smooth Coefficient | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+Oscillatory Coefficient (Without well-prepared initial data) | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: |
+Oscillatory Coefficient (With well-prepared initial data) | :heavy_check_mark: | :question: | :question: |
+Random Coefficient | :heavy_check_mark: | :question: | :question: |
 
 ## Introduction
 
