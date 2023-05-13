@@ -1,7 +1,5 @@
 # MultiscaleFEM.jl
 
-## Summary
-
 - [Summary](#summary)
 - [Introduction](#introduction)
 - [Higher order multiscale method](#higher-order-multiscale-method)
