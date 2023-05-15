@@ -585,7 +585,7 @@ $$
 \end{align}
 $$
 
-with $A(x,y) = 1.0$ and $f(x,y) = 2\pi^2\sin(\pi x)\sin(\pi y)$. To obtain the convergence rates, I use the reference solution computed using the traditional finite element method at $h=2^{-7}$ which is also the fine scale discretization parameter. I take the coarse space discretization $H = 2^{0}, 2^{-1}, 2^{-2}, 2^{-3}, 2^{-4}$ and then compute the $L^2$- and $H^1$-errors.
+with $A(x,y) = 1.0$ and $f(x,y) = 2\pi^2\sin(\pi x)\sin(\pi y)$. To obtain the convergence rates, I use the reference solution computed using the traditional finite element method at $h=2^{-7}$ which is also the fine scale discretization parameter. I take the coarse space discretization $H = 2^{0}, 2^{-1}, 2^{-2}, 2^{-3}, 2^{-4}$ and then compute the $L^2$- and $H^1$-errors. 
 
 Poisson Equation Solution |
 --- |
@@ -597,7 +597,7 @@ Convergence rates | |
 ![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p0_A_1.0.png) | ![](./2d_HigherOrderMS/Images/2d_ooc_Poisson_p1_A_1.0.png) | 
 
 
-The rates of convergence seem to be optimal as most of the rates are parallel to the reference lines. The slow-down in the convergence rates is expected in the higher order method due to the presence of growth term associated with the patch size (See [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321)). For the `p=1` case in the above figure, a much smaller find scale parameter needs to be used, in this case, $h=2^{-9}$. We again observe optimal convergence in both $L^2$- and $H^1$-errors.
+The rates of convergence seem to be optimal as most of the rates are parallel to the reference lines. The slow-down in the convergence rates is expected in the higher order method due to the presence of growth term associated with the patch size (See [Maier, R.](https://epubs.siam.org/doi/abs/10.1137/20M1364321)). For the `p=1` case in the above figure, a much smaller find scale parameter needs to be used, in this case, $h=2^{-9}$. We again observe optimal convergence in both $L^2$- and $H^1$-errors. **The code still needs to be tested more, and may contain errors.**
 
 ## References
 
