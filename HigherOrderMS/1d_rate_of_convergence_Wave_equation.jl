@@ -18,10 +18,10 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-# c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
+c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
 ## Oscillatory wave speed
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
-c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
+# c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
 ## Constant wave speed
 # c²(x) = 1.0
 u₀(x) = 0.0
@@ -88,7 +88,8 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[5,6,7,8]
+for l=[7,8]
+# for l=[9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))

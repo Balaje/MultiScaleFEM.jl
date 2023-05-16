@@ -486,6 +486,46 @@ Next, I show the rate of convergence results for a random piecewise-constant in 
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_random_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing.png) |
 
+The errors and the convergence rates for `p=3` and `l=7,8` are as follows
+
+``` julia
+L²Error = 
+ [2.813836726235343e-5,
+ 4.988827991816158e-7,
+ 1.1127711098892783e-8,
+ 1.7775346709062124e-9,
+ 4.0414836315938045e-10,
+ 1.3890518527993854e-10,
+ 1.556413958602914e-10]
+
+log.(L²Error[2:end]./L²Error[1:end-1])./log(0.5) =   
+ [5.817693879953462,
+ 5.486472153096103,
+ 2.6462072647066717,
+ 2.1369207902329976,
+ 1.5407845490107315,
+ -0.16412536859864296]
+```
+
+ ``` julia
+H¹Error = 
+[0.0005317826685733046,
+ 1.6555166712390332e-5,
+ 6.961151076781885e-7,
+ 2.251135974344496e-7,
+ 8.721593380331359e-8,
+ 9.539812707649906e-8,
+ 2.0509237859631738e-7]
+
+log.(H¹Error[2:end]./H¹Error[1:end-1])./log(0.5) = 
+[5.005483314800532,
+ 4.57181184280305,
+ 1.6286726840033017,
+ 1.3679895663609516,
+ -0.1293692120953031,
+ -1.104241033451946]
+ ```
+
 
 ###### Random wave-speed solved for large final time
 
@@ -494,6 +534,47 @@ Finally, I solve the problem with the random wave-speed till final time $T = 7.5
 | `(p=1)` | `(p=3)` |
 --- | --- |
  ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_random_forcing_t7.5.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_random_forcing_t7.5.png) | 
+
+ The convergence rates of the method for `p=3` and `l=7,8` is as follows:
+
+ ``` julia
+L²Error = 
+ [2.2320485961861755e-5,
+ 4.961755800340794e-7,
+ 4.8958170476893534e-8,
+ 9.246302547431055e-9,
+ 1.5101989685099656e-9,
+ 2.9265375851543793e-10,
+ 1.3435020886818075e-10]
+
+log.(L²Error[2:end]./L²Error[1:end-1])./log(0.5) = 
+ [5.491373894905659,
+ 3.3412291808248495,
+ 2.4046011720596137,
+ 2.614137932691149,
+ 2.3674719246984544,
+ 1.1231962428927407]
+ ```
+
+``` julia
+H¹Error = 
+ [0.00043096029006185364,
+ 1.8271795197744734e-5,
+ 3.4454468429994438e-6,
+ 1.248128813801055e-6,
+ 4.295718221451051e-7,
+ 1.7287799305600616e-7,
+ 1.786421313606517e-7]
+
+log.(H¹Error[2:end]./H¹Error[1:end-1])./log(0.5) = 
+  [4.559864650964216,
+  2.4068553806810433,
+  1.4649242634423194,
+  1.5387955683444856,
+  1.3131451334069864,
+ -0.0473181398874861]
+
+```
 
 ## Localized Orthogonal Decomposition Method
 -------
