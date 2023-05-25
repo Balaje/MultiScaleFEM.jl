@@ -20,8 +20,6 @@
         * [Smooth Wave-speeds](#smooth-wave-speeds)
         * [Oscillatory wave-speed without well-prepared data](#oscillatory-wave-speed-without-well-prepared-data)
         * [Oscillatory wave-speed with well-prepared data](#oscillatory-wave-speed-with-well-prepared-data)
-        * [Highly-oscillatory wave-speed with well-prepared data](#highly-oscillatory-wave-speed-with-well-prepared-data)
-        * [Highly-oscillatory wave-speed with well-prepared data solved for large final time](#highly-oscillatory-wave-speed-with-well-prepared-data-solved-for-large-final-time)
         * [Random wave-speed](#random-wave-speed)
         * [Random wave-speed solved for large final time](#random-wave-speed-solved-for-large-final-time)
 - [Localized Orthogonal Decomposition Method](#localized-orthogonal-decomposition-method)
@@ -451,28 +449,6 @@ and solve the problem till $T=1.5$ s, we observe the following convergence rates
 `(p=1)` | `(p=2)` | `(p=3)` |
 --- | --- |  --- |
 ![](./HigherOrderMS/Images/WaveEquation/ooc_p1_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing.png) | 
-
-###### Highly-oscillatory wave-speed with well-prepared data
-
-To be extra sure, now I run the above problem with the same non-zero forcing and zero initial data, but with the wave speed
-
-$$
-c^2(x) = \left(0.25 + 0.125\cos\left(\frac{2\pi x}{2 \times 10^{-5}}\right)\right)^{-1}
-$$
-
-This gives a highly oscillatory wave-speed, which at a very fine scale looks like smooth function. I still seem to obtain optimal convergence, even for highly oscillatory wave speeds.
-
-`(p=1)` | `(p=2)` | `(p=3)` |
---- | --- | --- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p1_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p2_high_osc_forcing.png) | ![](./HigherOrderMS/Images/WaveEquation/ooc_p3_high_osc_forcing.png) | 
-
-###### Highly-oscillatory wave-speed with well-prepared data solved for large final time
-
-Optimal convergence for the highly oscillatory case is observed even when we solve the problem for a long time. Here I show an example for the problem with the highly oscillatory coefficient with `p=3` at $T=7.5$ s. 
-
-`(p=3)` | 
---- |
-![](./HigherOrderMS/Images/WaveEquation/ooc_p3_osc_forcing_s7.5s.png) |
 
 ###### Random wave-speed
 
