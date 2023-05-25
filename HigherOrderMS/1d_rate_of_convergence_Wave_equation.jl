@@ -5,7 +5,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 ## Random wave speed
-Neps = 2^12
+Neps = 2^7
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 wave_speed_micro = 0.5 .+ 4.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -77,7 +77,7 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 N = [1,2,4,8,16,32,64]
 plt = plot();
 plt1 = plot();
-p = 3
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -88,7 +88,7 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[7,8]
+for l=[5,6,7,8]
 # for l=[9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
@@ -136,3 +136,9 @@ end
 
 plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+
+# Also plot the reference lines with slope 2,3 to check the reduced rate
+plot!(plt, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+plot!(plt, 1 ./N, (1 ./N).^3, label="Order 3", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+plot!(plt1, 1 ./N, (1 ./N).^1, label="Order 1", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
