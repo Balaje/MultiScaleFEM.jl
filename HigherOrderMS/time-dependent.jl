@@ -25,15 +25,29 @@ function CN!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Vₙ::Abstrac
   (U, 2*(U-Uₙ)/Δt - Vₙ)
 end
 """
-General Newmark scheme for the wave equation
+General Newmark scheme for the wave equation:
+β = 0, γ = 1/2 (Leap-Frog Scheme)
+β = 1/4, γ = 1/2 (Crank Nicolson Scheme)
 """
-function NM!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₊₁::AbstractVector{Float64}, Δt::Float64, 
+function NM!(fcache, tₙ::Float64, Uₙ::AbstractVector{Float64}, Uₙ₋₁::AbstractVector{Float64}, Δt::Float64, 
   K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, β::Float64, γ::Float64)
   M⁺ = (M + Δt^2*(β)*K)
   M⁻ = (M - Δt^2/4*(1-4β+2γ)*K)
   M̃  = (M + Δt^2/2*(1+2β-2γ)*K)
-  Fₙ = Δt^2*(f!(fcache,tₙ-Δt)+f!(fcache,tₙ))*0.5
-  M⁺\(2*M⁻*Uₙ₊₁ - M̃ *Uₙ + Fₙ)
+  Fₙ = Δt^2*f!(fcache, tₙ)  
+  M⁺\(2*M⁻*Uₙ - M̃ *Uₙ₋₁ + Fₙ)
+end
+"""
+The first step in the General Newmark Method for the wave equation. 
+The velocity intitial condition (time derivative) is discretized using the central difference formula.
+"""
+function NM1!(fcache, U₀::AbstractVector{Float64}, V₀::AbstractVector{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, β::Float64, γ::Float64)
+  M⁺ = (2M + Δt^2/2*(1+4β-2γ)*K)
+  M⁻ = (M - Δt^2/4*(1-4β+2γ)*K)
+  M̃  = (M + Δt^2/2*(1+2β-2γ)*K)  
+  Fₙ = Δt^2*f!(fcache, 0.0)
+  M⁺\(2*M⁻*U₀ + 2*Δt*M̃ *V₀ + Fₙ)
 end
 
 """

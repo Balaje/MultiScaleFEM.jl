@@ -60,6 +60,7 @@ let
   V₀ = uₜ₀.(nds_fine[freenodes])
   global U = zero(U₀)
   cache = fine_scale_space, freenodes
+  #= Crank Nicolson
   t = 0.0
   for i=1:ntime
     U₁, V₁ = CN!(cache, t, U₀, V₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!)
@@ -67,7 +68,18 @@ let
     (i%100 == 0) && print("Done t = "*string(t)*"\n")
     t += Δt
   end
-  U = U₀ # Final time solution  
+  U = U₀ # Final time solution   
+  =#
+  # Leap-frog method
+  t = 0.0
+  U₁ = NM1!(cache, U₀, V₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, 0.25, 0.5)
+  t += Δt
+  for i=2:ntime
+    U = NM!(cache, t, U₁, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, 0.25, 0.5)
+    U₀ = U₁
+    U₁ = U
+    t += Δt
+  end          
 end
 Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
@@ -88,8 +100,8 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[5,6,7,8]
-# for l=[9]
+# for l=[5,6,7,8]
+for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -107,13 +119,25 @@ for l=[5,6,7,8]
         V₀ = setup_initial_condition(uₜ₀, basis_vec_ms, fine_scale_space)
         global U = zero(U₀)
         cache = fine_scale_space, basis_vec_ms
+        #= # Crank Nicolson Method
         t = 0.0
         for i=1:ntime
           U₁, V₁ = CN!(cache, t, U₀, V₀, Δt, Kₘₛ, Mₘₛ, fₙ!)
           U₀, V₀ = U₁, V₁
           t += Δt
         end
-        U = U₀ # Final time solution  
+        U = U₀ # Final time solution   
+        =#
+        # Leap-frog method
+        t = 0.0
+        U₁ = NM1!(cache, U₀, V₀, Δt, Kₘₛ, Mₘₛ, fₙ!, 0.0, 0.5)
+        t += Δt
+        for i=2:ntime
+          U = NM!(cache, t, U₁, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, 0.0, 0.5)
+          U₀ = U₁
+          U₁ = U
+          t += Δt
+        end                
       end
       U_fine_scale = basis_vec_ms*U
       
