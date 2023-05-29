@@ -518,6 +518,14 @@ Again, we observe that the rates are approx $\approx 3$. The following figure su
 
 ![](./HigherOrderMS/Images/WaveEquation/random_coeffs.png)
 
+The choice of the time-step method also seems to influence the convergence rates. We consider the Newmark-Beta method with $\beta=0.25, \gamma=0.5$ which leads to the Crank Nicolson Method (an implicit scheme) and the choice $\beta=0.0, \gamma=0.5$ leads to the Leap-Frog Method (an explicit scheme).
+
+https://github.com/Balaje/MultiScaleFEM.jl/blob/4e5f8eadc117c733b28fe1f356b12dcddc264866/HigherOrderMS/time-dependent.jl#L32
+
+For a given time step value, the leap frog scheme saturates quickly compared to the Crank-Nicolson method as shown in the figure below
+
+![](./HigherOrderMS/Images/CN-LF.png)
+
 ###### Random wave-speed solved for large final time
 
 Finally, I solve the problem with the random wave-speed till final time $T = 7.5$ s, and show the convergence rates for `p=1,3`. The rate of convergence seem optimal for `p=1`, but seems to slow down for the `p=3` case. The reference solution was obtained using the traditional finite element method on a very fine mesh $h=2^{-15}$ whereas the oscillations are on the scale $\epsilon = 2^{-12}$.

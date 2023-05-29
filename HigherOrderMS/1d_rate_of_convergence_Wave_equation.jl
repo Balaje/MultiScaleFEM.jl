@@ -70,7 +70,7 @@ let
   end
   U = U₀ # Final time solution   
   =#
-  # Leap-frog method
+  # Use the Newmark-beta scheme and choose β=0.25, γ=0.5. This will choose the implicit Crank Nicolson Method
   t = 0.0
   U₁ = NM1!(cache, U₀, V₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, 0.25, 0.5)
   t += Δt
@@ -87,8 +87,8 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 ##### Now begin solving using the multiscale method #####
 # Create empty plots
 N = [1,2,4,8,16,32,64]
-plt = plot();
-plt1 = plot();
+# plt = plot();
+# plt1 = plot();
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
@@ -100,8 +100,8 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-# for l=[5,6,7,8]
-for l=[8]
+for l=[5,6,7,8]
+# for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -128,7 +128,7 @@ for l=[8]
         end
         U = U₀ # Final time solution   
         =#
-        # Leap-frog method
+        # Leap-frog method from the Newmark scheme with β=0, γ=0.25
         t = 0.0
         U₁ = NM1!(cache, U₀, V₀, Δt, Kₘₛ, Mₘₛ, fₙ!, 0.0, 0.5)
         t += Δt
@@ -152,17 +152,17 @@ for l=[8]
     end
   end
   println("Done l = "*string(l))
-  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*"), Δt = "*string(Δt)*" Leap-Frog", lw=2)
+  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*"), Δt = "*string(Δt)*" Leap-Frog", lw=2)
   scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
 
-plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+#= plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
 # Also plot the reference lines with slope 2,3 to check the reduced rate
 plot!(plt, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
 plot!(plt, 1 ./N, (1 ./N).^3, label="Order 3", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
 plot!(plt1, 1 ./N, (1 ./N).^1, label="Order 1", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10); =#
