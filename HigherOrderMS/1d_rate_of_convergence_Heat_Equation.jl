@@ -88,7 +88,7 @@ N = [1,2,4,8,16,32,64]
 # Create empty plots
 # plt = plot();
 # plt1 = plot();
-p = 3;
+p = 1;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -112,9 +112,9 @@ for l=[8]
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
       # Add the corrected version of the basis
       KLΛ = stima, massma*basis_vec_ms, Mₘₛ
-      l′ = l;
-      # basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
-      basis_vec_ms′ = basis_vec_ms      
+      l′ = l + 5;
+      global basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
+      # basis_vec_ms′ = basis_vec_ms      
       Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
       Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′      
       # basis_vec_ms = basis_vec_ms′
@@ -128,7 +128,7 @@ for l=[8]
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
-        fcache = (fine_scale_space, basis_vec_ms) 
+        fcache = (fine_scale_space, basis_vec_ms′) 
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
