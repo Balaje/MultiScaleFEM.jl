@@ -1,8 +1,10 @@
 include("HigherOrderMS.jl")
+include("corrected_basis.jl")
 
 domain = (0.0,1.0)
 
 A(x) = 0.5
+# A(x) = (1.0 + 0.8*cos(2π*x[1]/2^-7))^-1
 f(x,t) = 0.0
 u₀(x) = sin(π*x[1])
 
@@ -26,6 +28,17 @@ stima = assemble_stiffness_matrix(fine_scale_space, A)
 massma = assemble_mass_matrix(fine_scale_space, x->1.0)
 Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
 Mₘₛ = basis_vec_ms'*massma*basis_vec_ms
+
+KLΛ = stima, massma*basis_vec_ms, Mₘₛ
+l′ = l+3;
+basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)
+Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
+Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′
+# Update the basis
+basis_vec_ms = basis_vec_ms′
+Kₘₛ = Kₘₛ′
+Mₘₛ = Mₘₛ′ 
+
 function fₙ!(cache, tₙ::Float64)
   fspace, basis_vec_ms = cache
   loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
@@ -65,3 +78,9 @@ U_fine_scale = basis_vec_ms*U
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 plt2 = plot(nds_fine, U_fine_scale)
 plot!(plt2, nds_fine, exp(-0.5*π^2*tf)*u₀.(nds_fine))
+
+# Visually compare the basis functions
+nds_fine = LinRange(domain[1], domain[2], q*nf+1)
+b_ind = 10
+plt = plot(nds_fine, basis_vec_ms′[:,b_ind], lw=2, label="New basis")
+plot!(plt, nds_fine, basis_vec_ms[:,b_ind], lw=3, ls=:dash, size=(800,400), label="Old basis")

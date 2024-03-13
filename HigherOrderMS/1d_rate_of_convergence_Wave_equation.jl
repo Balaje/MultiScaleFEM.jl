@@ -1,4 +1,5 @@
 include("HigherOrderMS.jl");
+include("corrected_basis.jl");
 
 #=
 Problem data
@@ -100,7 +101,7 @@ function fₙ!(cache, tₙ::Float64)
   #zeros(Float64, size(basis_vec_ms, 2))
 end   
 
-for l=[5,6,7,8]
+for l=[8]
 # for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
@@ -113,10 +114,20 @@ for l=[5,6,7,8]
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
+      # Add the corrected version of the basis
+      KLΛ = stima, massma*basis_vec_ms, Mₘₛ
+      l′ = l+5;
+      # basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
+      basis_vec_ms′ = basis_vec_ms
+      Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
+      Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′
+      # basis_vec_ms = basis_vec_ms′
+      # Kₘₛ = Kₘₛ′
+      # Mₘₛ = Mₘₛ′
       # Time marching
       let 
-        U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)
-        V₀ = setup_initial_condition(uₜ₀, basis_vec_ms, fine_scale_space)
+        U₀ = setup_initial_condition(u₀, basis_vec_ms′, fine_scale_space)
+        V₀ = setup_initial_condition(uₜ₀, basis_vec_ms′, fine_scale_space)
         global U = zero(U₀)
         cache = fine_scale_space, basis_vec_ms
         #= # Crank Nicolson Method
@@ -129,17 +140,18 @@ for l=[5,6,7,8]
         U = U₀ # Final time solution   
         =#
         # Leap-frog method from the Newmark scheme with β=0, γ=0.25
+        # Crank Nicolson Method with β = 1/4, γ = 1/2
         t = 0.0
-        U₁ = NM1!(cache, U₀, V₀, Δt, Kₘₛ, Mₘₛ, fₙ!, 0.0, 0.5)
+        U₁ = NM1!(cache, U₀, V₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, 0.25, 0.5)
         t += Δt
         for i=2:ntime
-          U = NM!(cache, t, U₁, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, 0.0, 0.5)
+          U = NM!(cache, t, U₁, U₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, 0.25, 0.5)
           U₀ = U₁
           U₁ = U
           t += Δt
         end                
       end
-      U_fine_scale = basis_vec_ms*U
+      U_fine_scale = basis_vec_ms′*U
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -152,17 +164,17 @@ for l=[5,6,7,8]
     end
   end
   println("Done l = "*string(l))
-  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*"), Δt = "*string(Δt)*" Leap-Frog", lw=2)
-  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*"), Δt = "*string(Δt)*" Leap-Frog", lw=2)
+  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
   scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
 
-#= plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
 # Also plot the reference lines with slope 2,3 to check the reduced rate
-plot!(plt, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-plot!(plt, 1 ./N, (1 ./N).^3, label="Order 3", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-plot!(plt1, 1 ./N, (1 ./N).^1, label="Order 1", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10); =#
+# plot!(plt, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+# plot!(plt, 1 ./N, (1 ./N).^3, label="Order 3", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+# plot!(plt1, 1 ./N, (1 ./N).^1, label="Order 1", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
+# plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);

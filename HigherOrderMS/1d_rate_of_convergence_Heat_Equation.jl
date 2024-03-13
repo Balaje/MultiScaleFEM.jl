@@ -1,4 +1,5 @@
 include("HigherOrderMS.jl");
+include("corrected_basis.jl");
 
 #=
 Problem data
@@ -22,19 +23,19 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
-A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
+# A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
-f(x,t) = 0.0
-u₀(x) = sin(π*x[1])
-# f(x,t) = sin(π*x[1])*sin(π*t)
-# u₀(x) = 0.0
+# f(x,t) = 0.0
+# u₀(x) = sin(π*x[1])
+f(x,t) = sin(π*x[1])*sin(π*t)
+u₀(x) = 0.0
 
 # Problem parameters
 nf = 2^15
 q = 1
-qorder = 11
+qorder = 6
 # Temporal parameters
 Δt = 10^-3
 tf = 1.0
@@ -83,10 +84,10 @@ Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
 ##### Now begin solving using the multiscale method #####
-N = [1,2,4,8,16,32,64,128]
+N = [1,2,4,8,16,32,64]
 # Create empty plots
-plt = plot();
-plt1 = plot();
+# plt = plot();
+# plt1 = plot();
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
@@ -97,7 +98,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[7,8,9]
+for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -109,10 +110,20 @@ for l=[7,8,9]
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
       Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
+      # Add the corrected version of the basis
+      KLΛ = stima, massma*basis_vec_ms, Mₘₛ
+      l′ = l;
+      # basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
+      basis_vec_ms′ = basis_vec_ms      
+      Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
+      Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′      
+      # basis_vec_ms = basis_vec_ms′
+      # Kₘₛ = Kₘₛ′
+      # Mₘₛ = Mₘₛ′ 
       # Time marching
       let 
         # Project initial condition onto the multiscale space
-        U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)  
+        U₀ = setup_initial_condition(u₀, basis_vec_ms′, fine_scale_space)  
         # U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space, A)
         global U = zero(U₀)  
         t = 0.0
@@ -121,7 +132,7 @@ for l=[7,8,9]
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
-          U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, i)
+          U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, i)
           U₀ = hcat(U₁, U₀)
           t += Δt
         end
@@ -129,14 +140,14 @@ for l=[7,8,9]
         dlcache = get_dl_cache(BDF)
         cache = dlcache, fcache
         for i=BDF:ntime
-          U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, BDF)
+          U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
           t += Δt
         end
         U = U₀[:,1] # Final time solution
       end
-      U_fine_scale = basis_vec_ms*U
+      U_fine_scale = basis_vec_ms′*U
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
