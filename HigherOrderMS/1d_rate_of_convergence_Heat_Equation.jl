@@ -29,7 +29,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = 1.0 # Constant diffusion coefficient
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
-f(x,t) = sin(π*x[1])*sin(π*t)
+f(x,t) = 1.0
 u₀(x) = 0.0
 
 # Problem parameters
@@ -88,7 +88,7 @@ N = [1,2,4,8,16,32,64]
 # Create empty plots
 # plt = plot();
 # plt1 = plot();
-p = 1;
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
