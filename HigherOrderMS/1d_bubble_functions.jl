@@ -1,162 +1,90 @@
-"""
-Bubble function bₖ,ⱼ ⊆ H¹(Ω) obtained from the Legendre polynomial Λₖ,ⱼ ⊆ L²(Ω)
-"""
-function bⱼ(X, nds::NTuple{2, Float64}, p, order)
-  a, b = nds
-  n = ceil(Int64, 0.5*(2*(2p+2)+1))
-  x̂, w = gausslegendre(n);
-  x = (b+a)/2 .+ (b-a)/2*x̂
-  h = (b-a)
-  θ(x) = (b - x)/(b - a)*(x - a)/(b - a)
-  npolys = p+1
-  LHS = zeros(npolys, npolys)
-  RHS = zeros(npolys, npolys)
-  for i=1:npolys, j=1:npolys
-    for q=1:lastindex(w)      
-      LHS[i,j] += w[q]*θ(x[q])*Λₖ!(x[q], nds, p, i)*Λₖ!(x[q], nds, p, j)*h*0.5                  
-    end
-  end  
-  for i=1:npolys
-    for q=1:lastindex(w)
-      RHS[i,i] += w[q]*(Λₖ!(x[q], nds, p, i)*Λₖ!(x[q], nds, p, i))*h*0.5
-    end    
-  end
-  c = LHS\RHS
-  res = 0.0
-  for i=1:npolys
-    res += c[i,order]*θ(X)*Λₖ!(X, nds, p, i)
-  end
-  res
-end
+#### #### #### #### #### #### #### #### #### #### 
+# Code to test the bubble function implementation 
+#### #### #### #### #### #### #### #### #### #### 
 
-"""
-ιₖ function used in the construction of the extended bubble function
-"""
-function ιⱼ(x, nds::NTuple{2,Float64}, nds_patch::NTuple{2,Float64})
-  a, b = nds
-  ã, b̃ = nds_patch
-  res = 0.0
-  if(ã ≈ a)
-    if(ã ≤ x ≤ b)
-      res = (x - a)/(b - a)
-      # return 1.0
-    elseif(b ≤ x ≤ b̃)
-      res = (b̃ - x)/(b̃ - b)
-    end   
-  elseif(b̃ ≈ b)
-    if(ã ≤ x ≤ a)
-      res = (x - ã)/(a - ã)
-    elseif(a ≤ x ≤ b̃)
-      res = (b̃ - x)/(b̃ - a)
-      # return 1.0
-    end
+domain = (0.0,1.0)
+nc = 9
+p = 3
+nf = 2^15
+nds_fine = LinRange(domain..., nf+1)
+C = _c(domain, nc, p)
+elem_coarse = [i+j for i=1:nc, j=0:1]
+nds_coarse = LinRange(domain..., nc+1)
+
+plt1 = Plots.plot();
+plt2 = Plots.plot()
+plt3 = Plots.plot();
+plt4 = Plots.plot();
+
+for t = [1,5]
+  tri = Tuple(nds_coarse[elem_coarse[t,:]])
+  start = max(1,t-1)
+  last = min(nc,t+1)    
+  if(t==1 || t==nc) 
+    patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
   else
-    if(a < x < b)
-      res = 1.0
-    elseif(x <= a)
-      res = (x - ã)/(a - ã)
-    elseif(x >= b)
-      res = (b̃ - x)/(b̃ - b)
-    end
-  end
-  res*0.5
-end
-
-"""
-νₖ function used in the construction of the extended bubble function
-"""
-function νⱼ(x, tri::NTuple{2,Float64}, patch::NTuple{2,Float64}, p)
-  n = ceil(Int64, 0.5*(2*(2p+2)+1))
-  x̂, w = gausslegendre(n);
-  npolys = (p+1)  
-  # Patch
-  ã, b̃ = patch  
-  # Element
-  a, b = tri    
-  res = 0.0
-  # First element
-  if(ã ≈ a)
-    N¹K = (a, b), (b, b̃)     
-    for G ∈ N¹K
-      x₀, x₁ = G
-      xqs = (x₀+x₁)/2 .+ (x₁-x₀)/2*x̂            
-      for i=1:npolys 
-        𝐈 = (bⱼ.(xqs, Ref(tri), p, 1) - ιⱼ.(xqs, Ref(tri), Ref(patch))).*Λₖ!.(xqs, Ref(G), p, i)*(x₁-x₀)*0.5                
-        res += sum(w.*𝐈)*bⱼ(x, G, p, i)
-      end      
-    end
-  # Last element
-  elseif(b̃ ≈ b)
-    N¹K = (ã, a), (a, b)    
-    for G ∈ N¹K
-      x₀, x₁ = G
-      xqs = (x₀+x₁)/2 .+ (x₁-x₀)/2*x̂            
-      for i=1:npolys
-        𝐈 = (bⱼ.(xqs, Ref(tri), p, 1) - ιⱼ.(xqs, Ref(tri), Ref(patch))).*Λₖ!.(xqs, Ref(G), p, i)*(x₁-x₀)*0.5
-        res += sum(w.*𝐈)*bⱼ(x, G, p, i)
-      end            
-    end    
-  # Others
-  else    
-    N¹K = (ã, a), (a, b), (b, b̃)        
-    for G ∈ N¹K
-      x₀, x₁ = G
-      xqs = (x₀+x₁)/2 .+ (x₁-x₀)/2*x̂              
-      for i=1:npolys 
-        𝐈 = (bⱼ.(xqs, Ref(tri), p, 1) - ιⱼ.(xqs, Ref(tri), Ref(patch))).*Λₖ!.(xqs, Ref(G), p, i)*(x₁-x₀)*0.5       
-        res += sum(w.*𝐈)*bⱼ(x, G, p, i)
-      end    
-    end
-  end    
-  res
-end
-
-"""
-The extended bubble function Pₕbⱼ = ιₖ + νₖ
-"""
-function Pₕbⱼ(x, nds, patch, p)
-  ιⱼ(x, nds, patch) + νⱼ(x, nds, patch, p)
-end
-
-using Test
-
-@testset begin
-tri = (0.0,0.1); patch = (0.0, 0.2);
-p = 3;
-h = tri[2]-tri[1];
-Π = zeros(p+1, p+1);
-n = ceil(Int64, 0.5*(2*(2p+2)+1));
-x̂, w = gausslegendre(n);
-xqs = (tri[2]+tri[1])/2 .+ (tri[2]-tri[1])/2*x̂  
-for i=1:p+1
-  for q=1:lastindex(w)
-    Π[i,i] += w[q]*(Λₖ!(xqs[q], tri, p, i)*Λₖ!(xqs[q], tri, p, i))*h*0.5
+    patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[t,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
   end  
+  P = (patch[1][1], patch[end][2]); 
+
+  Plots.plot!(plt1, nds_fine, Λₖ!.(nds_fine, Ref(tri), Ref(p), Ref(1)), label="\$ \\Lambda_{1,K} \$", title="Legendre Polynomials")
+  Plots.plot!(plt2, nds_fine, bⱼ.(nds_fine, Ref(tri), Ref(C[end]), 1), label="\$ b_{1,K} \$", title="Bubble Functions")
+  Plots.plot!(plt3, nds_fine, νⱼ.(nds_fine, t, Ref(C)), label="\$ \\nu_{K} \$", lw=1)
+  Plots.plot!(plt3, nds_fine, ιⱼ.(nds_fine, Ref(tri), Ref(P)), label="\$ \\iota_{K} \$ ", lw=1, ls=:dash, title="Auxiliary functions")
+  Plots.plot!(plt4, nds_fine, Pₕbⱼ.(nds_fine, t, Ref(C)), label="\$ \\iota_{K} + \\nu_{K} \$", title="Extended bubble functions")
 end
-F = zeros(p+1);
-xqs = (tri[2]+tri[1])*0.5 .+ (tri[2]-tri[1])*0.5*x̂
-for i=1:p+1
-  F[i] = 0.0
-  for q=1:lastindex(w)
-    F[i] += w[q]*(Pb(xqs[q], tri, patch, p))*Λₖ!(xqs[q], tri, p, i)*h*0.5
+
+using Test 
+using LinearAlgebra
+
+@testset "Check the L²-projection of the corrected bubble functions" begin
+  for p=[1,2,3]
+    C = _c(domain, nc, p)
+    n = ceil(Int64, 0.5*(2*(2p+2)+1));
+    x̂, w = gausslegendre(n);        
+    Π = zeros(p+1, p+1);   
+    for t=1:nc
+      tri = Tuple(nds_coarse[elem_coarse[t,:]])
+      xqs = (tri[2]+tri[1])/2 .+ (tri[2]-tri[1])/2*x̂  
+      for i=1:p+1
+        Π[i,i] = sum(w .* Λₖ!.(xqs, Ref(tri), p, i) .* Λₖ!.(xqs, Ref(tri), p, i))*(tri[2]-tri[1])*0.5        
+      end
+
+      # Test whether the Legendre polynomials are orthonormal      
+      @test Π ≈ I(p+1) 
+
+      # Get the patch
+      start = max(1,t-1)
+      last = min(nc,t+1)    
+      if(t==1 || t==nc) 
+        patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
+      else
+        patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[t,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
+      end  
+      P = (patch[1][1], patch[end][2]); 
+
+      # Compute the L² projection of the zero-th order bubble functions
+      F1 = zeros(p+1);        
+      for i=1:p+1
+        F1[i] = sum(w .* bⱼ.(xqs, Ref(tri), Ref(C[end]), 1) .* Λₖ!.(xqs, Ref(tri), p, i))*(tri[2]-tri[1])*0.5                
+      end
+
+      # Compute the L² projection of the zero-th order extended bubble functions
+      F2 = zeros(p+1);        
+      for i=1:p+1
+        F2[i] = sum(w .* Pₕbⱼ.(xqs, t, Ref(C)) .* Λₖ!.(xqs, Ref(tri), p, i))*(tri[2]-tri[1])*0.5                
+      end
+
+      function E1(p)
+        res = zeros(p+1)
+        res[1] = 1.0
+        res
+      end
+
+      # Test if the L² projection of the extended bubble is equal to the Legendre polynomial      
+      @test F1 ≈ E1(p)
+      @test F2 ≈ E1(p)
+
+    end
   end
-end
-
-X = Π\F
-
-function E1(p) 
-  res = zeros(p+1)
-  res[1] = 1.0
-  res
-end
-@test X ≈ E1(p)
-
-# xvals_tri = LinRange(tri..., 50);
-# xvals_patch = LinRange(patch..., 241);
-# plt1 = Plots.plot(xvals_patch, Λₖ!.(xvals_patch, Ref(tri), Ref(p), Ref(1)), label="Legendre Polynomial \$ \\Lambda_{1,K} \$ ")
-# plt2 = Plots.plot(xvals_patch, bⱼ.(xvals_patch, Ref(tri), Ref(p), Ref(1)), label="Bubble function \$ b_{1,K} \$")
-# plt3 = Plots.plot(xvals_patch, νⱼ.(xvals_patch, Ref(tri), Ref(patch), Ref(0)), label="\$ \\nu_{K} \$")
-# plt4 = Plots.plot(xvals_patch, ιⱼ.(xvals_patch, Ref(tri), Ref(patch)), label="\$ \\iota_{K} \$ ")
-# plt5 = Plots.plot(xvals_patch, Pb.(xvals_patch, Ref(tri), Ref(patch), Ref(0)), label="\$ \\iota_{K} + \\nu_{K} \$")
-
-end
+end; # All tests should pass

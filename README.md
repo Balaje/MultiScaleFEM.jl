@@ -558,6 +558,14 @@ H¹Error, log.(H¹Error[2:end]./H¹Error[1:end-1])./log(0.5) =
  1.786421313606517e-7,      -0.0473181398874861
 ```
 
+##### Bubble functions and the improved higher order method
+
+The following image shows the extended bubble functions (zero-th order) along with the auxiliary functions to implement the improved higher order MS method. This will improve the localization error when computing the higher-order basis  functions.
+
+![](./HigherOrderMS/Images/BubbleFunction/img1.png) |
+--- |
+
+
 ## Localized Orthogonal Decomposition Method
 -------
 
