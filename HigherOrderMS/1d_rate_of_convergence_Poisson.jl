@@ -1,22 +1,22 @@
 include("HigherOrderMS.jl");
 
 # Create empty plots
-plt = plot()
-plt1 = plot()
+plt = Plots.plot()
+plt1 = Plots.plot()
 
 #=
 Problem data
 =#
 domain = (0.0,1.0)
-D(x) = 1.0 # Smooth Diffusion coefficient
-# D(x) = (2 + cos(2π*x/(2^-6)))^-1 # Oscillatory Diffusion coefficient
+# D(x) = 1.0 # Smooth Diffusion coefficient
+D(x) = (2 + cos(2π*x[1]/(2^-6)))^-1 # Oscillatory Diffusion coefficient
 f(x) = (π)^2*cos(π*x[1])
-bvals = [1.0,-1.0];
+bvals = [0.0,0.0];
 
 # Fine scale parameters
 q = 1
 nf = 2^16
-qorder = 2
+qorder = 8
 
 # Use Gridap to construct the space
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
@@ -32,12 +32,12 @@ U = fine_scale_space.U
 uₕ = FEFunction(U, vcat(bvals[1],sol_ϵ,bvals[2]))
 
 # Coarse scale parameters
-p = 1
-N = [1,2,4,8,16,32,64,128,256,512]
+p = 2
+N = [1,2,4,8,16,32,64]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
-for l=[7,8,9]
+for l=[9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -69,11 +69,11 @@ for l=[7,8,9]
     end
   end
   println("Done l = "*string(l))
-  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
-  scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
-  scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
+  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
 
-plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)

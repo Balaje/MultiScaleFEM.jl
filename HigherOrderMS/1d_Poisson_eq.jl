@@ -32,7 +32,7 @@ Fₘₛ = basis_vec_ms'*loadvec;
 sol = Kₘₛ\Fₘₛ
 # Plot
 sol_fine_scale = basis_vec_ms*sol
-plt3 = plot(nds_fine, sol_fine_scale, label="Homogeneous DBC")
+plt3 = Plots.plot(nds_fine, sol_fine_scale, label="Homogeneous DBC")
 
 # -- Example with non-homogenous Dirichlet boundary conditions
 f(x) = π^2*cos(π*x[1])
@@ -52,7 +52,7 @@ sol_fine_scale_dbc = zeros(Float64, q*nf+1)
 sol_fine_scale_dbc[freenodes] = basis_vec_ms[freenodes,:]*sol - boundary_correction*bvals;
 sol_fine_scale_dbc[bnodes] = bvals
 # Plot
-plt4 = plot(nds_fine, sol_fine_scale_dbc, label="Non-homogeneous DBC");
+plt4 = Plots.plot(nds_fine, sol_fine_scale_dbc, label="Non-homogeneous DBC");
 
 #= 
 However inverting the whole stiffness matrix in Line 40 may not always be feasible.
@@ -76,7 +76,7 @@ sol2 = Kₘₛ\Fₘₛ;
 # Apply the boundary correction
 sol_fine_scale_dbc_2 = basis_vec_ms*sol2 + boundary_contrib
 # Plot
-plt5 = plot(nds_fine, sol_fine_scale_dbc_2, label="Non-homogeneous DBC");
+plt5 = Plots.plot(nds_fine, sol_fine_scale_dbc_2, label="Non-homogeneous DBC");
 
 # Compute the error using the reference solution
 sol_ref = zeros(Float64, q*nf+1)
