@@ -4,7 +4,7 @@
 """
 Function to compute the Legendre basis functions on (-1,1)
 """
-function LP!(cache::Vector{Float64}, x::Float64)
+function LP!(cache, x)
   p = size(cache,1) - 1
   if(p==0)
     cache[1] = 1.0
@@ -57,13 +57,13 @@ end
 """
 Bubble function bₖ,ⱼ ⊆ H¹(Ω) obtained from the Legendre polynomial Λₖ,ⱼ ⊆ L²(Ω)
 """
-function bⱼ(x, nds::NTuple{2, Float64}, c, j)
+function bⱼ(x, nds::NTuple{2, Float64}, d, j)
   a, b = nds  
   θ(x) = (b - x)/(b - a)*(x - a)/(b - a)
   res = 0.0
-  npolys = size(c,1)
+  npolys = size(d,1)  
   for i=1:npolys
-    res += c[i,j]*θ(x)*Λₖ!(x, nds, p, i)
+    res += d[i,j]*θ(x)*Λₖ!(x, nds, npolys-1, i)
   end
   res
 end
@@ -139,6 +139,7 @@ end
 """
 function νⱼ(x, t, CC)
   C, elem_coarse, nds_coarse, d = CC  
+  nc = size(elem_coarse,1)
   npolys = size(d,1)  
   start = max(1,t-1); last = min(nc,t+1)
   if(t==1 || t==nc) 
@@ -161,6 +162,7 @@ The extended bubble function Pₕbⱼ = ιₖ + νₖ
 """
 function Pₕbⱼ(x, t, CC)
   _, elem_coarse, nds_coarse, _ = CC
+  nc = size(elem_coarse,1)
   tri = Tuple(nds_coarse[elem_coarse[t,:]]) 
   start = max(1,t-1); last = min(nc,t+1)
   if(t==1 || t==nc) 

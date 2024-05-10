@@ -2,11 +2,15 @@
 # Code to test the bubble function implementation 
 #### #### #### #### #### #### #### #### #### #### 
 
+include("HigherOrderMS.jl");
+
 domain = (0.0,1.0)
-nc = 9
-p = 3
+nc = 2
+p = 1
 nf = 2^15
-nds_fine = LinRange(domain..., nf+1)
+l = 2
+q = 1;
+nds_fine = LinRange(domain..., q*nf+1)
 C = _c(domain, nc, p)
 elem_coarse = [i+j for i=1:nc, j=0:1]
 nds_coarse = LinRange(domain..., nc+1)
@@ -16,7 +20,7 @@ plt2 = Plots.plot()
 plt3 = Plots.plot();
 plt4 = Plots.plot();
 
-for t = [1,5]
+for t = [2]
   tri = Tuple(nds_coarse[elem_coarse[t,:]])
   start = max(1,t-1)
   last = min(nc,t+1)    
@@ -38,8 +42,8 @@ using Test
 using LinearAlgebra
 
 @testset "Check the L²-projection of the corrected bubble functions" begin
-  for p=[1,2,3]
-    C = _c(domain, nc, p)
+  for p=[1,2,3]    
+    C = _c(domain, nc, p)    
     n = ceil(Int64, 0.5*(2*(2p+2)+1));
     x̂, w = gausslegendre(n);        
     Π = zeros(p+1, p+1);   
@@ -60,7 +64,7 @@ using LinearAlgebra
         patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
       else
         patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[t,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
-      end  
+      end        
       P = (patch[1][1], patch[end][2]); 
 
       # Compute the L² projection of the zero-th order bubble functions
@@ -88,3 +92,79 @@ using LinearAlgebra
     end
   end
 end; # All tests should pass
+
+##### ##### ##### ##### ##### ##### ##### ##### 
+# Compute the zero-th order improved MS basis #
+##### ##### ##### ##### ##### ##### ##### #####
+using FiniteDiff
+using StaticArrays
+
+"""
+Function to compute the multiscale basis function using the zero-th order extended bubble function
+"""
+function compute_ms_basis_bubble(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
+  patch_indices_to_global_indices::Vector{AbstractVector{Int64}})
+  nf = fspace.nf
+  q = fspace.q
+  basis_vec_ms = spzeros(Float64,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
+  K, L, Λ = get_saddle_point_problem(fspace, D, p, nc)  
+  C_data = _c(domain, nc, p)
+  patch_indices_to_global_indices₁ = coarse_space_to_fine_space(nc, nf, 1, (q,p))[1]
+  nds_fine = LinRange(domain..., q*nf+1)
+  index = 1
+  for t=1:nc    
+    fullnodes = patch_indices_to_global_indices[t]
+    bnodes = [fullnodes[1], fullnodes[end]]
+    freenodes = setdiff(fullnodes, bnodes)
+    start = max(1,t-l)
+    last = min(nc,t+l)
+    gn = start*(p+1)-p:last*(p+1)    
+    stima_el = K[freenodes,freenodes]
+    lmat_el = L[freenodes,gn]    
+
+    # j=1 (zero-th order function)
+    B(y) = Pₕbⱼ(y[1], t, C_data);     
+    # The main system.
+    fullnodes₁ = patch_indices_to_global_indices[t]
+    bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]    
+    freenodes₁ = setdiff(fullnodes₁, bnodes₁)    
+    fvecs_el = [K[freenodes, freenodes₁]*B.(nds_fine[freenodes₁]); 0*Λ[gn, index]]
+    lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
+    rhs = fvecs_el
+    sol = lhs\rhs
+    basis_vec_ms[freenodes,index] = B.(nds_fine[freenodes]) - sol[1:length(freenodes)]
+    index += 1   
+
+    for _=2:p+1
+      fvecs_el = [zeros(length(freenodes)); Λ[gn, index]]
+      lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
+      rhs = fvecs_el           
+      sol = lhs\rhs                 
+      basis_vec_ms[freenodes,index] = sol[1:length(freenodes)]
+      index += 1   
+    end
+  end
+  basis_vec_ms
+end
+
+# Test out the method
+
+# Get the Gridap fine-scale description
+fine_scale_space = FineScaleSpace(domain, 1, 4, nf);
+
+# Compute the map between the coarse and fine scale
+patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (1,p));
+
+# Compute Multiscale bases with some Diffusion coefficient
+D(x) = (2 + 0.5*cos(2π*x[1]))^-1;
+# D(x) = 1.0;
+basis_vec_ms₁ = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
+basis_vec_ms₂ = compute_ms_basis_bubble(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
+
+plt5 = Plots.plot();
+for el=[1]
+  i = el*(p+1)-p
+  @show i
+  Plots.plot!(plt5, nds_fine, basis_vec_ms₁[:,i], ls=:dash, lw=1, label="Old basis function "*string(i), lc=:blue)
+  Plots.plot!(plt5, nds_fine, basis_vec_ms₂[:,i], lw=1, label="New basis function "*string(i), lc=:red)
+end
