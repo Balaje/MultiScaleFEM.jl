@@ -9,9 +9,10 @@ Problem data
 =#
 domain = (0.0,1.0)
 # D(x) = 1.0 # Smooth Diffusion coefficient
-D(x) = (1.0 + 0.8*cos(2π*x[1]/2^-5))^-1
+D(x) = (2 + cos(2π*x[1]/2^-6))^-1;
 # D(x) = 1.0
 f(x) = (π)^2*sin(π*x[1])
+# f(x) = 1.0
 bvals = [0.0,0.0];
 
 # Fine scale parameters
@@ -33,12 +34,13 @@ U = fine_scale_space.U
 uₕ = FEFunction(U, vcat(bvals[1],sol_ϵ,bvals[2]))
 
 # Coarse scale parameters
-p = 3
+p = 2
 N = [2,4,8,16,32]
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 
-for l=[6]
+bubble = false
+for l=[1,2,3,4,5]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -46,7 +48,12 @@ for l=[6]
       # Compute the map between coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute MS bases
-      basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
+      # basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
+      if(!bubble) 
+        basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
+      else
+        basis_vec_ms = compute_ms_basis_bubble(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices, coarse_indices_to_fine_indices, 1, 1)
+      end
       # # Compute boundary contributions
       # Pₕug = compute_boundary_correction_matrix(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
       # boundary_contrib = apply_boundary_correction(Pₕug, bnodes, bvals, patch_indices_to_global_indices, p, nc, l, fine_scale_space);
@@ -74,11 +81,16 @@ for l=[6]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  if(!bubble)
+    Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), \$L^2\$ (l="*string(l)*")", lw=2, ls=:dash)
+    Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2, ls=:dash)
+  else
+    Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), \$L^2\$ (l="*string(l)*") Bubble", lw=1)
+    Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*") Bubble", lw=1)
+  end
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
 
-Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
-Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10)
+Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log2, yaxis=:log10)
+Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log2, yaxis=:log10)

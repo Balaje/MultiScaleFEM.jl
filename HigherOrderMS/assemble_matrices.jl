@@ -25,7 +25,7 @@ function get_saddle_point_problem(fspace::FineScaleSpace, D::Function, p::Int64,
   domain = fspace.domain
   K = assemble_stiffness_matrix(fspace, D)
   # The rectangular matrix
-  elem_coarse = [i+j for i=1:nc, j=0:p]
+  elem_coarse = [i+j for i=1:nc, j=0:1]
   nds_coarse = LinRange(domain[1], domain[2], nc+1)
   L = spzeros(Float64, size(K,1), nc*(p+1))
   index = 1

@@ -160,7 +160,7 @@ end
 """
 The extended bubble function Pₕbⱼ = ιₖ + νₖ
 """
-function Pₕbⱼ(x, t, CC)
+function Pₕbⱼ(x, t, CC, α, β)
   _, elem_coarse, nds_coarse, _ = CC
   nc = size(elem_coarse,1)
   tri = Tuple(nds_coarse[elem_coarse[t,:]]) 
@@ -171,5 +171,5 @@ function Pₕbⱼ(x, t, CC)
     patch = Tuple(nds_coarse[elem_coarse[start,:]]), Tuple(nds_coarse[elem_coarse[t,:]]), Tuple(nds_coarse[elem_coarse[last,:]])
   end
   P = (patch[1][1], patch[end][2]);
-  ιⱼ(x, tri, P) + νⱼ(x, t, CC)
+  α*ιⱼ(x, tri, P) + β*νⱼ(x, t, CC)
 end
