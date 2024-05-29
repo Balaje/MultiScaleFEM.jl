@@ -5,10 +5,10 @@
 include("HigherOrderMS.jl");
 
 domain = (0.0,1.0)
-nc = 8
-p = 1
+nc = 16
+p = 0
 nf = 2^15
-l = 3
+l = 4
 q = 1;
 nds_fine = LinRange(domain..., q*nf+1)
 C = _c(domain, nc, p)
@@ -117,7 +117,7 @@ function assemble_lm_bubble_matrix(domain, nc::Int64, p::Int64)
       # (t==1) && Plots.plot!(plot_spe, nds_fine, Pₕbⱼ.(nds_fine, t, Ref(C), 1, 1), label="")      
       for i=1:p+1, j=1:p+1        
         # (t==1) && Plots.plot!(plot_spe, nds_fine, Λₖ!.(nds_fine, Ref(tri), p, i), label="", ls=:dash, lw=1)
-        l2mat[(t-1)*(p+1)+i, (k-1)*(p+1)+j] += sum(w .* Pₕbⱼ.(xqs, t, Ref(C), 1, 1) .* Λₖ!.(xqs, Ref(tri), p, i))*(tri[2]-tri[1])*0.5                
+        l2mat[(t-1)*(p+1)+i, (k-1)*(p+1)+j] += sum(w .* (Λₖ!.(xqs, Ref(tri_t), p, i) - Pₕbⱼ.(xqs, t, Ref(C), 1, 0)) .* Λₖ!.(xqs, Ref(tri), p, i))*(tri[2]-tri[1])*0.5                
         # l2mat[(t-1)*(p+1)+i, (k-1)*(p+1)+j] = sum(w .* Λₖ!.(xqs, Ref(tri_t), p, i) .* Λₖ!.(xqs, Ref(tri), p, j))*(tri[2]-tri[1])*0.5                
       end                  
     end       
@@ -150,42 +150,33 @@ function compute_ms_basis_bubble(fspace::FineScaleSpace, D::Function, p::Int64, 
     lmat_el = L[freenodes,gn]    
 
     # j=1 (zero-th order function)      
-    ν(y) = Pₕbⱼ(y[1], t, C_data, 0, 1)
-    ι(y) = Pₕbⱼ(y[1], t, C_data, 1, 0)
-    
-    # Correcting ιₖ
+    # ν(y) = Pₕbⱼ(y[1], t, C_data, 0, 1)
+    # ι(y) = Pₕbⱼ(y[1], t, C_data, 1, 0)    
+    bₖ(y) = Pₕbⱼ(y[1], t, C_data, 1, 1)    
+
+    # Correcting νₖ    
+    # for k=max(1,t-1):min(nc,t+1)     
     for k=max(1,t-1):min(nc,t+1)
-      fullnodes₁ = coarse_indices_to_fine_indices[k]                    
-      bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]
-      freenodes₁ = setdiff(fullnodes₁, bnodes₁)        
-
-      fullnodes₂ = coarse_indices_to_fine_indices[k]
-      lhs = K[freenodes₁, freenodes₁]
-      rhs = K[freenodes₁, fullnodes₁]*ι.(nds_fine[fullnodes₁]) 
-      # Solve to obtain the corrector   
-      # basis_vec_ms[freenodes₁,index] += α*(-(lhs\rhs)[1:length(freenodes₁)])
-    end    
-
-    # Correcting νₖ
-    for k=max(1,t-1):min(nc,t+1)            
-      # Fine scale nodes inside the element k          
-      fullnodes₁ = coarse_indices_to_fine_indices[k]       
+      fullnodes₁ = coarse_indices_to_fine_indices[k] 
+      bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]   
+      freenodes₁ = setdiff(fullnodes₁, bnodes₁)      
       # l-patch of k (Saddle point problem domain)
       fullnodes₂ = patch_indices_to_global_indices[k]
       bnodes₂ = [fullnodes₂[1], fullnodes₂[end]]
       freenodes₂ = setdiff(fullnodes₂, bnodes₂)
       gn₂ = max(1,k-l)*(p+1)-p:min(nc,k+l)*(p+1)      
+      # Solve the problem for R(v - Iₕv)      
       # Evaluate LHS on the patch
-      lhs = [K[freenodes₂,freenodes₂] L[freenodes₂,gn₂]; L[freenodes₂,gn₂]' spzeros(Float64, length(gn₂), length(gn₂))]            
-      # Evaluate RHS by evaluating νₖ() on the element fine-scale DOFs      
-      # rhs = [K[freenodes₂, fullnodes₁]*ν.(nds_fine[fullnodes₁]); zeros(Float64, length(gn₂))]                    
-      rhs = [zeros(Float64, length(freenodes₂)); -Λ̃[gn₂,index]]                    
+      lhs = [K[freenodes₂,freenodes₂] L[freenodes₂,gn₂]; L[freenodes₂,gn₂]' spzeros(Float64, length(gn₂), length(gn₂))]                       
+      # Evaluate RHS by evaluating νₖ() on the element fine-scale DOFs            
+      rhs₁ = [K[freenodes₂,freenodes₁]*bₖ.(nds_fine[freenodes₁]); zeros(length(gn₂))]            
+      # rhs₁ = [zeros(length(freenodes₂)); -Λ̃[gn₂,index]]            
       # Solve to obtain the corrector
-      basis_vec_ms[freenodes₂,index] += β*(-(lhs\rhs)[1:length(freenodes₂)])                  
+      basis_vec_ms[freenodes₂,index] += (-(lhs\rhs₁)[1:length(freenodes₂)])                  
     end 
 
     # Add the extended bubble after adding the correction.
-    # basis_vec_ms[fullnodes, index] += α*ι.(nds_fine[fullnodes])
+    basis_vec_ms[fullnodes, index] += bₖ.(nds_fine[fullnodes])
     # basis_vec_ms[fullnodes, index] += β*ν.(nds_fine[fullnodes])    
         
     index += 1   
@@ -215,14 +206,14 @@ patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coars
 plt5 = Plots.plot();
 
 D(x) = 1.0;
+els = [4]
 # D(x) = (2 + cos(2π*x[1]/2^-5))^-1;
 basis_vec_ms₁ = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
-els = [1]
 for el=els
   i = el*(p+1)-p
   Plots.plot!(plt5, nds_fine, basis_vec_ms₁[:,i], ls=:dash, lw=1, label="Old basis function "*string(i), lc=:blue)
 end
-for αβ=[(1,1),(1,0),(0,1)]
+for αβ=[(1,0)]
   local α, β = αβ
   local basis_vec_ms₂ = compute_ms_basis_bubble(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices, coarse_indices_to_fine_indices, α, β);
   for el=els
@@ -233,7 +224,7 @@ for αβ=[(1,1),(1,0),(0,1)]
     elseif(α==0)
       Plots.plot!(plt5, nds_fine, basis_vec_ms₂[:,i], lw=0.5, label="\$ (1-C^l)(\\nu_k) \$", lc=:magenta)
     else
-      Plots.plot!(plt5, nds_fine, basis_vec_ms₂[:,i], lw=0.5, label="\$ (1-C^l)(\\iota_k) \$", lc=:red)
+      Plots.plot!(plt5, nds_fine, basis_vec_ms₂[:,i], lw=0.5, label="\$ (1-C^l)(\\iota_k) \$", lc=:red)      
     end
   end
 end
