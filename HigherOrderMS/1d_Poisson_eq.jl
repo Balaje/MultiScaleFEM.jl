@@ -2,8 +2,8 @@ include("HigherOrderMS.jl");
 
 domain = (0.0,1.0)
 
-# D(x) = (1.0 + 0.8*cos(2π*x[1]/2^-5))^-1
-D(x) = 1.0
+D(x) = (1.0 + 0.8*cos(2π*x[1]/2^-5))^-1
+# D(x) = 1.0
 f(x) = π^2*sin(π*x[1])
 
 nc = 2^2
@@ -32,7 +32,7 @@ Fₘₛ = basis_vec_ms'*loadvec;
 sol = Kₘₛ\Fₘₛ
 # Plot
 sol_fine_scale = basis_vec_ms*sol
-plt3 = plot(nds_fine, sol_fine_scale, label="Homogeneous DBC")
+plt3 = Plots.plot(nds_fine, sol_fine_scale, label="Homogeneous DBC")
 
 # -- Example with non-homogenous Dirichlet boundary conditions
 f(x) = π^2*cos(π*x[1])
@@ -52,7 +52,7 @@ sol_fine_scale_dbc = zeros(Float64, q*nf+1)
 sol_fine_scale_dbc[freenodes] = basis_vec_ms[freenodes,:]*sol - boundary_correction*bvals;
 sol_fine_scale_dbc[bnodes] = bvals
 # Plot
-plt4 = plot(nds_fine, sol_fine_scale_dbc, label="Non-homogeneous DBC");
+plt4 = Plots.plot(nds_fine, sol_fine_scale_dbc, label="Non-homogeneous DBC");
 
 #= 
 However inverting the whole stiffness matrix in Line 40 may not always be feasible.
@@ -76,7 +76,7 @@ sol2 = Kₘₛ\Fₘₛ;
 # Apply the boundary correction
 sol_fine_scale_dbc_2 = basis_vec_ms*sol2 + boundary_contrib
 # Plot
-plt5 = plot(nds_fine, sol_fine_scale_dbc_2, label="Non-homogeneous DBC");
+plt5 = Plots.plot(nds_fine, sol_fine_scale_dbc_2, label="Non-homogeneous DBC");
 
 # Compute the error using the reference solution
 sol_ref = zeros(Float64, q*nf+1)
@@ -94,3 +94,15 @@ h¹e₁ = sqrt(sum(∫(∇(u₁-uₕ)⋅∇(u₁-uₕ))dΩ))
 l²e₂ = sqrt(sum(∫((u₂-uₕ)*(u₂-uₕ))dΩ))
 h¹e₂ = sqrt(sum(∫(∇(u₂-uₕ)⋅∇(u₂-uₕ))dΩ))
 @show l²e₂ , h¹e₂
+
+## Plot basis functions
+function plot_legendre_poly!(plt, nds_fine, p, nc, j, basis_vec_ms; lc=:blue)
+  nds_coarse = LinRange(domain[1], domain[2], nc+1)
+  legendre_poly = Λₖ!.(nds_fine, Ref((nds_coarse[1], nds_coarse[2])), Ref(p), Ref(j))
+  legendre_poly_ind = findall( abs.(legendre_poly) .> 0.0);
+  Plots.plot!(plt, nds_fine[legendre_poly_ind], legendre_poly[legendre_poly_ind], 
+              xlims=(0,1), ylims=(-2,2), label="\$ \\Lambda_{"*string(j)*", 1} \$", ls=:dash, lw=1, lc=lc)
+  Plots.plot!(plt, nds_fine, basis_vec_ms[:,j], 
+              label="\$ \\tilde \\Lambda_{"*string(j)*", 1} \$", 
+              legendfontsize=10, lw=2, lc=lc)
+end

@@ -29,7 +29,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = 1.0 # Constant diffusion coefficient
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
-f(x,t) = sin(π*x[1])*sin(π*t)
+f(x,t) = 1.0
 u₀(x) = 0.0
 
 # Problem parameters
