@@ -6,7 +6,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^12
+Neps = 2^8
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -84,11 +84,11 @@ Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
 ##### Now begin solving using the multiscale method #####
-N = [1,2,4,8,16,32,64]
+N = [1,2,4,8,16]
 # Create empty plots
-# plt = plot();
-# plt1 = plot();
-p = 1;
+plt = plot();
+plt1 = plot();
+p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -106,29 +106,27 @@ for l=[8]
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute the multiscale basis
-      global basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
       # Assemble the stiffness, mass matrices
-      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
-      Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
-      # Add the corrected version of the basis
-      KLΛ = stima, massma*basis_vec_ms, Mₘₛ
-      l′ = l + 5;
-      global basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
+      Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁
+      Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁   
+      # Add the corrected version of the basis            
+      global basis_vec_ms₂ = compute_corrected_basis_function(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, 1.0, 1.0/Δt)
       # basis_vec_ms′ = basis_vec_ms      
-      Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
-      Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′      
+      Kₘₛ′ = basis_vec_ms₂'*stima*basis_vec_ms₂
+      Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂
       # basis_vec_ms = basis_vec_ms′
       # Kₘₛ = Kₘₛ′
       # Mₘₛ = Mₘₛ′ 
       # Time marching
       let 
         # Project initial condition onto the multiscale space
-        U₀ = setup_initial_condition(u₀, basis_vec_ms′, fine_scale_space)  
+        U₀ = setup_initial_condition(u₀, basis_vec_ms₂, fine_scale_space)  
         # U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space, A)
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
-        fcache = (fine_scale_space, basis_vec_ms′) 
+        fcache = (fine_scale_space, basis_vec_ms₂) 
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
@@ -147,7 +145,7 @@ for l=[8]
         end
         U = U₀[:,1] # Final time solution
       end
-      U_fine_scale = basis_vec_ms′*U
+      U_fine_scale = basis_vec_ms₂*U
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -175,7 +173,7 @@ plt3 = plot(nds_fine, A.(nds_fine), lw=2, label="A(x)")
 plt5 = plot(plt3, plt2, layout=(2,1))
 
 # Switch variables to global and plot
-plt4 = plot(nds_fine, basis_vec_ms*U, label="Multiscale solution", lw=2)
+plt4 = plot(nds_fine, basis_vec_ms₁*U, label="Multiscale solution", lw=2)
 plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
 
 plt6 = plot(plt, plt1, plt3, plt4, layout=(2,2))
