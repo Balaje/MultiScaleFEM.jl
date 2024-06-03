@@ -5,18 +5,16 @@ include("corrected_basis.jl");
 Construct the time dependent basis functions
 """
 function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function, 
-                                 p::Int64, nc::Int64, l::Int64, 
-                                 patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, 
-                                 BDF::Int64, tf::Float64, Δt::Float64)
-
+  p::Int64, nc::Int64, l::Int64, 
+  patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, 
+  BDF::Int64, tf::Float64, Δt::Float64)
+  
   ntime = ceil(Int64, (tf/Δt))
-
-  basis_vec_ms = [spzeros(Float64, q*nf+1, (p+1)*nc) for i=1:ntime]
+  
+  basis_vec_ms = [spzeros(Float64, q*nf+1, (p+1)*nc) for i=1:ntime+1]
   
   K, L, Λ = get_saddle_point_problem(fine_scale_space, D, p, nc)
-  M = assemble_mass_matrix(fine_scale_space, x->1.0)  
-
-  nds_fine = LinRange(fine_scale_space.domain..., fine_scale_space.q*fine_scale_space.nf+1)
+  M = assemble_mass_matrix(fine_scale_space, x->1.0)    
   
   index = 1
   for coarse_el=1:nc
@@ -40,10 +38,7 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
     for _=1:p+1      
       stima₁ = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
       massma₁ = [massma_el zero(lmat_el); zero(lmat_el') spzeros(Float64, length(gn), length(gn))]
-      U₀ = [zeros(Float64, length(freenodes)); zeros(Float64, length(gn))]      
-      # stima₁ = stima_el
-      # massma₁ = massma_el
-      # U₀ = sin.(π*nds_fine[freenodes])
+      U₀ = [zeros(Float64, length(freenodes)); zeros(Float64, length(gn))]
       
       ###### ###### ###### ###### ###### ###### 
       #  Solve the time dependent problem
@@ -61,7 +56,7 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
       # Remaining BDF steps
       dlcache = get_dl_cache(BDF)
       cache = dlcache, fcache
-      for i=BDF:ntime
+      for i=BDF:ntime+1
         U₁ = BDFk!(cache, t+Δt, U₀, Δt, stima₁, massma₁, ł, BDF)
         basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]        
         U₀[:,2:BDF] = U₀[:,1:BDF-1]        
@@ -71,33 +66,85 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
       ###### ###### ###### ###### ###### 
       # End time dependent problem
       ###### ###### ###### ###### ###### 
-
+      
       index += 1
     end    
   end
   basis_vec_ms
 end
 
-domain = (0.0,1.0)
 
-nc = 4;
-l = 7;
-p = 0;
+"""
+Modified BDF-k routine
+"""
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64, 
+  K::AbstractMatrix{Float64}, M::Vector{T}, f!::Function, k::Int64) where T <: AbstractMatrix{Float64}
+  # U should be arranged in descending order (n+k), (n+k-1), ...
+  # M should be arranged in descending order (n+k), (n+k-1), ...
+  @assert (size(U,2) == k) # Check if it is the right BDF-k
+  dl_cache, fcache = cache
+  coeffs = dl!(dl_cache, k)
+  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))    
+  for i=0:k-1    
+    RHS += -(coeffs[k-i]/coeffs[k+1])*M[k-i]*U[:,i+1]
+  end 
+  LHS = (M[k+1] + 1.0/(coeffs[k+1])*Δt*K)
+  Uₙ₊ₖ = LHS\RHS
+  Uₙ₊ₖ
+end
+
+
+#######################
+# Test out the method #
+#######################
+
+# Projection of the source function to the MS space
+function fₙ!(cache, tₙ::Float64)
+  fspace, basis_vec_ms = cache
+  F = assemble_load_vector(fspace, y->f(y, tₙ))
+  basis_vec_ms'*F
+end
+
+domain = (0.0,1.0)
+# nc = 4;
+# l = 7;
+p = 3;
 nf = 2^15;
 q = 1;
-qorder = 4;
+qorder = 6;
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
 nds_fine = LinRange(domain..., q*nf+1);
-A(x) = 1.0
-f(x,t) = 0.0
-u₀(x) = sin(π*x[1])
-
+# Random diffusion coefficient
+Neps = 2^8
+nds_micro = LinRange(domain[1], domain[2], Neps+1)
+diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
+function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
+  n = size(nds_micro, 1)
+  for i=1:n
+    if(nds_micro[i] < x < nds_micro[i+1])      
+      return diffusion_micro[i+1]
+    elseif(x==nds_micro[i])
+      return diffusion_micro[i+1]
+    elseif(x==nds_micro[i+1])
+      return diffusion_micro[i+1]
+    else
+      continue
+    end 
+  end
+end
+A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x) = (2 + cos(2π*x[1]/2^0))^-1
+f(x,t) = 1.0
+u₀(x) = 0.0
 # Define the time discretization parameters
-tf = 1.0
 Δt = 1e-2;
+tf = 0.5
 ntime = ceil(Int64, tf/Δt);
-BDF = 1;
+BDF = 4;
 
+###################################
+#  Compute the reference solution #
+###################################
 stima = assemble_stiffness_matrix(fine_scale_space, A);
 massma = assemble_mass_matrix(fine_scale_space, x->1.0);
 fullnodes = 1:q*nf+1;
@@ -133,19 +180,81 @@ let
   end
   Uex = U₀[:,1] # Final time solution
 end
+Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
+uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
+##### ########## ########## ########## ########## #####
+# Compute the solution using the multiscale method
+##### ########## ########## ########## ########## #####
+N = [1,2,4,8]
+plt = Plots.plot();
+plt1 = Plots.plot();
+L²Error = zeros(Float64,size(N));
+H¹Error = zeros(Float64,size(N));
+for l=[7]
+  fill!(L²Error, 0.0)
+  fill!(H¹Error, 0.0)
+  for (nc,itr) in zip(N, 1:lastindex(N))
+    # Compute the time dependent multiscale basis
+    patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
+    global Λ = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt);       
 
-### Solve using the multiscale method
-patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-basis_vec_ms = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt);
-Uₘₛ = setup_initial_condition(u₀, basis_vec_ms[1], fine_scale_space);
-for i=1:ntime-1
-  Λₖ = basis_vec_ms[i+1]
-  Λₖ₋₁ = basis_vec_ms[i]
-  Kₘₛ = Λₖ'*stima*Λₖ; 
-  Mₘₛ = Λₖ'*massma*Λₖ;
-  LHS = Mₘₛ + Δt*Kₘₛ
-  F = assemble_load_vector(fine_scale_space, y->f(y, (i+1)*Δt))
-  RHS = (Δt)*Λₖ'*F + (Λₖ'*massma*Λₖ₋₁)*Uₘₛ
-  global Uₘₛ = (LHS\RHS)
+    # Compute the original MS method bases.
+    # basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices) 
+    # global Λ = fill(basis_vec_ms, ntime+1)   
+    # Compute the projection of the fine scale matrices to the multiscale space    
+    𝐊 = [Λ[i+1]'*stima*Λ[i+1] for i=1:ntime]; # Stiffness matrix    
+    Mₘₛ¹ = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[k] for k=i+1:-1:1]][end:-1:1] for i=1:BDF-1]# Compute the vector of mass matrices    
+    Mₘₛ² = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:BDF]][end:-1:1] for i=BDF:ntime]
+    𝐌 = vcat(Mₘₛ¹, Mₘₛ²)
+
+    println("Done computing the multiscale space")
+
+    # Time marching
+    let 
+      U₀ = setup_initial_condition(u₀, Λ[1], fine_scale_space);
+      global U = zero(U₀)
+      t = 0.0
+      for i=1:BDF-1
+        dlcache = get_dl_cache(i)            
+        # Execute the BDF step
+        fcache = fine_scale_space, Λ[i]
+        cache = dlcache, fcache
+        U₁ = BDFk!(cache, t, U₀, Δt, 𝐊[i], 𝐌[i], fₙ!, i) 
+        U₀ = hcat(U₁,U₀)
+        t += Δt    
+      end
+      dlcache = get_dl_cache(BDF) 
+      for i=BDF:ntime
+        # Execute the BDF step
+        fcache = fine_scale_space, Λ[i+1]
+        cache = dlcache, fcache
+        U₁ = BDFk!(cache, t, U₀, Δt, 𝐊[i], 𝐌[i], fₙ!, BDF) 
+        # Update the time step
+        U₀[:, 2:BDF] = U₀[:, 1:BDF-1]
+        U₀[:,1] = U₁    
+        t += Δt    
+      end
+      U = U₀[:,1]
+
+      U_fine_scale = Λ[ntime+1]*U
+      
+      # Compute the errors
+      dΩ = Measure(get_triangulation(Uₕ), qorder)
+      uₘₛ = FEFunction(Uₕ, U_fine_scale)    
+      e = uₕ - uₘₛ
+      L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
+      H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));      
+    end
+
+    println("Done nc = "*string(nc))
+  end
+  println("Done l = "*string(l))
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
+  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
+
+Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
