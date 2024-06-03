@@ -59,8 +59,8 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64,
   @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
   coeffs = dl!(dl_cache, k)
-  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))  
-  for i=0:k-1
+  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))    
+  for i=0:k-1    
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end 
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)

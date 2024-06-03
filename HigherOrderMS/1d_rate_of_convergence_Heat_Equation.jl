@@ -86,8 +86,8 @@ uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16]
 # Create empty plots
-plt = plot();
-plt1 = plot();
+plt = Plots.plot();
+plt1 = Plots.plot();
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
@@ -111,8 +111,8 @@ for l=[8]
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁
       Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁   
       # Add the corrected version of the basis            
-      global basis_vec_ms₂ = compute_corrected_basis_function(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, 1.0, 1.0/Δt)
-      # basis_vec_ms′ = basis_vec_ms      
+      global basis_vec_ms₂ = compute_corrected_basis_function(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, 1.0, 100.0)
+      # global basis_vec_ms₂ = basis_vec_ms₁
       Kₘₛ′ = basis_vec_ms₂'*stima*basis_vec_ms₂
       Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂
       # basis_vec_ms = basis_vec_ms′
@@ -158,22 +158,22 @@ for l=[8]
     end
   end
   println("Done l = "*string(l))
-  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
-  scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
-  scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
+  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
 
-plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
 # Plot the rates along with the diffusion coefficient
-plt2 = plot(plt, plt1, layout=(1,2))
-plt3 = plot(nds_fine, A.(nds_fine), lw=2, label="A(x)")
-plt5 = plot(plt3, plt2, layout=(2,1))
+plt2 = Plots.plot(plt, plt1, layout=(1,2))
+plt3 = Plots.plot(nds_fine, A.(nds_fine), lw=2, label="A(x)")
+plt5 = Plots.plot(plt3, plt2, layout=(2,1))
 
 # Switch variables to global and plot
-plt4 = plot(nds_fine, basis_vec_ms₁*U, label="Multiscale solution", lw=2)
-plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
+plt4 = Plots.plot(nds_fine, basis_vec_ms₁*U, label="Multiscale solution", lw=2)
+Plots.plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
 
-plt6 = plot(plt, plt1, plt3, plt4, layout=(2,2))
+plt6 = Plots.plot(plt, plt1, plt3, plt4, layout=(2,2))
