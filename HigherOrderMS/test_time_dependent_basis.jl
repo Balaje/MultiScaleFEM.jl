@@ -7,7 +7,7 @@ Construct the time dependent basis functions
 function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function, 
   p::Int64, nc::Int64, l::Int64, 
   patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, 
-  BDF::Int64, tf::Float64, Δt::Float64)
+  BDF::Int64, tf::Float64, Δt::Float64, N::Int64)
   
   ntime = ceil(Int64, (tf/Δt))
   
@@ -33,7 +33,7 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
       freenodes, Λₜ = cache
       [zeros(length(freenodes))*tₙ; Λₜ]
       # zeros(length(freenodes))
-    end 
+    end     
     
     for _=1:p+1      
       stima₁ = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
@@ -56,12 +56,16 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
       # Remaining BDF steps
       dlcache = get_dl_cache(BDF)
       cache = dlcache, fcache
-      for i=BDF:ntime+1
+      for i=BDF:N
         U₁ = BDFk!(cache, t+Δt, U₀, Δt, stima₁, massma₁, ł, BDF)
         basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]        
         U₀[:,2:BDF] = U₀[:,1:BDF-1]        
         U₀[:,1] = U₁
         t += Δt
+      end
+
+      for i=N+1:ntime+1
+        basis_vec_ms[i] = basis_vec_ms[N]
       end
       ###### ###### ###### ###### ###### 
       # End time dependent problem
@@ -86,9 +90,9 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64,
   coeffs = dl!(dl_cache, k)
   RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))    
   for i=0:k-1    
-    RHS += -(coeffs[k-i]/coeffs[k+1])*M[k-i]*U[:,i+1]
+    RHS += -(coeffs[k-i]/coeffs[k+1])*M[i+1]*U[:,i+1]
   end 
-  LHS = (M[k+1] + 1.0/(coeffs[k+1])*Δt*K)
+  LHS = (M[1] + 1.0/(coeffs[k+1])*Δt*K)
   Uₙ₊ₖ = LHS\RHS
   Uₙ₊ₖ
 end
@@ -134,7 +138,7 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1
-f(x,t) = 1.0
+f(x,t) = sin(π*x[1])
 u₀(x) = 0.0
 # Define the time discretization parameters
 Δt = 1e-2;
@@ -183,10 +187,10 @@ end
 Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
-##### ########## ########## ########## ########## #####
-# Compute the solution using the multiscale method
-##### ########## ########## ########## ########## #####
-N = [1,2,4,8]
+##### ########## ########## ########## ########## ##
+# Compute the solution using the multiscale method #
+##### ########## ########## ########## ########## ##
+N = [16]
 plt = Plots.plot();
 plt1 = Plots.plot();
 L²Error = zeros(Float64,size(N));
@@ -197,15 +201,15 @@ for l=[7]
   for (nc,itr) in zip(N, 1:lastindex(N))
     # Compute the time dependent multiscale basis
     patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-    global Λ = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt);       
+    global Λ = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt, 10);       
 
     # Compute the original MS method bases.
     # basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices) 
     # global Λ = fill(basis_vec_ms, ntime+1)   
     # Compute the projection of the fine scale matrices to the multiscale space    
     𝐊 = [Λ[i+1]'*stima*Λ[i+1] for i=1:ntime]; # Stiffness matrix    
-    Mₘₛ¹ = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[k] for k=i+1:-1:1]][end:-1:1] for i=1:BDF-1]# Compute the vector of mass matrices    
-    Mₘₛ² = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:BDF]][end:-1:1] for i=BDF:ntime]
+    Mₘₛ¹ = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:i]] for i=1:BDF-1]# Compute the vector of mass matrices    
+    Mₘₛ² = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:BDF]] for i=BDF:ntime]
     𝐌 = vcat(Mₘₛ¹, Mₘₛ²)
 
     println("Done computing the multiscale space")
@@ -225,7 +229,7 @@ for l=[7]
         t += Δt    
       end
       dlcache = get_dl_cache(BDF) 
-      for i=BDF:ntime
+      for i=BDF:1
         # Execute the BDF step
         fcache = fine_scale_space, Λ[i+1]
         cache = dlcache, fcache
@@ -250,8 +254,8 @@ for l=[7]
     println("Done nc = "*string(nc))
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L \$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=1, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
