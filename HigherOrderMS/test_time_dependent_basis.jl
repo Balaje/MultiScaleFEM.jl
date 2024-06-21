@@ -14,8 +14,11 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
   basis_vec_ms = [spzeros(Float64, q*nf+1, (p+1)*nc) for i=1:ntime+1]
   
   K, L, Λ = get_saddle_point_problem(fine_scale_space, D, p, nc)
-  M = assemble_mass_matrix(fine_scale_space, x->1.0)    
+  M = assemble_mass_matrix(fine_scale_space, x->1.0)      
+
+  # nds_fine = LinRange(fine_scale_space.domain..., fine_scale_space.q*fine_scale_space.nf+1)
   
+  β = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
   index = 1
   for coarse_el=1:nc
     fullnodes = patch_indices_to_global_indices[coarse_el]
@@ -30,26 +33,30 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
     
     # Initial condition for the basis
     function ł(cache, tₙ::Float64)
-      freenodes, Λₜ = cache
-      [zeros(length(freenodes))*tₙ; Λₜ]
+      f, Λ₀ = cache
+      [f; Λ₀]
       # zeros(length(freenodes))
     end     
     
+    Z_el = spzeros(Float64, length(gn), length(gn))
     for _=1:p+1      
-      stima₁ = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
-      massma₁ = [massma_el zero(lmat_el); zero(lmat_el') spzeros(Float64, length(gn), length(gn))]
-      U₀ = [zeros(Float64, length(freenodes)); zeros(Float64, length(gn))]
+      stima₁ = [stima_el lmat_el; 
+                (1/Δt)*(lmat_el)' Z_el]
+      massma₁ = [massma_el zero(lmat_el); 
+                zero(lmat_el') Z_el]
+      U₀ = zeros(Float64, length(freenodes)+length(gn))
+      # U₀ = [collect(β[freenodes,index]); zeros(length(gn))]
       
       ###### ###### ###### ###### ###### ###### 
       #  Solve the time dependent problem
       ###### ###### ###### ###### ###### ###### 
-      fcache = freenodes, Λ[gn, index]
+      fcache = zeros(length(freenodes)), (1/Δt)*Λ[gn, index]
       t = 0.0
       for i=1:BDF-1
         dlcache = get_dl_cache(i)
         cache = dlcache, fcache        
         U₁ = BDFk!(cache, t, U₀, Δt, stima₁, massma₁, ł, i)                
-        basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]        
+        basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]
         U₀ = hcat(U₁, U₀)        
         t += Δt
       end      
@@ -58,7 +65,7 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
       cache = dlcache, fcache
       for i=BDF:N
         U₁ = BDFk!(cache, t+Δt, U₀, Δt, stima₁, massma₁, ł, BDF)
-        basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]        
+        basis_vec_ms[i][freenodes, index] .=  U₁[1:length(freenodes)]
         U₀[:,2:BDF] = U₀[:,1:BDF-1]        
         U₀[:,1] = U₁
         t += Δt
@@ -102,18 +109,32 @@ end
 # Test out the method #
 #######################
 
-# Projection of the source function to the MS space
+"""
+Projection of the source function to the MS space
+"""
 function fₙ!(cache, tₙ::Float64)
   fspace, basis_vec_ms = cache
   F = assemble_load_vector(fspace, y->f(y, tₙ))
   basis_vec_ms'*F
 end
 
+"""
+Function to setup the initial condition
+"""
+function setup_initial_condition(u₀::Function, Λ::NTuple{2,SparseMatrixCSC{Float64,Int64}}, fspace::FineScaleSpace)
+  Λᵣ, Λₜ = Λ
+  massma = assemble_mass_matrix(fspace, x->1.0)
+  loadvec = assemble_load_vector(fspace, u₀)
+  Mₘₛ = Λₜ'*massma*Λᵣ
+  Lₘₛ = Λₜ'*loadvec
+  Mₘₛ\Lₘₛ
+end 
+
 domain = (0.0,1.0)
 # nc = 4;
 # l = 7;
 p = 3;
-nf = 2^15;
+nf = 2^14;
 q = 1;
 qorder = 6;
 fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
@@ -141,8 +162,8 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 f(x,t) = sin(π*x[1])
 u₀(x) = 0.0
 # Define the time discretization parameters
-Δt = 1e-2;
-tf = 0.5
+Δt = 1e-3;
+tf = 0.5;
 ntime = ceil(Int64, tf/Δt);
 BDF = 4;
 
@@ -171,7 +192,7 @@ let
     cache = dlcache, fcache
     U₁ = BDFk!(cache, t, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, i)
     U₀ = hcat(U₁, U₀)
-    t += Δt
+    t += Δt    
   end
   # Remaining BDF steps
   dlcache = get_dl_cache(BDF)
@@ -190,7 +211,7 @@ uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 ##### ########## ########## ########## ########## ##
 # Compute the solution using the multiscale method #
 ##### ########## ########## ########## ########## ##
-N = [16]
+N = [1,2,4,8,16]
 plt = Plots.plot();
 plt1 = Plots.plot();
 L²Error = zeros(Float64,size(N));
@@ -200,38 +221,39 @@ for l=[7]
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
     # Compute the time dependent multiscale basis
-    patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-    global Λ = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt, 10);       
+    local patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));    
 
     # Compute the original MS method bases.
-    # basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices) 
-    # global Λ = fill(basis_vec_ms, ntime+1)   
+    global Λₜ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices)         
+    # global Λ = time_dependent_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, BDF, tf, Δt, min(ntime, 20));       
+    global Λ = fill(Λₜ, ntime+1)
+
     # Compute the projection of the fine scale matrices to the multiscale space    
-    𝐊 = [Λ[i+1]'*stima*Λ[i+1] for i=1:ntime]; # Stiffness matrix    
-    Mₘₛ¹ = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:i]] for i=1:BDF-1]# Compute the vector of mass matrices    
-    Mₘₛ² = [[[Λ[i+1]'*massma*Λ[i+1]]; [Λ[i+1]'*massma*Λ[i+1-k] for k=1:BDF]] for i=BDF:ntime]
+    𝐊 = [Λₜ'*stima*Λ[i+1] for i=1:ntime]; # Stiffness matrix    
+    Mₘₛ¹ = [[[Λₜ'*massma*Λ[i+1]]; [Λₜ'*massma*Λ[i+1-k] for k=1:i]] for i=1:BDF-1]# Compute the vector of mass matrices    
+    Mₘₛ² = [[[Λₜ'*massma*Λ[i+1]]; [Λₜ'*massma*Λ[i+1-k] for k=1:BDF]] for i=BDF:ntime]
     𝐌 = vcat(Mₘₛ¹, Mₘₛ²)
 
     println("Done computing the multiscale space")
 
     # Time marching
     let 
-      U₀ = setup_initial_condition(u₀, Λ[1], fine_scale_space);
+      U₀ = setup_initial_condition(u₀, (Λₜ, Λ[1]), fine_scale_space);
       global U = zero(U₀)
       t = 0.0
       for i=1:BDF-1
         dlcache = get_dl_cache(i)            
         # Execute the BDF step
-        fcache = fine_scale_space, Λ[i]
+        fcache = fine_scale_space, Λₜ
         cache = dlcache, fcache
         U₁ = BDFk!(cache, t, U₀, Δt, 𝐊[i], 𝐌[i], fₙ!, i) 
         U₀ = hcat(U₁,U₀)
         t += Δt    
       end
       dlcache = get_dl_cache(BDF) 
-      for i=BDF:1
+      for i=BDF:ntime
         # Execute the BDF step
-        fcache = fine_scale_space, Λ[i+1]
+        fcache = fine_scale_space, Λₜ
         cache = dlcache, fcache
         U₁ = BDFk!(cache, t, U₀, Δt, 𝐊[i], 𝐌[i], fₙ!, BDF) 
         # Update the time step
