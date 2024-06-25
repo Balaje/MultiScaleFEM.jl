@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 0.1
+tf = 0.01
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -94,20 +94,15 @@ N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-plt7 = Plots.plot();
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
-  fspace, basis_vec_ms, z1, z2 = cache
-  loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  [z1; z2; basis_vec_ms'*loadvec]
-
   # "A Computationally Efficient Method"
-  # fspace, basis_vec_ms, z1 = cache
-  # loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  # [z1; basis_vec_ms'*loadvec]
+  fspace, basis_vec_ms = cache
+  loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
+  basis_vec_ms'*loadvec
 end   
 
 for l=[8]
@@ -118,65 +113,51 @@ for l=[8]
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute the multiscale basis
-      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
-      # Assemble the stiffness, mass matrices
-      Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁
-      Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁       
-      L₁ = massma*basis_vec_ms₁;
-      L₂ = basis_vec_ms₁'*massma;
-      P = get_saddle_point_problem(fine_scale_space, A, p, nc)[2]
-            
-      global 𝐌 = [massma[freenodes, freenodes] zero(P[freenodes,:])       -L₁[freenodes,:]; 
-                     zero(P[freenodes,:])'      zeros(nc*(p+1), nc*(p+1))  zeros(nc*(p+1), nc*(p+1));
-                     -L₂[:,freenodes]           zeros(nc*(p+1), nc*(p+1))     Mₘₛ];
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);      
       
-      global 𝐊 = [stima[freenodes, freenodes]     P[freenodes,:]            zero(L₁[freenodes,:]);
-                      P[freenodes,:]'         zeros(nc*(p+1), nc*(p+1))     zeros(nc*(p+1), nc*(p+1));
-                   zero(L₂[:,freenodes])      zeros(nc*(p+1), nc*(p+1))         Kₘₛ];
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l+5, (q,p));
+      # Compute the multiscale basis correction
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l+5, patch_indices_to_global_indices, 1/Δt);
 
-      # "A Computationally Efficient Method"
-      # global 𝐌 = [Mₘₛ -Mₘₛ;
-      #             -Mₘₛ  Mₘₛ]
-      # global 𝐊 = blockdiag(Kₘₛ, Kₘₛ);
-      
-          
+
+      global basis_vec_ms = basis_vec_ms₁ - basis_vec_ms₂
+      # Assemble the stiffness, mass matrices
+      global Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
+      global Mₘₛ = basis_vec_ms'*massma*basis_vec_ms
+                
       # Time marching
       let 
         # Project initial condition onto the multiscale space
-        U₀ = [zeros(length(freenodes)); zeros(nc*(p+1)); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
-
+        
         # "A Computationally Efficient Method"
-        # U₀ = [zeros(nc*(p+1)); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
-        # fcache = fine_scale_space, basis_vec_ms₁, zeros(nc*(p+1))        
+        U₀ = setup_initial_condition(u₀, basis_vec_ms₂, fine_scale_space)
+        fcache = fine_scale_space, basis_vec_ms
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
-        fcache = fine_scale_space, basis_vec_ms₁, zeros(length(freenodes)), zeros(nc*(p+1))        
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
-          U₁ = BDFk!(cache, t, U₀, Δt, 𝐊, 𝐌, fₙ!, i)
+          U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, i)
           U₀ = hcat(U₁, U₀)
           t += Δt
-          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))          
+          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))
         end
         # Remaining BDF steps
         dlcache = get_dl_cache(BDF)
         cache = dlcache, fcache
         for i=BDF:ntime
-          U₁ = BDFk!(cache, t+Δt, U₀, Δt, 𝐊, 𝐌, fₙ!, BDF)
+          U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
           t += Δt
-          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))          
+          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))
         end
         U = U₀[:,1] # Final time solution
-      end
-      U_fine_scale = (basis_vec_ms₁*U[length(freenodes)+nc*(p+1)+1:end]) - [0; U[1:length(freenodes)]; 0]
+      end      
 
-      # "A Computationally Efficient Method"
-      # U_sol = reshape(U, nc*(p+1), 2)
-      # U_fine_scale = basis_vec_ms₁*(U_sol[:,2] - U_sol[:,1])
+      # "A Computationally Efficient Method"      
+      U_fine_scale = basis_vec_ms*U      
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -205,9 +186,8 @@ plt5 = Plots.plot(plt3, plt2, layout=(2,1))
 
 # Switch variables to global and plot
 plt4 = Plots.plot()
-nc = N[end]
-U_sol = (basis_vec_ms₁*U[length(freenodes)+nc*(p+1)+1:end]) - [0; U[1:length(freenodes)]; 0]
-Plots.plot!(plt4, nds_fine, U_sol, label="Multiscale solution", lw=2)
+U_fine_scale = basis_vec_ms*U
+Plots.plot!(plt4, nds_fine, U_fine_scale, label="Multiscale solution", lw=2)
 Plots.plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
 
 plt6 = Plots.plot(plt, plt1, plt3, plt4, layout=(2,2))

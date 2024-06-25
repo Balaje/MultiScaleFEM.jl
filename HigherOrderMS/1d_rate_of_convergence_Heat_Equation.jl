@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 1e-2
+tf = 0.1
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -86,8 +86,8 @@ uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32]
 # Create empty plots
-plt = Plots.plot();
-plt1 = Plots.plot();
+# plt = Plots.plot();
+# plt1 = Plots.plot();
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
@@ -105,8 +105,10 @@ for l=[8]
     let      
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
+      patch_indices_to_global_indices₁, coarse_indices_to_fine_indices₁, ms_elem₁ = coarse_space_to_fine_space(nc, nf, l+3, (q,p));
       # Compute the multiscale basis
-      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      # global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      global basis_vec_ms₁ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, l+3, patch_indices_to_global_indices₁)
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁
       Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁   
