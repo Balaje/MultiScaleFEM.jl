@@ -4,7 +4,7 @@
 include("HigherOrderMS.jl");
 
 function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
-                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, ϵ)                                     
+                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}})                                     
   ### To build the basis functions
   nf = fine_scale_space.nf
   q = fine_scale_space.q
@@ -19,7 +19,7 @@ function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Functi
     freenodes₁ = setdiff(fullnodes₁, bnodes₁)    
     start₁ = max(1,t-l); last₁ = min(nc,t+l)    
     gn₁ = start₁*(p+1)-p:last₁*(p+1)    
-    stima_el = M[freenodes₁,freenodes₁] + (1/ϵ)*K[freenodes₁,freenodes₁]
+    stima_el = K[freenodes₁,freenodes₁]
     lmat_el = L[freenodes₁,gn₁]
     for _=1:p+1
       fvecs_el = [M[freenodes₁,freenodes₁]*β[freenodes₁,index]; zeros(Float64,length(gn₁))]
@@ -66,11 +66,12 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+A(x) = 1.0
 Λ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices)
-Λₗ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, 1);
+Λₗ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
 
 nb = 9;
 Plots.plot();
 Plots.plot!(nds_fine, Λₗ[:,nb], label="New Basis");
-Plots.plot!(nds_fine, Λ[:,nb], label="Old Basis");
+# Plots.plot!(nds_fine, Λ[:,nb], label="Old Basis");

@@ -23,8 +23,8 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-# A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
+# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
 f(x,t) = sin(π*x[1])
@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 0.1
+tf = 5Δt
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -90,11 +90,13 @@ println("Solving MS problem...")
 println(" ")
 
 ##### Now begin solving using the multiscale method #####
-N = [1,2,4,8,16,32]
+N = [1,2,4,8]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-plt7 = Plots.plot();
+plt7_1 = Plots.plot();
+plt7_2 = Plots.plot();
+plt7 = Plots.plot()
 p = 3;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
@@ -109,6 +111,8 @@ function fₙ!(cache, tₙ::Float64)
   # loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
   # [z1; basis_vec_ms'*loadvec]
 end   
+
+maxvals_correction = zeros(Float64, ntime)
 
 for l=[8]
   fill!(L²Error, 0.0)
@@ -159,6 +163,10 @@ for l=[8]
           U₀ = hcat(U₁, U₀)
           t += Δt
           (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))          
+          if(nc==1) 
+            Plots.plot!(plt7_1, nds_fine, basis_vec_ms₁*U₀[length(freenodes)+nc*(p+1)+1:end, 1], label="")
+            Plots.plot!(plt7_2, nds_fine, [0.0; U₀[1:length(freenodes), 1]; 0.0], label="")           
+          end
         end
         # Remaining BDF steps
         dlcache = get_dl_cache(BDF)
@@ -169,6 +177,10 @@ for l=[8]
           U₀[:,1] = U₁
           t += Δt
           (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))          
+          if(nc==1) 
+            Plots.plot!(plt7_1, nds_fine, basis_vec_ms₁*U₀[length(freenodes)+nc*(p+1)+1:end, 1], label="")
+            Plots.plot!(plt7_2, nds_fine, [0.0; U₀[1:length(freenodes), 1]; 0.0], label="")
+          end
         end
         U = U₀[:,1] # Final time solution
       end

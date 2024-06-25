@@ -6,7 +6,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^8
+Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.1 .+ 0.1*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -27,7 +27,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])
+f(x,t) = sin(π*x[1])*sin(π*t)
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 0.1
+tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -104,11 +104,9 @@ for l=[8]
   for (nc,itr) in zip(N, 1:lastindex(N))
     let      
       # Obtain the map between the coarse and fine scale
-      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-      patch_indices_to_global_indices₁, coarse_indices_to_fine_indices₁, ms_elem₁ = coarse_space_to_fine_space(nc, nf, l+3, (q,p));
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));      
       # Compute the multiscale basis
-      # global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
-      global basis_vec_ms₁ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, l+3, patch_indices_to_global_indices₁)
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁
       Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁   

@@ -41,16 +41,16 @@ function time_dependent_ms_basis(fine_scale_space::FineScaleSpace, D::Function,
     Z_el = spzeros(Float64, length(gn), length(gn))
     for _=1:p+1      
       stima₁ = [stima_el lmat_el; 
-                (1/Δt)*(lmat_el)' Z_el]
+                (lmat_el)' Z_el]
       massma₁ = [massma_el zero(lmat_el); 
                 zero(lmat_el') Z_el]
-      U₀ = zeros(Float64, length(freenodes)+length(gn))
-      # U₀ = [collect(β[freenodes,index]); zeros(length(gn))]
+      # U₀ = zeros(Float64, length(freenodes)+length(gn))
+      U₀ = [collect(β[freenodes,index]); zeros(length(gn))]
       
       ###### ###### ###### ###### ###### ###### 
       #  Solve the time dependent problem
       ###### ###### ###### ###### ###### ###### 
-      fcache = zeros(length(freenodes)), (1/Δt)*Λ[gn, index]
+      fcache = zeros(length(freenodes)), zeros(Float64,length(gn))
       t = 0.0
       for i=1:BDF-1
         dlcache = get_dl_cache(i)
