@@ -8,7 +8,7 @@ domain = (0.0,1.0)
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.1 .+ 0.1*rand(Neps+1)
+diffusion_micro = 0.5 .+ 1.0*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -86,15 +86,18 @@ Uₕ = TrialFESpace(fine_scale_space.U, 0.0)
 uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 
 println(" ")
-println("Solving MS problem...")
+println("Solving new MS problem...")
 println(" ")
 
-##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 3;
+p = 2;
+
+###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
+# Begin solving using the new multiscale method and compare the convergence rates #
+###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -142,8 +145,7 @@ for l=[8]
           cache = dlcache, fcache
           U₁ = BDFk!(cache, t, U₀, Δt, 𝐊, 𝐌, fₙ!, i)
           U₀ = hcat(U₁, U₀)
-          t += Δt
-          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))
+          t += Δt          
         end
         # Remaining BDF steps
         dlcache = get_dl_cache(BDF)
@@ -152,8 +154,7 @@ for l=[8]
           U₁ = BDFk!(cache, t+Δt, U₀, Δt, 𝐊, 𝐌, fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
-          t += Δt
-          (i%(ntime/20) ≈ 0.0) && println("Done t = "*string(t))
+          t += Δt          
         end
         U = U₀[:,1] # Final time solution
       end      
@@ -162,6 +163,90 @@ for l=[8]
       U_sol = reshape(U, nc*(p+1), 2)
       U_fine_scale = basis_vec_ms₁*U_sol[:,2] - basis_vec_ms₂*U_sol[:,1]
       
+      # Compute the errors
+      dΩ = Measure(get_triangulation(Uₕ), qorder)
+      uₘₛ = FEFunction(Uₕ, U_fine_scale)    
+      e = uₕ - uₘₛ
+      L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
+      H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
+      
+      println("Done nc = "*string(nc))
+    end
+  end
+  println("Done l = "*string(l))
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
+  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
+end 
+
+# Plot the corrected solution
+plt4 = Plots.plot()
+nc = N[end]
+U_sol = reshape(U, nc*(p+1), 2)
+U_fine_scale = basis_vec_ms₁*U_sol[:,2] - basis_vec_ms₂*U_sol[:,1]
+Plots.plot!(plt4, nds_fine, U_fine_scale, label="New Multiscale solution", lw=1)
+
+println(" ")
+println("Solving old MS problem...")
+println(" ")
+
+###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
+# Begin solving using the old multiscale method and compare the convergence rates #
+###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
+L²Error = zeros(Float64,size(N));
+H¹Error = zeros(Float64,size(N));
+# Define the projection of the load vector onto the multiscale space
+function fₙ!(cache, tₙ::Float64)
+  # "A Computationally Efficient Method"
+  fspace, basis_vec_ms = cache
+  loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
+  basis_vec_ms'*loadvec
+end   
+
+for l=[8]
+  fill!(L²Error, 0.0)
+  fill!(H¹Error, 0.0)
+  for (nc,itr) in zip(N, 1:lastindex(N))
+    let      
+      # Obtain the map between the coarse and fine scale
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
+      # Compute the multiscale basis
+      global basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);            
+      # Assemble the stiffness, mass matrices
+      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms; 
+      Mₘₛ = basis_vec_ms'*massma*basis_vec_ms;                         
+      # Time marching
+      let 
+        # Project initial condition onto the multiscale space        
+        # "A Computationally Efficient Method"
+        U₀ = setup_initial_condition(u₀, basis_vec_ms, fine_scale_space)
+        fcache = fine_scale_space, basis_vec_ms
+        global U = zero(U₀)  
+        t = 0.0
+        # Starting BDF steps (1...k-1) 
+        for i=1:BDF-1
+          dlcache = get_dl_cache(i)
+          cache = dlcache, fcache
+          U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, i)
+          U₀ = hcat(U₁, U₀)
+          t += Δt        
+        end
+        # Remaining BDF steps
+        dlcache = get_dl_cache(BDF)
+        cache = dlcache, fcache
+        for i=BDF:ntime
+          U₁ = BDFk!(cache, t+Δt, U₀, Δt,  Kₘₛ, Mₘₛ, fₙ!, BDF)
+          U₀[:,2:BDF] = U₀[:,1:BDF-1]
+          U₀[:,1] = U₁
+          t += Δt          
+        end
+        U = U₀[:,1] # Final time solution
+      end      
+
+      # "A Computationally Efficient Method"      
+      U_fine_scale = basis_vec_ms*U
+
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
       uₘₛ = FEFunction(Uₕ, U_fine_scale)    
@@ -188,11 +273,8 @@ plt3 = Plots.plot(nds_fine, A.(nds_fine), lw=2, label="A(x)")
 plt5 = Plots.plot(plt3, plt2, layout=(2,1))
 
 # Switch variables to global and plot
-plt4 = Plots.plot()
-nc = N[end]
-U_sol = reshape(U, nc*(p+1), 2)
-U_fine_scale = basis_vec_ms₁*U_sol[:,2] - basis_vec_ms₂*U_sol[:,1]
-Plots.plot!(plt4, nds_fine, U_fine_scale, label="Multiscale solution", lw=2)
-Plots.plot!(plt4, nds_fine, vcat(0.0, Uex, 0.0), label="Reference Solution", lw=1, ls=:dash, lc=:black)
+U_fine_scale = basis_vec_ms*U
+Plots.plot!(plt4, nds_fine, U_fine_scale, label="Old Multiscale solution", lw=1.5, ls=:dash)
+Plots.plot!(plt4, nds_fine, [0.0; Uex; 0.0], label="Reference solution", lw=2, ls=:dot)
 
 plt6 = Plots.plot(plt, plt1, plt3, plt4, layout=(2,2))
