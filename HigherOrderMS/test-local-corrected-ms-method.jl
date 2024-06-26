@@ -23,14 +23,14 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
-# A(x) = 0.5 # Constant diffusion coefficient
-# f(x,t) = sin(π*x[1])
-# u₀(x) = 0.0
-f(x,t) = 0.0
-u₀(x) = sin(π*x[1])
+A(x) = 0.5 # Constant diffusion coefficient
+f(x,t) = sin(π*x[1])
+u₀(x) = 0.0
+# f(x,t) = 0.0
+# u₀(x) = sin(π*x[1])
 
 # Problem parameters
 nf = 2^15
@@ -131,7 +131,7 @@ for l=[8]
       
       global 𝐌 = [Mₘₛ′ Lₘₛ; 
                   Lₘₛ'  Mₘₛ];
-      global 𝐊 = [Kₘₛ′+Mₘₛ′ zero(Lₘₛ); 
+      global 𝐊 = [Kₘₛ′ zero(Lₘₛ); 
                   Pₘₛ'   Kₘₛ] 
                 
       # Time marching
