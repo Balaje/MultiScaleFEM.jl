@@ -23,11 +23,11 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
+A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+# A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])
+f(x,t) = sin(π*x[1])*sin(π*t)
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 5Δt
+tf = 1e-2
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 

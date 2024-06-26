@@ -33,7 +33,7 @@ function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Functi
   basis_vec_ms
 end
 
-# Coarse scale space parameters
+#= # Coarse scale space parameters
 domain = (0.0,1.0)
 nc = 16;
 p = 3;
@@ -73,5 +73,5 @@ A(x) = 1.0
 
 nb = 9;
 Plots.plot();
-Plots.plot!(nds_fine, Λₗ[:,nb], label="New Basis");
+Plots.plot!(nds_fine, Λₗ[:,nb], label="New Basis"); =#
 # Plots.plot!(nds_fine, Λ[:,nb], label="Old Basis");
