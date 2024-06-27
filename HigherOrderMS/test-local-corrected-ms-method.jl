@@ -6,9 +6,9 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^8
+Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.1 .+ 0.1*rand(Neps+1)
+diffusion_micro = 0.5 .+ 4.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -23,14 +23,14 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-# A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
+A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
-A(x) = 0.5 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])
-u₀(x) = 0.0
-# f(x,t) = 0.0
-# u₀(x) = sin(π*x[1])
+# A(x) = 0.5 # Constant diffusion coefficient
+# f(x,t) = sin(π*x[1])*sin(π*t)
+# u₀(x) = 0.0
+f(x,t) = 0.0
+u₀(x) = sin(π*x[1])
 
 # Problem parameters
 nf = 2^15
@@ -93,7 +93,7 @@ N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 3;
+p = 2;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -110,7 +110,7 @@ end
 
 δ = 1;
 p′ = 1;
-for l=[8]
+for l=[4,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -209,7 +209,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[8]
+for l=[4,8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -263,8 +263,8 @@ for l=[8]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=1, ls=:dash)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=1, ls=:dash)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
