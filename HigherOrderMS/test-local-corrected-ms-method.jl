@@ -8,7 +8,7 @@ domain = (0.0,1.0)
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.5 .+ 4.5*rand(Neps+1)
+diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -93,7 +93,7 @@ N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 2;
+p = 3;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -110,7 +110,7 @@ end
 
 δ = 1;
 p′ = 1;
-for l=[4,8]
+for l=[4,5,6,7]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -209,7 +209,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[4,8]
+for l=[4,5,6,7]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
