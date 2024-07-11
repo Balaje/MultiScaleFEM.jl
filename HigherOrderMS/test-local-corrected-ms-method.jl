@@ -27,10 +27,10 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
-# f(x,t) = sin(π*x[1])*sin(π*t)
-# u₀(x) = 0.0
-f(x,t) = 0.0
-u₀(x) = sin(π*x[1])
+f(x,t) = sin(π*x[1])*sin(π*t)
+u₀(x) = 0.0
+# f(x,t) = 0.0
+# u₀(x) = sin(π*x[1])
 
 # Problem parameters
 nf = 2^15
@@ -93,7 +93,7 @@ N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 2;
+p = 3;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -110,7 +110,7 @@ end
 
 δ = 1;
 p′ = 1;
-for l=[4,8]
+for l=[4,5,6]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -209,7 +209,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[4,8]
+for l=[32]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -263,8 +263,8 @@ for l=[4,8]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=1, ls=:dash)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=1, ls=:dash)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=3, ls=:dash)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=3, ls=:dash)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 

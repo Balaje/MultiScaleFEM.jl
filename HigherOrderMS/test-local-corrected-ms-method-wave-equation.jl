@@ -19,12 +19,12 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
+# c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
 ## Oscillatory wave speed
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
 ## Constant wave speed
-# c²(x) = 1.0
+c²(x) = 1.0
 u₀(x) = 0.0
 # uₜ₀(x) = π*sin(π*x[1])
 uₜ₀(x) = 0.0
@@ -123,10 +123,10 @@ for l=[8]
       Lₘₛ = basis_vec_ms₂'*massma*basis_vec_ms₁
       Pₘₛ = basis_vec_ms₂'*stima*basis_vec_ms₁
       
-      global 𝐌 = [Mₘₛ′ 0*Lₘₛ; 
-                  0*Lₘₛ'  Mₘₛ];
+      global 𝐌 = [Mₘₛ′ Lₘₛ; 
+                  Lₘₛ'  Mₘₛ];
       global 𝐊 = [Kₘₛ′ zero(Lₘₛ); 
-                  0*Pₘₛ'   Kₘₛ] 
+                  Pₘₛ'   Kₘₛ] 
       # basis_vec_ms = basis_vec_ms′
       # Kₘₛ = Kₘₛ′
       # Mₘₛ = Mₘₛ′
@@ -170,8 +170,8 @@ for l=[8]
     end
   end
   println("Done l = "*string(l))
-  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=1.5, ls=:dash)
-  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=1.5, ls=:dash)
+  plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
   scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 

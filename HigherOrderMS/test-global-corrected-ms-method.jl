@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 1e-2
+tf = 0.1
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
