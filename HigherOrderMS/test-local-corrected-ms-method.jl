@@ -1,5 +1,5 @@
 include("HigherOrderMS.jl");
-include("corrected_basis.jl");
+include("./include/corrected_basis.jl");
 
 #=
 Problem data
