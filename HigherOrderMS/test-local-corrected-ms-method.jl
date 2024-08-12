@@ -93,8 +93,7 @@ N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 3;
-p = 3;
+p = 4;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -110,8 +109,8 @@ function fₙ!(cache, tₙ::Float64)
 end   
 
 δ = 1;
-p′ = 1;
-for l=[4,5,6]
+p′ = p - 2;
+for l=[8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -210,7 +209,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[4,5,6]
+for l=[8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
