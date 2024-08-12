@@ -8,7 +8,7 @@ domain = (0.0,1.0)
 # Random diffusion coefficient
 Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.5 .+ 0.5*rand(Neps+1)
+diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -27,7 +27,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])*sin(π*t)
+f(x,t) = sin(3π*x[1])*sin(t)
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
@@ -89,7 +89,7 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = [1,2,4,8,16,32]
+N = [1,2,4,8,16,32,64]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
@@ -109,8 +109,8 @@ function fₙ!(cache, tₙ::Float64)
 end   
 
 δ = 1;
-p′ = p - 2;
-for l=[8,9]
+for p′ = [2,3]
+for l = [64]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -177,20 +177,22 @@ for l=[8,9]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L² (l="*string(l)*")", lw=4-p′, ls=:solid)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=4-p′, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
-end 
+end
+println("Done q = "*string(p′)) 
+end
 
 # Plot the corrected solution
-plt4 = Plots.plot()
+#= plt4 = Plots.plot()
 nc = N[end]
 U_fine_scale = basis_vec_ms₁*U[(p′+1)*δ*nc+1:end] + basis_vec_ms₂*U[1:(p′+1)*δ*nc]
 plt7_1 = Plots.plot(nds_fine, basis_vec_ms₁*U[(p′+1)*(δ)*nc+1:end])
 plt7_2 = Plots.plot(nds_fine, basis_vec_ms₂*U[1:(p′+1)*(δ)*nc])
 plt7 = Plots.plot(plt7_1, plt7_2, layout=(1,2))
-Plots.plot!(plt4, nds_fine, U_fine_scale, label="New Multiscale solution", lw=1)
+Plots.plot!(plt4, nds_fine, U_fine_scale, label="New Multiscale solution", lw=1) =#
 
 println(" ")
 println("Solving old MS problem...")
@@ -209,7 +211,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[8,9]
+for l=[64]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -278,8 +280,8 @@ Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc
 # plt5 = Plots.plot(plt3, plt2, layout=(2,1))
 
 # Switch variables to global and plot
-U_fine_scale = basis_vec_ms*U
-Plots.plot!(plt4, nds_fine, U_fine_scale, label="Old Multiscale solution", lw=1.5, ls=:dash)
-Plots.plot!(plt4, nds_fine, [0.0; Uex; 0.0], label="Reference solution", lw=2, ls=:dot)
+# U_fine_scale = basis_vec_ms*U
+# Plots.plot!(plt4, nds_fine, U_fine_scale, label="Old Multiscale solution", lw=1.5, ls=:dash)
+# Plots.plot!(plt4, nds_fine, [0.0; Uex; 0.0], label="Reference solution", lw=2, ls=:dot)
 
 # plt6 = Plots.plot(plt, plt1, plt3, plt4, layout=(2,2))
