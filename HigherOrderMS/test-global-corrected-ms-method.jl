@@ -6,9 +6,9 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^8
+Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.1 .+ 0.1*rand(Neps+1)
+diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -27,7 +27,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])*sin(π*t)
+f(x,t) = sin(3π*x[1])*sin(t)
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
@@ -38,7 +38,7 @@ q = 1
 qorder = 6
 # Temporal parameters
 Δt = 1e-3
-tf = 0.1
+tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
@@ -90,14 +90,14 @@ println("Solving MS problem...")
 println(" ")
 
 ##### Now begin solving using the multiscale method #####
-N = [1,2,4,8]
+N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
 plt7_1 = Plots.plot();
 plt7_2 = Plots.plot();
 plt7 = Plots.plot()
-p = 3;
+p = 4;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -114,7 +114,7 @@ end
 
 maxvals_correction = zeros(Float64, ntime)
 
-for l=[8]
+for l=[N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))

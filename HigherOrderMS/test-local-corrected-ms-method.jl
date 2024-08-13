@@ -109,8 +109,8 @@ function fₙ!(cache, tₙ::Float64)
 end   
 
 δ = 1;
-for p′ = [2,3]
-for l = [64]
+for p′ = [0,1,2,3]
+for l = [N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -177,8 +177,8 @@ for l = [64]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L² (l="*string(l)*")", lw=4-p′, ls=:solid)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=4-p′, ls=:solid)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L² (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=1, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
@@ -211,7 +211,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[64]
+for l=[N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
