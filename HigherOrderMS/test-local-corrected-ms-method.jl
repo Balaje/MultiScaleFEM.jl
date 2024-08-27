@@ -6,7 +6,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^12
+Neps = 2^8
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -27,7 +27,7 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
-f(x,t) = sin(3π*x[1])*sin(t)
+f(x,t) = sin(3π*x[1])^2*sin(t)^2
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
@@ -103,14 +103,14 @@ H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
   # "A Computationally Efficient Method"
-  fspace, basis_vec_ms, z1 = cache
+  fspace, basis_vec_ms, basis_vec_ms₂ = cache
   loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  [z1; basis_vec_ms'*loadvec]
+  [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
 δ = 1;
-for p′ = [0,1,2,3]
-for l = [N[end]]
+for p′ = [2]
+for l = [7,8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -131,8 +131,8 @@ for l = [N[end]]
       
       global 𝐌 = [Mₘₛ′ Lₘₛ; 
                   Lₘₛ'  Mₘₛ];
-      global 𝐊 = [Kₘₛ′ zero(Lₘₛ); 
-                  Pₘₛ'   Kₘₛ] 
+      global 𝐊 = [Kₘₛ′ Pₘₛ; 
+                  Pₘₛ' Kₘₛ] 
                 
       # Time marching
       let 
@@ -140,7 +140,7 @@ for l = [N[end]]
         
         # "A Computationally Efficient Method"
         U₀ = [zeros(Float64, (p′+1)*(δ)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
-        fcache = fine_scale_space, basis_vec_ms₁, zeros(Float64, (p′+1)*(δ)*nc)
+        fcache = fine_scale_space, basis_vec_ms₁, basis_vec_ms₂; #, zeros(Float64, (p′+1)*(δ)*nc)
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
@@ -177,7 +177,7 @@ for l = [N[end]]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L² (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L\$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
   Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=1, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
@@ -211,7 +211,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[N[end]]
+for l=[7,8,9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -262,10 +262,10 @@ for l=[N[end]]
       H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
       
       println("Done nc = "*string(nc))
-    end
-  end
+    end    
+  end  
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=3, ls=:dash)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L\$^2\$ (l="*string(l)*")", lw=3, ls=:dash)
   Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=3, ls=:dash)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
