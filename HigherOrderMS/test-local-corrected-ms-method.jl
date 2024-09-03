@@ -24,7 +24,7 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
   end
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-# A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
+# A(x) = (2 + cos(2π*x[1]/2^-10))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
 f(x,t) = sin(3π*x[1])^2*sin(t)^2
@@ -89,7 +89,7 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = [1,2,4,8,16,32,64]
+N = [1,2,4,8,16,32]
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
@@ -108,39 +108,38 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-δ = 1;
-for p′ = [2]
-for l = [7,8,9]
+for p′ = [0]
+for l = [9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
-    let      
+    let            
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+
       # Compute the multiscale basis
-      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);     
-            
-      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(δ*nc, nf, δ*l, (q,p′));
-      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p′, δ*nc, δ*l, patch_indices_to_global_indices);      
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p′));
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, p′);      
 
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
       Kₘₛ′ = basis_vec_ms₂'*stima*basis_vec_ms₂; Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂; 
       Lₘₛ = basis_vec_ms₂'*massma*basis_vec_ms₁
       Pₘₛ = basis_vec_ms₂'*stima*basis_vec_ms₁
-      
+            
       global 𝐌 = [Mₘₛ′ Lₘₛ; 
                   Lₘₛ'  Mₘₛ];
       global 𝐊 = [Kₘₛ′ Pₘₛ; 
-                  Pₘₛ' Kₘₛ] 
+                  Pₘₛ' Kₘₛ]
                 
       # Time marching
       let 
         # Project initial condition onto the multiscale space
         
         # "A Computationally Efficient Method"
-        U₀ = [zeros(Float64, (p′+1)*(δ)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
-        fcache = fine_scale_space, basis_vec_ms₁, basis_vec_ms₂; #, zeros(Float64, (p′+1)*(δ)*nc)
+        U₀ = [zeros(Float64, (p′+1)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
+        fcache = fine_scale_space, basis_vec_ms₁, α*basis_vec_ms₂
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
@@ -164,7 +163,7 @@ for l = [7,8,9]
       end      
 
       # "A Computationally Efficient Method"            
-      U_fine_scale = basis_vec_ms₁*U[(p′+1)*(δ)*nc+1:end] + basis_vec_ms₂*U[1:(δ)*(p′+1)*nc]
+      U_fine_scale = basis_vec_ms₁*U[(p′+1)*nc+1:end] + basis_vec_ms₂*U[1:(p′+1)*nc]
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -172,8 +171,8 @@ for l = [7,8,9]
       e = uₕ - uₘₛ
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
-      
-      println("Done nc = "*string(nc))
+
+      println("nc = "*string(nc)*" cond(M) = "*string(cond(collect(𝐌))))
     end
   end
   println("Done l = "*string(l))
@@ -185,14 +184,20 @@ end
 println("Done q = "*string(p′)) 
 end
 
-# Plot the corrected solution
-#= plt4 = Plots.plot()
-nc = N[end]
-U_fine_scale = basis_vec_ms₁*U[(p′+1)*δ*nc+1:end] + basis_vec_ms₂*U[1:(p′+1)*δ*nc]
-plt7_1 = Plots.plot(nds_fine, basis_vec_ms₁*U[(p′+1)*(δ)*nc+1:end])
-plt7_2 = Plots.plot(nds_fine, basis_vec_ms₂*U[1:(p′+1)*(δ)*nc])
-plt7 = Plots.plot(plt7_1, plt7_2, layout=(1,2))
-Plots.plot!(plt4, nds_fine, U_fine_scale, label="New Multiscale solution", lw=1) =#
+ev = eigvals(collect(𝐌)\collect(𝐊));
+# plt_ev = Vector{Plots.Plot}(undef, 3);
+# plt_ev[1] = Plots.plot();
+# Plots.scatter!(plt_ev[1], real(ev), imag(ev), label="Eigenvalues \$N_H = "*string(N[1])*", N_{\\epsilon} = "*string(Neps)*"\$ (New Method)", msw=0.0);
+
+# # Plot the corrected solution
+# plt4 = Plots.plot()
+# nc = N[end]
+# p′ = 2
+# U_fine_scale = basis_vec_ms₁*U[(p′+1)*δ*nc+1:end] + basis_vec_ms₂*U[1:(p′+1)*δ*nc]
+# plt7_1 = Plots.plot(nds_fine, basis_vec_ms₁*U[(p′+1)*(δ)*nc+1:end])
+# plt7_2 = Plots.plot(nds_fine, basis_vec_ms₂*U[1:(p′+1)*(δ)*nc])
+# plt7 = Plots.plot(plt7_1, plt7_2, layout=(1,2))
+# Plots.plot!(plt4, nds_fine, U_fine_scale, label="New Multiscale solution", lw=1)
 
 println(" ")
 println("Solving old MS problem...")
@@ -211,7 +216,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[7,8,9]
+for l=[9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -221,8 +226,8 @@ for l=[7,8,9]
       # Compute the multiscale basis
       global basis_vec_ms = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);            
       # Assemble the stiffness, mass matrices
-      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms; 
-      Mₘₛ = basis_vec_ms'*massma*basis_vec_ms;                         
+      global Kₘₛ = basis_vec_ms'*stima*basis_vec_ms; 
+      global Mₘₛ = basis_vec_ms'*massma*basis_vec_ms;                         
       # Time marching
       let 
         # Project initial condition onto the multiscale space        
