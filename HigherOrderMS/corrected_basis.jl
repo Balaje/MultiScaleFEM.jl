@@ -27,7 +27,7 @@ function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Functi
       lhs = [stima_el lmat_el; (lmat_el)'  spzeros(Float64, length(gn₁), length(gn₁))]
       rhs = fvecs_el           
       sol = lhs\collect(rhs)
-      basis_vec_ms[freenodes₁, index] = sol[1:length(freenodes₁)]/norm(sol[1:length(freenodes₁)], Inf)
+      basis_vec_ms[freenodes₁, index] = sol[1:length(freenodes₁)]
       index += 1   
     end
   end

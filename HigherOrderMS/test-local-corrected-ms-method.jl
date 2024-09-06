@@ -6,7 +6,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^8
+Neps = 2^12
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -108,7 +108,7 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for p′ = [0]
+for p′ = [2]
 for l = [9]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
@@ -132,6 +132,8 @@ for l = [9]
                   Lₘₛ'  Mₘₛ];
       global 𝐊 = [Kₘₛ′ Pₘₛ; 
                   Pₘₛ' Kₘₛ]
+      sM = SchurComplementMatrix(𝐌, (nc*(p′+1), nc*(p+1)))
+      sK = SchurComplementMatrix(𝐊, (nc*(p′+1), nc*(p+1)))
                 
       # Time marching
       let 
@@ -139,22 +141,22 @@ for l = [9]
         
         # "A Computationally Efficient Method"
         U₀ = [zeros(Float64, (p′+1)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
-        fcache = fine_scale_space, basis_vec_ms₁, α*basis_vec_ms₂
+        fcache = fine_scale_space, basis_vec_ms₁, basis_vec_ms₂
         global U = zero(U₀)  
         t = 0.0
         # Starting BDF steps (1...k-1) 
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
-          U₁ = BDFk!(cache, t, U₀, Δt, 𝐊, 𝐌, fₙ!, i)
+          U₁ = BDFk!(cache, t, U₀, Δt, sK, sM, fₙ!, i)
           U₀ = hcat(U₁, U₀)
           t += Δt          
         end
         # Remaining BDF steps
         dlcache = get_dl_cache(BDF)
-        cache = dlcache, fcache
+        cache = dlcache, fcache, (nc*(p′+1), nc*(p+1))
         for i=BDF:ntime
-          U₁ = BDFk!(cache, t+Δt, U₀, Δt, 𝐊, 𝐌, fₙ!, BDF)
+          U₁ = BDFk!(cache, t+Δt, U₀, Δt, sK, sM, fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
           t += Δt          
@@ -172,7 +174,7 @@ for l = [9]
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
 
-      println("nc = "*string(nc)*" cond(M) = "*string(cond(collect(𝐌))))
+      println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
     end
   end
   println("Done l = "*string(l))
@@ -184,7 +186,7 @@ end
 println("Done q = "*string(p′)) 
 end
 
-ev = eigvals(collect(𝐌)\collect(𝐊));
+ev = eigvals(collect(𝐌 + Δt*𝐊));
 # plt_ev = Vector{Plots.Plot}(undef, 3);
 # plt_ev[1] = Plots.plot();
 # Plots.scatter!(plt_ev[1], real(ev), imag(ev), label="Eigenvalues \$N_H = "*string(N[1])*", N_{\\epsilon} = "*string(Neps)*"\$ (New Method)", msw=0.0);
