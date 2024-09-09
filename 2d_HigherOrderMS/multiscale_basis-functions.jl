@@ -93,21 +93,21 @@ struct MultiScaleTriangulation
 end
 function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
   # Fine Scale Space
-  model_h = simplexify(CartesianDiscreteModel(domain, (nf,nf)))
+  model_h = CartesianDiscreteModel(domain, (nf,nf))
   Ωf = Triangulation(model_h)
-  σ_fine = get_cell_node_ids(Ωf)
+  σ_fine = vec(get_cell_node_ids(Ωf))
   # Coarse Scale Space
-  model_H = simplexify(CartesianDiscreteModel(domain, (nc,nc)))
+  model_H = CartesianDiscreteModel(domain, (nc,nc))
   Ωc = Triangulation(model_H)
-  σ_coarse = get_cell_node_ids(Ωc)
+  σ_coarse = vec(get_cell_node_ids(Ωc))
   # Store the tree of the coarse mesh for obtaining the patch
   R = vec(map(x->SVector(Tuple(x)), σ_coarse))
   tree = BruteTree(R, ElemDist())
   # Get the data structures required to build the discrete DiscreteModels
   num_coarse_cells = num_cells(Ωc)
-  num_fine_cells = num_cells(Ωf)
   # 1) Get the element indices inside the patch on the coarse and fine scales
-  coarse_to_fine_elems = get_coarse_to_fine_map(num_coarse_cells, num_fine_cells)
+  nsteps =  (Int64(log2(nf/nc)))
+  coarse_to_fine_elems = vec(coarsen(model_h, nsteps))
 
   patch_coarse_elems = lazy_map(get_patch_coarse_elem, 
     lazy_fill(Ωc, num_coarse_cells), 
@@ -174,7 +174,7 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A:
   interior_global_dofs = Ωms.interior_boundary_global[1] # Since we have zero boundary conditions, we extract only the interior nodes
 
   num_coarse_cells = num_cells(Ωc)
-  n_monomials = Int((p+1)*(p+2)*0.5)
+  n_monomials = (p+1)^2
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
 
@@ -193,11 +193,7 @@ end
 Function to obtain the multiscale bases functions
 """
 
-function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, 
-  lmat::SparseMatrixCSC{Float64,Int64}, 
-  rhsmat::SparseMatrixCSC{Float64,Int64}, 
-  interior_dofs, 
-  coarse_dofs)
+function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrixCSC{Float64,Int64}, rhsmat::SparseMatrixCSC{Float64,Int64}, interior_dofs, coarse_dofs)
   n_fine_dofs = size(lmat, 1)
   n_coarse_dofs = length(coarse_dofs)
   basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)    
@@ -223,5 +219,5 @@ end
 
 function get_interior_indices_direct(σ)
   c = groupcount(combinedims(σ))
-  [k for (k,v) in zip(c.indices,c.values) if (v==6)]
+  [k for (k,v) in zip(c.indices,c.values) if (v==4)]
 end
