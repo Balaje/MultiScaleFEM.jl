@@ -2,7 +2,6 @@ include("2d_HigherOrderMS.jl");
 
 # Problem description
 domain = (0.0, 1.0, 0.0, 1.0)
-# A(x) = (2 + cos(2π*x[1]/2^-7)*cos(2π*x[2]/2^-7))^-1 # Oscillatory diffusion coefficient
 A(x) = 1.0
 f(x) = sin(π*x[1])*sin(π*x[2])
 
@@ -31,10 +30,10 @@ let
   global K = assemble_stima(V0, A, 5);
   global F = assemble_loadvec(V0, f, 5);
   for p=[1]
-    for l=[3]
+    for l=[3,6]
       for (nc,i) = zip(N, 1:length(N))
         # Construct the triangulation of the coarse-scale
-        model_coarse = CartesianDiscreteModel(domain, (nc,nc))
+        global model_coarse = CartesianDiscreteModel(domain, (nc,nc))
         Ω_coarse = Triangulation(model_coarse)
         # Obtain the coarse-to-fine map
         nsteps =  (Int64(log2(nf/nc)))
@@ -62,11 +61,14 @@ let
       Plots.scatter!(plt2, 1 ./N, H¹Error, label="", markersize=2, legend=:best, xaxis=:log10, yaxis=:log10)
       println("Done l = "*string(l))
     end
-  Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-  Plots.plot!(plt2, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+    Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+    Plots.plot!(plt2, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+    ##### ##### ##### ##### ##### ##### ##### ##### 
+    # Script to visualize the basis functions
+    ##### ##### ##### ##### ##### ##### ##### ##### 
+    Λ = basis_vec_ms[:,(p+1)^2];
+    Φ = FEFunction(Vₘₛ.Uh, Λ);
+    writevtk(get_triangulation(Φ), "./2d_HigherOrderMS/basis_ms", cellfields=["u(x)"=>Φ]);
+    writevtk(model_coarse, "./2d_HigherOrderMS/model");
   end 
 end
-
-
-# writevtk(Ωₘₛ.Ωf, "./2d_HigherOrderMS/sol_ms", cellfields=["u(x)"=>Uₘₛʰ]);
-
