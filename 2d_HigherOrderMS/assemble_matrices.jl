@@ -36,7 +36,7 @@ end
 """
 Function to assemble the full rectangular matrix in the saddle point system
 """
-function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64, patch_local_node_ids)
+function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64)
   coarse_cell_coords = lazy_map(Broadcasting(Reindex(get_node_coordinates(coarse_trian))), get_cell_node_ids(coarse_trian))
   num_patch_coarse_cells = num_cells(coarse_trian)
   Ω_fine = get_triangulation(fine_space)
@@ -49,12 +49,11 @@ function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, 
   for i=1:num_patch_coarse_cells
     coarse_cell_coord = coarse_cell_coords[i]
     nds_x = (coarse_cell_coord[1][1], coarse_cell_coord[2][1])
-    nds_y = (coarse_cell_coord[1][2], coarse_cell_coord[3][2])
-    node_ids = patch_local_node_ids[i]   
+    nds_y = (coarse_cell_coord[1][2], coarse_cell_coord[3][2])    
     for j=1:n_monomials
       b = x->ℳ(x, nds_x, nds_y, p, αβ[j])    
       lh(v) = ∫(b*v)dΩ_fine
-      L[node_ids,index] += assemble_vector(lh, fine_space)[node_ids]
+      L[:,index] += assemble_vector(lh, fine_space)
       index = index+1
     end
   end
@@ -67,8 +66,6 @@ Function to assemble the inner-product of the L² functions.
 function assemble_rhs_matrix(coarse_trian::Triangulation, p::Int64)
   coarse_cell_coords = lazy_map(Broadcasting(Reindex(get_node_coordinates(coarse_trian))), get_cell_node_ids(coarse_trian))
   num_patch_coarse_cells = num_cells(coarse_trian)
-  Q = CellQuadrature(coarse_trian, 2p)
-  cellmaps = get_cell_map(coarse_trian)
   n_monomials = (p+1)^2
   L = spzeros(Float64, num_patch_coarse_cells*n_monomials, num_patch_coarse_cells*n_monomials)  
   index = 1
@@ -76,18 +73,10 @@ function assemble_rhs_matrix(coarse_trian::Triangulation, p::Int64)
   αβ = poly_exps(p)
   for i=1:num_patch_coarse_cells
     coarse_cell_coord = coarse_cell_coords[i]
-    Qi = get_data(Q)[i]
-    cellmap = cellmaps[i]
-    Qpoints = lazy_map(Broadcasting(cellmap), Qi.coordinates)
-    Qweights = Qi.weights
-    nds_x = (coarse_cell_coord[1][1], coarse_cell_coord[2][1])
     nds_y = (coarse_cell_coord[1][2], coarse_cell_coord[3][2])
-    for j=1:n_monomials, k=1:n_monomials
-      bj = x->ℳ(x, nds_x, nds_y, p, αβ[j])
-      bk = x->ℳ(x, nds_x, nds_y, p, αβ[k])
-      for q=1:lastindex(Qpoints)
-        L[index+j-1, index+k-1] += Qweights[q]*bj(Qpoints[q])*bk(Qpoints[q])
-      end
+    h = (nds_y[2]-nds_y[1])
+    for j=1:n_monomials
+      L[index+j-1, index+j-1] = (h/(2*(i-1)+1))*(h/(2*(i-1)+1))
     end
     index += n_monomials
   end

@@ -127,7 +127,7 @@ function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
   elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
 
   # Return the Object
-  MultiScaleTriangulation(Ωc, Ωf, interior_boundary_global, (elem_global_node_ids, patch_coarse_elems))
+  MultiScaleTriangulation(Ωc, Ωf, collect(interior_boundary_global), (collect(elem_global_node_ids), collect(patch_coarse_elems)))
 end
 
 
@@ -157,19 +157,10 @@ OUTPUT: MultiScaleFESpace(Ωms, Uh, `basis_vec_ms`)
 - `basis_vec_ms`:: Sparse Matrix containing the multiscale bases.
 
 """
-function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A::CellField, qorder::Int64)
+function MultiScaleFESpace(Ωms::MultiScaleTriangulation, 
+                           p::Int64, Uh::FESpace, A)
   # Extract the necessay data from the Triangulation
-  Ωf = Ωms.Ωf
-  Ωc = Ωms.Ωc
-  elem_global_node_ids = Ωms.local_to_global_map[1]
-  elem_global_unique_node_ids = lazy_map(get_unique_node_ids, elem_global_node_ids)
-  # Build the background fine-scale FESpace of order q
-  reffe = ReferenceFE(lagrangian, Float64, q)
-  Uh = TestFESpace(Ωf, reffe, conformity=:H1)
-  # Build the full matrices
-  K = assemble_stima(Uh, A, qorder);
-  L = assemble_rect_matrix(Ωc, Uh, p, elem_global_unique_node_ids);
-  Λ = assemble_rhs_matrix(Ωc, p)
+  Ωc = Ωms.Ωc 
 
   interior_global_dofs = Ωms.interior_boundary_global[1] # Since we have zero boundary conditions, we extract only the interior nodes
 
@@ -178,13 +169,15 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, q::Int64, p::Int64, A:
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
 
-  # Obtain the basis functions
-  basis_vec_ms = lazy_map(get_ms_bases, 
-    lazy_fill(K, num_coarse_cells), 
-    lazy_fill(L, num_coarse_cells), 
-    lazy_fill(Λ, num_coarse_cells), 
-    interior_global_dofs, 
-    coarse_dofs);
+  # Build the full matrices
+  K = assemble_stima(Uh, A, 6);
+  L = assemble_rect_matrix(Ωc, Uh, p);
+  Λ = assemble_rhs_matrix(Ωc, p)
+
+  basis_vec_ms = spzeros(Float64, num_free_dofs(Uh), (p+1)^2*num_coarse_cells)
+  for i=1:num_coarse_cells    
+      basis_vec_ms[:, (i-1)*(p+1)^2+1:i*(p+1)^2] = get_ms_bases(K, L, Λ, interior_global_dofs[i], coarse_dofs[i])  
+  end
 
   MultiScaleFESpace(Ωms, Uh, basis_vec_ms)
 end
@@ -203,7 +196,7 @@ function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrix
   patch_lmat = lmat[I, J]
   patch_rhs = rhsmat[J, J]
   LHS = saddle_point_system(patch_stima, patch_lmat)  
-  RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]      
+  RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]   
   luA = lu(LHS)  
   ldiv!(luA, RHS)  
   for j=1:lastindex(J), i=1:lastindex(I)        

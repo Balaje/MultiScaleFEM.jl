@@ -10,7 +10,16 @@ using Gridap.CellData
 using StaticArrays
 using NearestNeighbors
 using SparseArrays
+
+using PyPlot
 using Plots
+pyplot()
+using LaTeXStrings
+using ColorSchemes
+PyPlot.matplotlib[:rc]("text", usetex=true) 
+PyPlot.matplotlib[:rc]("mathtext",fontset="cm")
+PyPlot.matplotlib[:rc]("font",family="serif",size=20)
+
 using SplitApplyCombine
 using LinearAlgebra
 
