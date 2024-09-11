@@ -1,4 +1,6 @@
-include("2d_HigherOrderMS.jl");
+using Gridap
+using MultiscaleFEM
+using Plots
 
 # Problem description
 domain = (0.0, 1.0, 0.0, 1.0)
@@ -7,7 +9,7 @@ A(x) = 1.0
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
 
 # # Construct the triangulation of the fine-scale
-nf = 2^7
+nf = 2^9
 model = CartesianDiscreteModel(domain, (nf,nf))
 Ω_fine = Triangulation(model)
 # reffe = ReferenceFE(lagrangian, Float64, 1)
@@ -30,7 +32,7 @@ let
   V0 = TestFESpace(Ω_fine, reffe, conformity=:H1)
   Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), Ω_fine)
   for p=[1]
-    for l=[10]
+    for l=[3,6]
       for (nc,i) = zip(N, 1:length(N))
         # Construct the triangulation of the coarse-scale
         global model_coarse = CartesianDiscreteModel(domain, (nc,nc))
@@ -69,7 +71,7 @@ let
     ##### ##### ##### ##### ##### ##### ##### ##### 
     Λ = basis_vec_ms[:,(p+1)^2];
     Φ = FEFunction(Vₘₛ.Uh, Λ);
-    writevtk(get_triangulation(Φ), "./2d_HigherOrderMS/basis_ms", cellfields=["u(x)"=>Φ]);
-    writevtk(model_coarse, "./2d_HigherOrderMS/model");
+    writevtk(get_triangulation(Φ), "basis_ms", cellfields=["u(x)"=>Φ]);
+    writevtk(model_coarse, "model");
   end 
 end

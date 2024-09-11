@@ -2,6 +2,7 @@ module CoarseToFine
 
 using Gridap
 using BlockArrays
+using SplitApplyCombine
 
 function coarsen(model::DiscreteModel, ntime::Int64)
   nc = num_cells(model)
@@ -17,6 +18,12 @@ end
 
 function collect_node_indices_inside_block(b::AbstractArray{T}) where T
   sort(unique(vec(b)))
+end
+
+function get_fine_nodes_in_coarse_elems(local_to_global_map, global_node_coords)  
+  unique_nodes = x->unique(vec(combinedims(x)));    
+  fine_node_indices = lazy_map(unique_nodes, local_to_global_map)
+  fine_node_indices, lazy_map(Broadcasting(Reindex(global_node_coords)), fine_node_indices)
 end
 
 end
