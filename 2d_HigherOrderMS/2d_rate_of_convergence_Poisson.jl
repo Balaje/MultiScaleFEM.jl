@@ -3,22 +3,23 @@ include("2d_HigherOrderMS.jl");
 # Problem description
 domain = (0.0, 1.0, 0.0, 1.0)
 A(x) = 1.0
-f(x) = sin(π*x[1])*sin(π*x[2])
+# # A(x) = (2 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
+f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
 
-# Construct the triangulation of the fine-scale
-nf = 2^8
+# # Construct the triangulation of the fine-scale
+nf = 2^7
 model = CartesianDiscreteModel(domain, (nf,nf))
 Ω_fine = Triangulation(model)
-reffe = ReferenceFE(lagrangian, Float64, 1)
-Vh = TestFESpace(Ω_fine, reffe, conformity=:H1, dirichlet_tags="boundary");
-Vh0 = TrialFESpace(Vh, 0.0);
-dΩ_fine = Measure(Ω_fine, 5);
-a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ_fine;
-b(v) = ∫(v*f)dΩ_fine;
-op = AffineFEOperator(a,b,Vh0,Vh);
-Uex = solve(op);
+# reffe = ReferenceFE(lagrangian, Float64, 1)
+# Vh = TestFESpace(Ω_fine, reffe, conformity=:H1, dirichlet_tags="boundary");
+# Vh0 = TrialFESpace(Vh, 0.0);
+# dΩ_fine = Measure(Ω_fine, 5);
+# a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ_fine;
+# b(v) = ∫(v*f)dΩ_fine;
+# op = AffineFEOperator(a,b,Vh0,Vh);
+# Uex = solve(op);
 
-N = [1,2,4,8];
+N = [1,2,4,8,16];
 L²Error = zeros(Float64, length(N));
 H¹Error = zeros(Float64, length(N));
 
@@ -27,10 +28,9 @@ plt2 = Plots.plot();
 
 let 
   V0 = TestFESpace(Ω_fine, reffe, conformity=:H1)
-  global K = assemble_stima(V0, A, 5);
-  global F = assemble_loadvec(V0, f, 5);
+  Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), Ω_fine)
   for p=[1]
-    for l=[3,6]
+    for l=[10]
       for (nc,i) = zip(N, 1:length(N))
         # Construct the triangulation of the coarse-scale
         global model_coarse = CartesianDiscreteModel(domain, (nc,nc))
@@ -39,8 +39,9 @@ let
         nsteps =  (Int64(log2(nf/nc)))
         coarse_to_fine_map = coarsen(model, nsteps); 
         global Ωₘₛ = MultiScaleTriangulation(domain, nf, nc, l);
-        global Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V0, A);
+        global Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V0, A, f);
         global basis_vec_ms = Vₘₛ.basis_vec_ms
+        K, L, Λ, F = Vₘₛ.fine_scale_system
         
         global Kₘₛ = basis_vec_ms'*K*basis_vec_ms;
         global fₘₛ = basis_vec_ms'*F;

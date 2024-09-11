@@ -134,7 +134,8 @@ end
 struct MultiScaleFESpace <: FESpace
   Ω::MultiScaleTriangulation
   Uh::FESpace
-  basis_vec_ms
+  basis_vec_ms::AbstractMatrix{Float64}
+  fine_scale_system::NTuple{4,AbstractVecOrMat{Float64}}
 end
 
 """
@@ -158,7 +159,7 @@ OUTPUT: MultiScaleFESpace(Ωms, Uh, `basis_vec_ms`)
 
 """
 function MultiScaleFESpace(Ωms::MultiScaleTriangulation, 
-                           p::Int64, Uh::FESpace, A)
+                           p::Int64, Uh::FESpace, A, f)
   # Extract the necessay data from the Triangulation
   Ωc = Ωms.Ωc 
 
@@ -170,16 +171,17 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation,
   coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
 
   # Build the full matrices
-  K = assemble_stima(Uh, A, 6);
+  K = assemble_stima(Uh, A, 0);
   L = assemble_rect_matrix(Ωc, Uh, p);
   Λ = assemble_rhs_matrix(Ωc, p)
+  F = assemble_loadvec(Uh, f, 0);
 
   basis_vec_ms = spzeros(Float64, num_free_dofs(Uh), (p+1)^2*num_coarse_cells)
   for i=1:num_coarse_cells    
       basis_vec_ms[:, (i-1)*(p+1)^2+1:i*(p+1)^2] = get_ms_bases(K, L, Λ, interior_global_dofs[i], coarse_dofs[i])  
   end
 
-  MultiScaleFESpace(Ωms, Uh, basis_vec_ms)
+  MultiScaleFESpace(Ωms, Uh, basis_vec_ms, (K,L,Λ,F))
 end
 
 """
@@ -197,8 +199,7 @@ function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrix
   patch_rhs = rhsmat[J, J]
   LHS = saddle_point_system(patch_stima, patch_lmat)  
   RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]   
-  luA = lu(LHS)  
-  ldiv!(luA, RHS)  
+  RHS = LHS\RHS
   for j=1:lastindex(J), i=1:lastindex(I)        
     basis_vec_ms[I[i],j] = RHS[i,j]        
   end    

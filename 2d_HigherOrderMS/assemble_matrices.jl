@@ -36,28 +36,30 @@ end
 """
 Function to assemble the full rectangular matrix in the saddle point system
 """
-function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64)
-  coarse_cell_coords = lazy_map(Broadcasting(Reindex(get_node_coordinates(coarse_trian))), get_cell_node_ids(coarse_trian))
+function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, p::Int64)  
+  # Coarse Scale
   num_patch_coarse_cells = num_cells(coarse_trian)
-  Ω_fine = get_triangulation(fine_space)
-  dΩ_fine = Measure(Ω_fine, p+1)
-  n_monomials = (p+1)^2
-  L = spzeros(Float64, num_nodes(Ω_fine), num_patch_coarse_cells*n_monomials)    
-  index = 1
   coarse_cell_coords = get_cell_coordinates(coarse_trian)
+  # Fine Scale
+  Ω_fine = get_triangulation(fine_space)    
+  fine_node_coordinates = vec(get_node_coordinates(Ω_fine))
+  n_monomials = (p+1)^2
+  L = spzeros(Float64, num_nodes(Ω_fine), num_patch_coarse_cells*n_monomials)      
+  M = assemble_massma(fine_space, x->1.0, 0)
+  # Begin computing the DOF matrices
+  index = 1
   αβ = poly_exps(p)
   for i=1:num_patch_coarse_cells
     coarse_cell_coord = coarse_cell_coords[i]
     nds_x = (coarse_cell_coord[1][1], coarse_cell_coord[2][1])
     nds_y = (coarse_cell_coord[1][2], coarse_cell_coord[3][2])    
     for j=1:n_monomials
-      b = x->ℳ(x, nds_x, nds_y, p, αβ[j])    
-      lh(v) = ∫(b*v)dΩ_fine
-      L[:,index] += assemble_vector(lh, fine_space)
+      b = x->ℳ(x, nds_x, nds_y, p, αβ[j])          
+      L[:,index] = b.(fine_node_coordinates)      
       index = index+1
     end
   end
-  L
+  M*L
 end
 
 """

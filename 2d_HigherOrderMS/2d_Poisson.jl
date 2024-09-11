@@ -6,31 +6,19 @@ include("2d_HigherOrderMS.jl");
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-nf = 2^8;
-q = 1;
-nc = 2^3;
+nf = 2^7;
+nc = 2^1;
 p = 1;
 l = 3; # Patch size parameter
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
-f(x) = sin(π*x[1])*sin(π*x[2])
+f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
 
 # Fine scale reference solution
 model = CartesianDiscreteModel(domain, (nf,nf));
 Ω_fine = Triangulation(model);
 reffe = ReferenceFE(lagrangian, Float64, 1)
-Vh = TestFESpace(Ω_fine, reffe, conformity=:H1, dirichlet_tags="boundary");
-Vh0 = TrialFESpace(Vh, 0.0);
-dΩ_fine = Measure(Ω_fine, 5);
-a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ_fine;
-b(v) = ∫(v*f)dΩ_fine;
-op = AffineFEOperator(a,b,Vh0,Vh);
-Uex = solve(op);
-
-# Fine-scale stiffness and mass matrices
-V0 = TestFESpace(Ω_fine, reffe, conformity=:H1)
-K = assemble_stima(V0, A, 5);
-F = assemble_loadvec(V0, f, 5);
+Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), Ω_fine)
 
 # Coarse scale discretization
 model_coarse = CartesianDiscreteModel(domain, (nc,nc))
@@ -42,8 +30,9 @@ coarse_to_fine_map = coarsen(model, nsteps);
 # Multiscale Triangulation
 Ωₘₛ = MultiScaleTriangulation(domain, nf, nc, l);
 # Multiscale Space
-Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V0, A);
+Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, TestFESpace(Ω_fine, reffe, conformity=:H1), A, f);
 basis_vec_ms = Vₘₛ.basis_vec_ms
+K, L, Λ, F = Vₘₛ.fine_scale_system
 
 # Multiscale Stiffness and RHS
 Kₘₛ = basis_vec_ms'*K*basis_vec_ms;
