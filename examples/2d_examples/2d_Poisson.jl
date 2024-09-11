@@ -1,7 +1,10 @@
 ###### ######## ######## ######## ######## ######## # 
 # Program to test the multiscale basis computation  #
 ###### ######## ######## ######## ######## ######## # 
-include("2d_HigherOrderMS.jl");
+
+using Gridap
+using MultiscaleFEM
+# include("2d_HigherOrderMS.jl");
 
 domain = (0.0, 1.0, 0.0, 1.0);
 
@@ -27,14 +30,14 @@ model_coarse = CartesianDiscreteModel(domain, (nc,nc))
 nsteps =  (Int64(log2(nf/nc)))
 coarse_to_fine_map = coarsen(model, nsteps); 
 
-# Multiscale Triangulation
+# # Multiscale Triangulation
 Ωₘₛ = MultiScaleTriangulation(domain, nf, nc, l);
-# Multiscale Space
+# # Multiscale Space
 Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, TestFESpace(Ω_fine, reffe, conformity=:H1), A, f);
 basis_vec_ms = Vₘₛ.basis_vec_ms
 K, L, Λ, F = Vₘₛ.fine_scale_system
 
-# Multiscale Stiffness and RHS
+# # Multiscale Stiffness and RHS
 Kₘₛ = basis_vec_ms'*K*basis_vec_ms;
 fₘₛ = basis_vec_ms'*F;
 solₘₛ = Kₘₛ\fₘₛ;
@@ -43,8 +46,8 @@ Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);
 
 Λ = basis_vec_ms[:,2];
 Φ = FEFunction(Vₘₛ.Uh, Λ);
-writevtk(get_triangulation(Φ), "./2d_HigherOrderMS/basis_ms", cellfields=["u(x)"=>Φ]);
-writevtk(model_coarse, "./2d_HigherOrderMS/model");
+writevtk(get_triangulation(Φ), "basis_ms", cellfields=["u(x)"=>Φ]);
+writevtk(model_coarse, "model");
 
 # Compute the Errors
 dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);

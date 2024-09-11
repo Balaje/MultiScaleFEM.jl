@@ -1,3 +1,4 @@
+module MultiscaleBases
 # #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 # File containing the code to extract the 2d patch and compute the multiscale basis functions  
 # Contains mainly two parts:
@@ -9,6 +10,25 @@
 # #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 
 #################### BEGIN SOME ESSENTIAL FUNCTIONS THAT ARE USED LATER ON ######################
+
+using Gridap
+using Gridap
+using Gridap.FESpaces
+using Gridap.ReferenceFEs
+using Gridap.Arrays
+using Gridap.Geometry
+using Gridap.Fields
+using Gridap.CellData
+using NearestNeighbors
+
+# For array operations
+using SparseArrays
+using StaticArrays
+using SplitApplyCombine
+
+# Import functions from other modules
+using MultiscaleFEM.CoarseToFine: coarsen
+using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, assemble_rect_matrix, assemble_rhs_matrix, saddle_point_system
 
 """
 Just repeats x n times.
@@ -214,4 +234,6 @@ end
 function get_interior_indices_direct(σ)
   c = groupcount(combinedims(σ))
   [k for (k,v) in zip(c.indices,c.values) if (v==4)]
+end
+
 end

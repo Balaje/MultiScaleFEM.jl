@@ -1,8 +1,7 @@
-##### ##### ##### ##### ##### ##### ##### ##### 
-# Script to define the refinement strategy
-##### ##### ##### ##### ##### ##### ##### ##### 
+module CoarseToFine
+
+using Gridap
 using BlockArrays
-using SplitApplyCombine
 
 function coarsen(model::DiscreteModel, ntime::Int64)
   nc = num_cells(model)
@@ -20,3 +19,4 @@ function collect_node_indices_inside_block(b::AbstractArray{T}) where T
   sort(unique(vec(b)))
 end
 
+end

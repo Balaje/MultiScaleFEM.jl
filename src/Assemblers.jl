@@ -1,3 +1,15 @@
+module Assemblers
+
+using Gridap
+using Gridap.FESpaces
+using Gridap.ReferenceFEs
+using Gridap.Arrays
+using Gridap.Geometry
+using Gridap.Fields
+using Gridap.CellData
+
+using SparseArrays
+
 ##### ###### ###### ###### ###### ###### ###### ###### ###### ####### ####### ####### ####### #
 # Contains the interfaces to build the coarse scale fespaces and the saddle point matrices
 ##### ###### ###### ###### ###### ###### ###### ###### ###### ####### ####### ####### ####### #
@@ -54,7 +66,7 @@ function assemble_rect_matrix(coarse_trian::Triangulation, fine_space::FESpace, 
     nds_x = (coarse_cell_coord[1][1], coarse_cell_coord[2][1])
     nds_y = (coarse_cell_coord[1][2], coarse_cell_coord[3][2])    
     for j=1:n_monomials
-      b = x->ℳ(x, nds_x, nds_y, p, αβ[j])          
+      b = x->Λₖ(x, nds_x, nds_y, p, αβ[j])          
       L[:,index] = b.(fine_node_coordinates)      
       index = index+1
     end
@@ -94,7 +106,7 @@ end
 Scaled monomial bases at each coarse rectanles. 
 The L² functions in the higher order MS Method is the tensor product of the Legendre polynomials in the cell
 """
-function ℳ(x::Point, nds_x::NTuple{2,Float64}, nds_y::NTuple{2,Float64}, p::Int64, αβ::NTuple{2,Int64})  
+function Λₖ(x::Point, nds_x::NTuple{2,Float64}, nds_y::NTuple{2,Float64}, p::Int64, αβ::NTuple{2,Int64})  
   α,β = αβ
   Λₖ!(x[1], nds_x, p, α+1)*Λₖ!(x[2], nds_y, p, β+1)
 end
@@ -139,3 +151,6 @@ end
 Function to get the saddle point system given the stiffness and the rectangular matrix
 """
 saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
+
+
+end
