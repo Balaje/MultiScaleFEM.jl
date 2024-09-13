@@ -66,12 +66,12 @@ let
     end
     Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
     Plots.plot!(plt2, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-    ##### ##### ##### ##### ##### ##### ##### ##### 
-    # Script to visualize the basis functions
-    ##### ##### ##### ##### ##### ##### ##### ##### 
-    Λ = basis_vec_ms[:,(p+1)^2];
-    Φ = FEFunction(Vₘₛ.Uh, Λ);
-    writevtk(get_triangulation(Φ), "basis_ms", cellfields=["u(x)"=>Φ]);
-    writevtk(model_coarse, "model");
+    # ##### ##### ##### ##### ##### ##### ##### ##### 
+    # # Script to visualize the basis functions
+    # ##### ##### ##### ##### ##### ##### ##### ##### 
+    # Λ = basis_vec_ms[:,(p+1)^2];
+    # Φ = FEFunction(Vₘₛ.Uh, Λ);
+    # writevtk(get_triangulation(Φ), "basis_ms", cellfields=["u(x)"=>Φ]);
+    # writevtk(model_coarse, "model");
   end 
 end

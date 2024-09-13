@@ -10,6 +10,7 @@ using Gridap.CellData
 
 using SparseArrays
 using SplitApplyCombine
+using ProgressMeter
 
 using MultiscaleFEM.CoarseToFine: get_fine_nodes_in_coarse_elems
 
@@ -156,10 +157,49 @@ function poly_exps(p::Int64)
   map((a,b)->(a,b), X, Y)
 end
 
-"""
-Function to get the saddle point system given the stiffness and the rectangular matrix
-"""
-saddle_point_system(stima, lmat) = [stima lmat; lmat' spzeros(size(lmat,2), size(lmat,2))]
 
+"""
+assemble_ms_matrix(B::Vector{SparseMatrix}, K::SparseMatrix, p::Int64):
+1) B - Multiscale bases on the coarse scale.
+2) K - Fine-scale matrix (eg. stiffness/mass)
+3) p - Polynomial approximation order
+
+Function to assemble the multiscale matrix corresponding to the fine-scale matrix K
+"""
+function assemble_ms_matrix(B, K)  
+  B'*K*B
+end
+
+"""
+assemble_ms_loadvec(B::Vector{SparseMatrix}, F::Vector, p::Int64):
+1) B - Multiscale bases on the coarse scale.
+2) F - Fine-scale vector (eg. load vector)
+3) p - Polynomial approximation order
+
+Function to assemble the multiscale matrix corresponding to the fine-scale matrix K
+"""
+function assemble_ms_loadvec(B, F)
+  B'*F
+end
+
+"""
+Function to convert the multiscale matrix to the fine scale.
+"""
+function assemble_fine_scale_from_ms(V)
+  n_coarse_scale = length(V)
+  res = zero(V[1])
+  for i=1:n_coarse_scale
+    res += V[i]
+  end
+  res
+end
+
+"""
+Function to solve the multiscale problem and split the dimensions to convert to fine scale.
+"""
+function solve_ms_problem(K, F, dims)
+  sol = K\F  
+  splitdimsview(reshape(sol, dims))
+end
 
 end

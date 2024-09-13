@@ -25,10 +25,11 @@ using NearestNeighbors
 using SparseArrays
 using StaticArrays
 using SplitApplyCombine
+using LinearAlgebra
 
 # Import functions from other modules
 using MultiscaleFEM.CoarseToFine: coarsen
-using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, assemble_rect_matrix, assemble_rhs_matrix, saddle_point_system
+using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, assemble_rect_matrix, assemble_rhs_matrix
 
 """
 Just repeats x n times.
@@ -52,7 +53,7 @@ Function to obtain the indices of the coarse-scale elements present in the patch
 Uses a KDTree search to find out the Nearest Neighbors.
 """
 function get_patch_coarse_elem(Ω::Triangulation, tree::BruteTree, l::Int64, el::Int64)  
-  σ = get_cell_node_ids(Ω)
+  σ = vec(get_cell_node_ids(Ω))
   el_inds = inrange(tree, σ[el], 1) # Find patch of size 1
   for _=2:l # Recursively do this for 2:l and collect the unique indices. 
     X = [inrange(tree, i, 1) for i in σ[el_inds]]
@@ -77,85 +78,99 @@ Takes the indices of the fine scale elements in the patch and applies the connec
 """
 get_patch_global_node_ids(patch_fine_elems, σ_fine) = lazy_map(Broadcasting(Reindex(σ_fine)), patch_fine_elems)
 
-get_unique_node_ids(x) = unique(combinedims(x))
-
 ######################### END OF ESSENTIAL FUNCTIONS ###############################
 ################## BEGIN INTERFACE FOR THE MULTISCALE BASES COMPUTATION ##################
 
-"""
-The Combined MultiScale Triangulation
-
-MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
-
-INPUT: 
-
-- domain: Tuple containing the end points of the domain
-- nf: Number of fine-scale partitions on the axes
-- nc: Number of coarse-scale partitions on the axes
-- l: Patch size.
-
-OUTPUT:
-
-- Ωc: Gridap.Triangulation containing the coarse triangulation
-- Ωf: Gridap-Triangulation containing the fine triangulation
-- `patch_models_coarse`: A Vector{Gridap.DiscreteModel} containing the patch mesh in the coarse scale
-- `patch_models_fine`: A Vector{Gridap.DiscreteModel} containing the patch mesh in the fine scale
-- `interior_boundary_local`: Tuple containing the local (fine-scale) node numbering of (interior, boundary) in the patch meshes 
-- `interior_boundary_global`: Tuple containing the global (fine-scale) node numbering of (interior, boundary) in the patch meshes 
-- `local_to_global_map`: Global (fine-scale) indices in each coarse element.
-
-"""
-struct MultiScaleTriangulation
-  Ωc::Triangulation
-  Ωf::Triangulation
-  interior_boundary_global
-  local_to_global_map
+struct CoarseTriangulation
+  trian::Triangulation
+  tree::NNTree
+  patch_size::Int64
 end
-function MultiScaleTriangulation(domain::Tuple, nf::Int64, nc::Int64, l::Int64)
-  # Fine Scale Space
-  model_h = CartesianDiscreteModel(domain, (nf,nf))
-  Ωf = Triangulation(model_h)
-  σ_fine = vec(get_cell_node_ids(Ωf))
-  # Coarse Scale Space
-  model_H = CartesianDiscreteModel(domain, (nc,nc))
-  Ωc = Triangulation(model_H)
-  σ_coarse = vec(get_cell_node_ids(Ωc))
+function CoarseTriangulation(domain::Tuple, nc::Int64, l::Int64)
+  model_coarse = CartesianDiscreteModel(domain, (nc,nc))
+  Ω_coarse = Triangulation(model_coarse)
+  σ_coarse = vec(get_cell_node_ids(Ω_coarse))
   # Store the tree of the coarse mesh for obtaining the patch
   R = vec(map(x->SVector(Tuple(x)), σ_coarse))
   tree = BruteTree(R, ElemDist())
-  # Get the data structures required to build the discrete DiscreteModels
+  CoarseTriangulation(Ω_coarse, tree, l)
+end
+
+struct FineTriangulation
+  trian::Triangulation
+end
+function FineTriangulation(domain::Tuple, nf::Int64)
+  model = CartesianDiscreteModel(domain, (nf,nf));
+  Ω_fine = Triangulation(model);
+  FineTriangulation(Ω_fine)
+end
+
+
+struct MultiScaleTriangulation
+  Ωc::CoarseTriangulation
+  Ωf::FineTriangulation
+  patch_interior_boundary_fine_scale
+  patch_local_to_global_map
+end
+function MultiScaleTriangulation(coarse_trian::CoarseTriangulation, fine_trian::FineTriangulation)
+  # Fine Scale Triangulation
+  Ωf = fine_trian.trian
+  σ_fine = get_cell_node_ids(Ωf) |> vec
+  num_fine_cells = num_cells(Ωf)
+  # Coarse Scale Triangulation
+  Ωc = coarse_trian.trian
+  tree = coarse_trian.tree # The brute tree of the coarse mesh for obtaining the patch
   num_coarse_cells = num_cells(Ωc)
-  # 1) Get the element indices inside the patch on the coarse and fine scales
-  nsteps =  (Int64(log2(nf/nc)))
-  coarse_to_fine_elems = vec(coarsen(model_h, nsteps))
+  l = coarse_trian.patch_size
+  # 1) Get the element-wise map between the coarse and fine-scales
+  nsteps =  (num_fine_cells/num_coarse_cells) |> sqrt |> log2 |> Int64
+  coarse_to_fine_elems = coarsen(num_fine_cells, nsteps) |> vec
 
-  patch_coarse_elems = lazy_map(get_patch_coarse_elem, 
-    lazy_fill(Ωc, num_coarse_cells), 
-    lazy_fill(tree, num_coarse_cells), 
-    lazy_fill(l, num_coarse_cells), 
-    1:num_coarse_cells)
+  # Get the coarse elements on the patch
+  patch_coarse_elems = lazy_map(get_patch_coarse_elem, lazy_fill(Ωc, num_coarse_cells), lazy_fill(tree, num_coarse_cells), lazy_fill(l, num_coarse_cells), 1:num_coarse_cells)
 
+  # Get the elements on the fine scale inside of the coarse scale patch
   patch_fine_elems = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
 
+  # Get the fine-scale node indices on the patch and separate them as interior and boundary of the patch
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ_fine)
   interior_global = lazy_map(get_interior_indices_direct, patch_fine_node_ids)
   boundary_global = lazy_map(get_boundary_indices_direct, patch_fine_node_ids)
-  interior_boundary_global = (interior_global, boundary_global)
 
   # Lastly, obtain the global-local map on each elements
   elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
   elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
 
   # Return the Object
-  MultiScaleTriangulation(Ωc, Ωf, collect(interior_boundary_global), (collect(elem_global_node_ids), collect(patch_coarse_elems)))
+  MultiScaleTriangulation(coarse_trian, fine_trian, (interior_global, boundary_global), (patch_coarse_elems, elem_global_node_ids))
 end
+
+"""
+Function to obtain the interior fine-scale node indices in the coarse-scale patch
+"""
+get_coarse_scale_patch_fine_scale_interior_node_indices(x::MultiScaleTriangulation) = x.patch_interior_boundary_fine_scale[1]
+
+"""
+Function to obtain the boundary fine-scale node indices in the coarse-scale patch
+"""
+get_coarse_scale_patch_fine_scale_boundary_node_indices(x::MultiScaleTriangulation) = x.patch_interior_boundary_fine_scale[2]
+
+"""
+Function to obtain the element indices of the patch of the element
+"""
+get_coarse_scale_patch_coarse_elem_ids(x::MultiScaleTriangulation) = x.patch_local_to_global_map[1]
+
+"""
+Function to obtain the fine-scale node indices present inside each coarse scale elements
+"""
+get_coarse_scale_elem_fine_scale_node_indices(x::MultiScaleTriangulation) = x.patch_local_to_global_map[2]
 
 
 struct MultiScaleFESpace <: FESpace
   Ω::MultiScaleTriangulation
   Uh::FESpace
-  basis_vec_ms::AbstractMatrix{Float64}
-  fine_scale_system::NTuple{4,AbstractVecOrMat{Float64}}
+  basis_vec_ms
+  fine_scale_system
 end
 
 """
@@ -178,53 +193,57 @@ OUTPUT: MultiScaleFESpace(Ωms, Uh, `basis_vec_ms`)
 - `basis_vec_ms`:: Sparse Matrix containing the multiscale bases.
 
 """
-function MultiScaleFESpace(Ωms::MultiScaleTriangulation, 
-                           p::Int64, Uh::FESpace, A, f)
+function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices)
   # Extract the necessay data from the Triangulation
   Ωc = Ωms.Ωc   
-
-  local_to_global_map = Ωms.local_to_global_map[1]
-  interior_global_dofs = Ωms.interior_boundary_global[1] # Since we have zero boundary conditions, we extract only the interior nodes
-
-  num_coarse_cells = num_cells(Ωc)
+  num_coarse_cells = num_cells(Ωc.trian)
   n_monomials = (p+1)^2
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
 
-  # Build the full matrices
-  K = assemble_stima(Uh, A, 0);
-  L = assemble_rect_matrix(Ωc, Uh, local_to_global_map, p);
-  Λ = assemble_rhs_matrix(Ωc, p)
-  F = assemble_loadvec(Uh, f, 0);
+  # Since we have zero boundary conditions, we extract only the interior nodes
+  patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms) 
 
-  basis_vec_ms = spzeros(Float64, num_free_dofs(Uh), (p+1)^2*num_coarse_cells)
-  for i=1:num_coarse_cells    
-    basis_vec_ms[:, (i-1)*(p+1)^2+1:i*(p+1)^2] = get_ms_bases(K, L, Λ, interior_global_dofs[i], coarse_dofs[i])  
-  end
+  K, L, Λ = fine_scale_matrices
 
-  MultiScaleFESpace(Ωms, Uh, basis_vec_ms, (K,L,Λ,F))
+  Ks = lazy_fill(K, num_coarse_cells);
+  Ls = lazy_fill(L, num_coarse_cells);
+  Λs = lazy_fill(Λ, num_coarse_cells);
+
+  basis_vec_ms = lazy_map(get_ms_bases, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs)
+
+  MultiScaleFESpace(Ωms, Uh, basis_vec_ms, (Ks,Ls,Λs))
 end
 
 """
 Function to obtain the multiscale bases functions
 """
 
-function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrixCSC{Float64,Int64}, rhsmat::SparseMatrixCSC{Float64,Int64}, interior_dofs, coarse_dofs)
-  n_fine_dofs = size(lmat, 1)
-  n_coarse_dofs = length(coarse_dofs)
-  basis_vec_ms = spzeros(Float64, n_fine_dofs, n_coarse_dofs)    
+function get_ms_bases(stima::SparseMatrixCSC{Float64, Int64}, lmat::SparseMatrixCSC{Float64,Int64}, rhsmat::SparseMatrixCSC{Float64,Int64}, interior_dofs, coarse_dofs)    
   I = interior_dofs
   J = coarse_dofs
+  basis_vec_ms = spzeros(size(lmat,1), length(J))    
   patch_stima = stima[I, I]
-  patch_lmat = lmat[I, J]
-  patch_rhs = rhsmat[J, J]
-  LHS = saddle_point_system(patch_stima, patch_lmat)  
-  RHS = [zeros(Float64, size(I,1), size(J,1)); collect(patch_rhs)]   
-  RHS = LHS\RHS
-  for j=1:lastindex(J), i=1:lastindex(I)        
-    basis_vec_ms[I[i],j] = RHS[i,j]        
-  end    
+  patch_lmat = collect(lmat[I, J])
+  patch_rhs = collect(rhsmat[J, J])
+  RHS = solve_schur_complement(patch_stima, patch_lmat, patch_rhs)
+  basis_vec_ms[I,:] = RHS[1:length(I), :]
   basis_vec_ms
+end
+
+"""
+Function to solve the saddle point system: 
+      x = LHS⁻¹RHS
+where
+      LHS = [K  L; L'  0]
+      RHS = [0; Λ]
+"""
+function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Float64}, f₂::AbstractVecOrMat{Float64})
+  luK = lu(K)
+  Σ = -L'*(luK\L);
+  τ = f₂
+  Σ⁻¹τ = Σ\τ
+  vcat(luK\(-L*Σ⁻¹τ), Σ⁻¹τ)
 end
 
 function get_boundary_indices_direct(σ)

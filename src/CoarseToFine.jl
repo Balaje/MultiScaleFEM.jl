@@ -4,8 +4,7 @@ using Gridap
 using BlockArrays
 using SplitApplyCombine
 
-function coarsen(model::DiscreteModel, ntime::Int64)
-  nc = num_cells(model)
+function coarsen(nc::Int64, ntime::Int64)
   dims = (Int64(sqrt(nc)),Int64(sqrt(nc)))
   X = reshape(1:nc, dims) 
   m = size(X,1)
