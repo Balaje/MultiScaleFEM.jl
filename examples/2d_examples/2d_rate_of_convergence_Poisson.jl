@@ -1,6 +1,7 @@
 using Gridap
 using MultiscaleFEM
 using Plots
+using ProgressBars
 
 # Problem description
 domain = (0.0, 1.0, 0.0, 1.0)
@@ -9,7 +10,7 @@ A(x) = 1.0
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
 
 # # Construct the triangulation of the fine-scale
-nf = 2^9
+nf = 2^8
 model = CartesianDiscreteModel(domain, (nf,nf))
 Ω_fine = Triangulation(model)
 # reffe = ReferenceFE(lagrangian, Float64, 1)
@@ -21,7 +22,7 @@ model = CartesianDiscreteModel(domain, (nf,nf))
 # op = AffineFEOperator(a,b,Vh0,Vh);
 # Uex = solve(op);
 
-N = [1,2,4,8,16];
+N = [2,4,8,16];
 L²Error = zeros(Float64, length(N));
 H¹Error = zeros(Float64, length(N));
 
@@ -29,29 +30,43 @@ plt1 = Plots.plot();
 plt2 = Plots.plot();
 
 let 
-  V0 = TestFESpace(Ω_fine, reffe, conformity=:H1)
-  Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), Ω_fine)
-  for p=[1]
-    for l=[3,6]
+  FineScale = FineTriangulation(domain, nf);
+  reffe = ReferenceFE(lagrangian, Float64, 1);
+  V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1); 
+  K = assemble_stima(V₀, A, 0);
+  F = assemble_loadvec(V₀, f, 3);
+  M = assemble_massma(V₀, x->1.0, 6);
+  for p=[2]
+    for l=[p+2,p+3]
       for (nc,i) = zip(N, 1:length(N))
-        # Construct the triangulation of the coarse-scale
-        global model_coarse = CartesianDiscreteModel(domain, (nc,nc))
-        Ω_coarse = Triangulation(model_coarse)
-        # Obtain the coarse-to-fine map
-        nsteps =  (Int64(log2(nf/nc)))
-        coarse_to_fine_map = coarsen(model, nsteps); 
-        global Ωₘₛ = MultiScaleTriangulation(domain, nf, nc, l);
-        global Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V0, A, f);
-        global basis_vec_ms = Vₘₛ.basis_vec_ms
-        K, L, Λ, F = Vₘₛ.fine_scale_system
+        # Coase scale discretization
+        CoarseScale = CoarseTriangulation(domain, nc, l);
+
+        # Multiscale Triangulation
+        Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
+        L = assemble_rect_matrix(Ωₘₛ, V₀, p);
+        Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
         
-        global Kₘₛ = basis_vec_ms'*K*basis_vec_ms;
-        global fₘₛ = basis_vec_ms'*F;
-        global solₘₛ = Kₘₛ\fₘₛ;
+        Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
+        basis_vec_ms, patch_interior_fine_scale_dofs, coarse_dofs  = Vₘₛ.basis_vec_ms;
+        Ks, Ls, Λs = Vₘₛ.fine_scale_system;
+        # Lazy fill the fine-scale vector
+        Fs = lazy_fill(F, num_cells(CoarseScale.trian));
         
-        Uₘₛ = basis_vec_ms*solₘₛ;
-        Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);      
+        B = zero(L);
+        for i=ProgressBar(1:nc^2)
+          B[patch_interior_fine_scale_dofs[i], coarse_dofs[i]] = basis_vec_ms[i];  
+        end
         
+        # # Multiscale Stiffness and RHS
+        Kₘₛ = assemble_ms_matrix(B, K);
+        Fₘₛ = assemble_ms_loadvec(B, F);
+        solₘₛ = Kₘₛ\Fₘₛ;
+        Uₘₛ = B*solₘₛ;
+        Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);          
+        
+        
+        Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
         dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
         L²Error[i] = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ));
         H¹Error[i] = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))

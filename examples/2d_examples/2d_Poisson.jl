@@ -2,20 +2,29 @@
 # Program to test the multiscale basis computation  #
 ###### ######## ######## ######## ######## ######## # 
 
+using Pkg
+Pkg.activate(".")
+
 using Gridap
 using MultiscaleFEM
-using ProgressBars
 using SparseArrays
+using ProgressMeter
 
-# include("2d_HigherOrderMS.jl");
+using MPI
+comm = MPI.COMM_WORLD
+MPI.Init()
+mpi_size = MPI.Comm_size(comm)
 
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-nf = 2^7;
-nc = 2^4;
-p = 1;
-l = 3; # Patch size parameter
+nf, nc, p, l = parse.(Int64, ARGS)
+if(ARGS == Nothing)
+  nf = 2^8;
+  nc = 2^3;
+  p = 2;
+  l = 5; # Patch size parameter
+end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
@@ -25,45 +34,46 @@ FineScale = FineTriangulation(domain, nf);
 reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
 K = assemble_stima(V₀, A, 0);
-F = assemble_loadvec(V₀, f, 3);
+F = assemble_loadvec(V₀, f, 4);
 
 # Coarse scale discretization
 CoarseScale = CoarseTriangulation(domain, nc, l);
-Λ = assemble_rhs_matrix(CoarseScale.trian, p);
 
-# # Multiscale Triangulation
+# Multiscale Triangulation
 Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
-C₂F = get_coarse_scale_elem_fine_scale_node_indices(Ωₘₛ);
-L = assemble_rect_matrix(CoarseScale.trian, V₀, C₂F, p);
+L = assemble_rect_matrix(Ωₘₛ, p);
+Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 
 Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
-basis_vec_ms = Vₘₛ.basis_vec_ms;
+basis_vec_ms, patch_interior_fine_scale_dofs, coarse_dofs = Vₘₛ.basis_vec_ms;
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
-
 # Lazy fill the fine-scale vector
 Fs = lazy_fill(F, num_cells(CoarseScale.trian));
 
-elem_to_monomials(i) = (i-1)*(p+1)^2+1:i*(p+1)^2;
-L1 = zero(L);
-for i = 1:num_cells(CoarseScale.trian)
-  L1[:,elem_to_monomials(i)] .= basis_vec_ms[i];
+t1 = MPI.Wtime()
+mpi_rank = MPI.Comm_rank(comm);
+n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size)
+B = zeros(Float64, size(L,1), n_cells_per_proc*(p+1)^2)
+@showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)  
+  B[patch_interior_fine_scale_dofs[i], coarse_dofs[i] .- mpi_rank*n_cells_per_proc*(p+1)^2] = basis_vec_ms[i];  
+end
+B = MPI.Gather(B, comm);
+t2 = MPI.Wtime()
+(mpi_rank == 0) && println("Elasped time = $(t2-t1)");
+
+if(mpi_rank == 0)
+  B = reshape(B, size(L)...)
+  Kₘₛ = assemble_ms_matrix(B, K);
+  Fₘₛ = assemble_ms_loadvec(B, F);
+  solₘₛ = Kₘₛ\Fₘₛ;
+  Uₘₛ = B*solₘₛ;
+  Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);      
+
+  Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
+  dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
+  L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
+  H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
+  println("L²Error = $L²Error, H¹Error = $H¹Error")
 end
 
-# Multiscale Stiffness and RHS
-Kₘₛ = assemble_ms_matrix(L1, K);
-Fₘₛ = assemble_ms_loadvec(L1, F);
-solₘₛ = solve_ms_problem(Kₘₛ, Fₘₛ, ((p+1)^2, num_cells(CoarseScale.trian)));
-elem_fine_scale = lazy_map(*, basis_vec_ms,  solₘₛ);
-Uₘₛ = assemble_fine_scale_from_ms(elem_fine_scale);
-Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);      
-
-# # Compute the Errors
-Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
-dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
-L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
-H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
-
-# Λ = basis_vec_ms[2][:,1];
-# Φ = FEFunction(Vₘₛ.Uh, Λ);
-# writevtk(get_triangulation(Φ), "basis_ms", cellfields=["u(x)"=>Φ]);
-# writevtk(CoarseScale.trian, "model");
+# # # Multiscale Stiffness and RHS
