@@ -18,16 +18,16 @@ mpi_size = MPI.Comm_size(comm)
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-nf, nc, p, l = parse.(Int64, ARGS)
-if(ARGS == Nothing)
-  nf = 2^8;
+# nf, nc, p, l = parse.(Int64, ARGS)
+# if(ARGS == Nothing)
+  nf = 2^7;
   nc = 2^3;
   p = 2;
   l = 5; # Patch size parameter
-end
+# end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
-f(x) = 2π^2*sin(π*x[1])*sin(π*x[2])
+f(x) = sin(3π*x[1])*sin(5π*x[2])
 
 # Background fine scale discretization
 FineScale = FineTriangulation(domain, nf);
@@ -68,12 +68,20 @@ if(mpi_rank == 0)
   solₘₛ = Kₘₛ\Fₘₛ;
   Uₘₛ = B*solₘₛ;
   Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);      
+  
+  Vh = TestFESpace(Ωₘₛ.Ωf.trian, reffe, conformity=:H1, dirichlet_tags="boundary");
+  Vh0 = TrialFESpace(Vh, 0.0);
+  dΩ = Measure(Ωₘₛ.Ωf.trian, 5);
+  a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ;
+  b(v) = ∫(v*f)dΩ;
+  op = AffineFEOperator(a,b,Vh0,Vh);
+  Uex = solve(op);
 
-  Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
+  # Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
   dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
   L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
   H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
-  println("L²Error = $L²Error, H¹Error = $H¹Error")
+  println("$L²Error, $H¹Error")
 end
 
 # # # Multiscale Stiffness and RHS
