@@ -20,13 +20,13 @@ mpi_size = MPI.Comm_size(comm)
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-# nf, nc, p, l = parse.(Int64, ARGS)
-# if(ARGS == Nothing)
-nf = 2^7;
-nc = 2^3;
-p = 2;
-l = 5; # Patch size parameter
-# end
+(length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
+if(length(ARGS)==0)
+  nf = 2^7;
+  nc = 2^3;
+  p = 2;
+  l = 5; # Patch size parameter
+end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
 f(x,t) = sin(3π*x[1])*sin(5π*x[2])*sin(t)
@@ -38,7 +38,6 @@ reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
 K = assemble_stima(V₀, A, 0);
 M = assemble_massma(V₀, x->1.0, 0);
-F = assemble_loadvec(V₀, f, 4);
 
 # Coarse scale discretization
 CoarseScale = CoarseTriangulation(domain, nc, l);
@@ -51,12 +50,10 @@ L = assemble_rect_matrix(Ωₘₛ, p);
 Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 basis_vec_ms, patch_interior_fine_scale_dofs, coarse_dofs = Vₘₛ.basis_vec_ms;
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
-# Lazy fill the fine-scale vector
-Fs = lazy_fill(F, num_cells(CoarseScale.trian));
 
-(mpi_rank == 0) && println("Computing basis functions...")
 t1 = MPI.Wtime()
 mpi_rank = MPI.Comm_rank(comm);
+(mpi_rank == 0) && println("Computing basis functions...")
 n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size)
 B = zeros(Float64, size(L,1), n_cells_per_proc*(p+1)^2)
 @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)  

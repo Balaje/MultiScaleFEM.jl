@@ -18,13 +18,13 @@ mpi_size = MPI.Comm_size(comm)
 domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
-# nf, nc, p, l = parse.(Int64, ARGS)
-# if(ARGS == Nothing)
+(length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
+if(length(ARGS)==0)
   nf = 2^7;
   nc = 2^3;
   p = 2;
   l = 5; # Patch size parameter
-# end
+end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
 f(x) = sin(3π*x[1])*sin(5π*x[2])
