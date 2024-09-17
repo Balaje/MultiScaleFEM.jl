@@ -28,6 +28,8 @@ using SplitApplyCombine
 using LinearAlgebra
 using LazyArrays
 using FillArrays
+using ProgressMeter
+using MPI
 
 # Import functions from other modules
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
@@ -283,6 +285,7 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
 end
 
 struct MultiScaleCorrections
+  Ω::MultiScaleTriangulation
   Vms::MultiScaleFESpace  
   order::Int64  
   ms_corrections
@@ -310,17 +313,17 @@ function MultiScaleCorrections(Vms::MultiScaleFESpace, p::Int64, fine_scale_matr
   # Global node-ids on patch
   patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)
   # Extract the fine-scale matrices
-  K, L, M = fine_scale_matrices
+  K, L, M, L₀ = fine_scale_matrices
   Ks = lazy_fill(K, num_coarse_cells)
   Ls = lazy_fill(L, num_coarse_cells)  
   βs = Vms.basis_vec_ms
   Ms = lazy_fill(M, num_coarse_cells) 
-  L_size = lazy_fill(size(L), num_coarse_cells); 
+  L_size = lazy_fill(size(L₀), num_coarse_cells); 
   # Compute the correction bases using the MultiscaleFESpace
   γ = BroadcastVector(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
   γs = BroadcastVector(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
   # Return the multiscale object
-  MultiScaleCorrections(Vms, q, γs, fine_scale_matrices)
+  MultiScaleCorrections(Ωms, Vms, q, γs, fine_scale_matrices)
 end
 
 function build_global_sparse_matrix_from_basis(B::AbstractMatrix{Float64}, Ms, Ns, shape::NTuple{2,Int64})
@@ -367,6 +370,33 @@ function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Fl
   Σ⁻¹τ = Σ\τ
   luK\(-L*Σ⁻¹τ + F₁)
 end
+
+"""
+Functions to obtain the basis functions from the object
+"""
+get_basis_functions(V::MultiScaleFESpace) = V.basis_vec_ms
+get_basis_functions(V::MultiScaleCorrections) = V.ms_corrections
+
+function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
+  mpi_size = MPI.Comm_size(comm)
+  mpi_rank = MPI.Comm_rank(comm)
+  for (Vₘₛ,B) in zip(Vs, Bs)
+    CoarseScale = Vₘₛ.Ω.Ωc
+    n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);  
+    @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+      B .= B + get_basis_functions(Vₘₛ)[i]    
+    end
+    BI, BJ, BV = findnz(B);
+    BI = MPI.Gather(BI, comm);
+    BJ = MPI.Gather(BJ, comm);
+    BV = MPI.Gather(BV, comm);
+    if(mpi_rank == 0) 
+      B .= sparse(BI, BJ, BV, size(B)...)
+    end
+  end
+  Bs  
+end
+
 
 """
 Function to solve the saddle point system: 

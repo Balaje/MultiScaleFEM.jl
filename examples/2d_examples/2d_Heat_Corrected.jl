@@ -11,6 +11,7 @@ using SparseArrays
 using ProgressMeter
 
 include("./time-dependent.jl")
+include("./schur.jl");
 
 using MPI
 comm = MPI.COMM_WORLD
@@ -53,43 +54,56 @@ basis_vec_ms = Vₘₛ.basis_vec_ms;
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
 
 # # Compute the corrections
-# L₀ = assemble_rect_matrix(Ωₘₛ, 0);
-# Λ₀ = assemble_lm_l2_matrix(Ωₘₛ, 0);
-# Vₘₛ′ = MultiScaleFESpace(Ωₘₛ, 0, V₀, (K, L₀, Λ₀));
-# Wₘₛ =  MultiScaleCorrections(Vₘₛ′, p, (K, L, M));
+q = 0
+L₀ = assemble_rect_matrix(Ωₘₛ, q);
+Λ₀ = assemble_lm_l2_matrix(Ωₘₛ, q);
+Vₘₛ′ = MultiScaleFESpace(Ωₘₛ, q, V₀, (K, L₀, Λ₀));
+Wₘₛ =  MultiScaleCorrections(Vₘₛ′, p, (K, L, M, L₀));
 
 (mpi_rank == 0) && println("Computing basis functions...")
 t1 = MPI.Wtime()
-B = zero(L)
-build_basis_functions!((B,), (Vₘₛ,), comm);
+B = zero(L); B₂ = zero(L₀)
+build_basis_functions!((B,B₂), (Vₘₛ,Wₘₛ), comm);
 t2 = MPI.Wtime()
 (mpi_rank == 0) && println("Elasped time = $(t2-t1)\n");
 
 if(mpi_rank == 0)
   Kₘₛ = assemble_ms_matrix(B, K);
   Mₘₛ = assemble_ms_matrix(B, M);
+  Pₘₛ = assemble_ms_matrix(B, K, B₂);
+  Lₘₛ = assemble_ms_matrix(B, M, B₂);
+  Kₘₛ′ = assemble_ms_matrix(B₂, K);
+  Mₘₛ′ = assemble_ms_matrix(B₂, M);
+
+  global 𝐌 = [Mₘₛ Lₘₛ; 
+              Lₘₛ'  Mₘₛ′];
+  global 𝐊 = [Kₘₛ Pₘₛ; 
+              Pₘₛ' Kₘₛ′]
+
+  sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
 
   # Begin solving the heat equation in rank 0
   println("Solving multiscale problem...")
   function fₙ(cache, tₙ::Float64)
-    Vₕ, B = cache
+    Vₕ, B, B₂ = cache
     L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4)
-    B'*L
+    [B'*L; B₂'*L]
   end
   Δt = 10^-3
   tf = 1.0
   ntime = ceil(Int, tf/Δt)
   BDF = 4
   let 
-    U₀ = setup_initial_condition(u₀, B, V₀)  
+    U₀ = [setup_initial_condition(u₀, B, V₀); zeros(Float64, (q+1)^2*num_cells(CoarseScale.trian))]
     global U = zero(U₀)  
     t = 0.0
     # Starting BDF steps (1...k-1) 
-    fcache = (V₀, B) 
+    fcache = (V₀, B, B₂) 
     for i=1:BDF-1
       dlcache = get_dl_cache(i)
       cache = dlcache, fcache
-      U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ, i)
+      U₁ = BDFk!(cache, t, U₀, Δt, sK, sM, fₙ, i)
       U₀ = hcat(U₁, U₀)
       t += Δt
     end
@@ -97,14 +111,14 @@ if(mpi_rank == 0)
     dlcache = get_dl_cache(BDF)
     cache = dlcache, fcache
     @showprogress for i=BDF:ntime
-      U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₘₛ, Mₘₛ, fₙ, BDF)
+      U₁ = BDFk!(cache, t+Δt, U₀, Δt, sK, sM, fₙ, BDF)
       U₀[:,2:BDF] = U₀[:,1:BDF-1]
       U₀[:,1] = U₁
       t += Δt
     end
     U = U₀[:,1] # Final time solution
   end
-  Uₘₛ = B*U
+  Uₘₛ = B₂*U[(p+1)^2*num_cells(CoarseScale.trian)+1:end] + B*U[1:(p+1)^2*num_cells(CoarseScale.trian)]
 
   Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);  
   

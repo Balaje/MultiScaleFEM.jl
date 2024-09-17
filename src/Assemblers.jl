@@ -104,6 +104,9 @@ Function to assemble the multiscale matrix corresponding to the fine-scale matri
 function assemble_ms_matrix(B, K)  
   B'*K*B
 end
+function assemble_ms_matrix(A, K, B)
+  A'*K*B
+end
 
 """
 assemble_ms_loadvec(B::Vector{SparseMatrix}, F::Vector, p::Int64):

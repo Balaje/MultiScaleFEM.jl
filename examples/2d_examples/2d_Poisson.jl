@@ -14,6 +14,7 @@ using MPI
 comm = MPI.COMM_WORLD
 MPI.Init()
 mpi_size = MPI.Comm_size(comm)
+mpi_rank = MPI.Comm_rank(comm)
 
 domain = (0.0, 1.0, 0.0, 1.0);
 
@@ -48,23 +49,14 @@ Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 basis_vec_ms = Vₘₛ.basis_vec_ms;
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
 
-t1 = MPI.Wtime()
-mpi_rank = MPI.Comm_rank(comm);
 (mpi_rank == 0) && println("Computing basis functions...")
+t1 = MPI.Wtime()
 B = zero(L)
-n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);
-@showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
-  global B += basis_vec_ms[i];  
-end
-BI, BJ, BV = findnz(B);
-BI = MPI.Gather(BI, comm);
-BJ = MPI.Gather(BJ, comm);
-BV = MPI.Gather(BV, comm);
+build_basis_functions!((B,), (Vₘₛ,), comm);
 t2 = MPI.Wtime()
 (mpi_rank == 0) && println("Elasped time = $(t2-t1)\n");
 
 if(mpi_rank == 0)
-  B = sparse(BI, BJ, BV, size(L)...); 
   Kₘₛ = assemble_ms_matrix(B, K);
   Fₘₛ = assemble_ms_loadvec(B, F);
   solₘₛ = Kₘₛ\Fₘₛ;
