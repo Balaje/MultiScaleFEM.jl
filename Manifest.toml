@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "2a75fd8d33b4758ec067643b92553e294e3c8fbc"
+project_hash = "aac04a306760898b82c2143fb131d84bcfbd8743"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -259,6 +259,12 @@ git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.4"
 
+[[deps.LazyArrays]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "SparseArrays", "StaticArrays"]
+git-tree-sha1 = "c9af92d0be60963babfd762e57376bb1bde01bce"
+uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+version = "1.5.2"
+
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
@@ -331,6 +337,12 @@ version = "0.5.13"
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
+
+[[deps.MatrixFactorizations]]
+deps = ["ArrayLayouts", "LinearAlgebra", "Printf", "Random"]
+git-tree-sha1 = "e721126cb2e08226cba1324f78cd34aaf1f31581"
+uuid = "a3b82374-2e81-5b9e-98ce-41277c0e4c87"
+version = "1.0.0"
 
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]

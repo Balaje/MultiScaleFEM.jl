@@ -26,6 +26,8 @@ using SparseArrays
 using StaticArrays
 using SplitApplyCombine
 using LinearAlgebra
+using LazyArrays
+using FillArrays
 
 # Import functions from other modules
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
@@ -34,7 +36,7 @@ using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, poly_exps, Λ�
 """
 Just repeats x n times.
 """
-lazy_fill(x, n) = Gridap.Arrays.Fill(x, n)
+lazy_fill(x, n) = Fill(x, n)
 
 """
 Metric to find the neighbours of the element. Used in BruteTree
@@ -127,15 +129,15 @@ function MultiScaleTriangulation(coarse_trian::CoarseTriangulation, fine_trian::
   coarse_to_fine_elems = coarsen(num_fine_cells, nsteps) |> vec
   
   # Get the coarse elements on the patch
-  patch_coarse_elems = lazy_map(get_patch_coarse_elem, lazy_fill(Ωc, num_coarse_cells), lazy_fill(tree, num_coarse_cells), lazy_fill(l, num_coarse_cells), 1:num_coarse_cells)
+  patch_coarse_elems = BroadcastVector(get_patch_coarse_elem, lazy_fill(Ωc, num_coarse_cells), lazy_fill(tree, num_coarse_cells), lazy_fill(l, num_coarse_cells), 1:num_coarse_cells)
   
   # Get the elements on the fine scale inside of the coarse scale patch
   patch_fine_elems = get_patch_fine_elems(patch_coarse_elems, coarse_to_fine_elems)
   
   # Get the fine-scale node indices on the patch and separate them as interior and boundary of the patch
   patch_fine_node_ids = get_patch_global_node_ids(patch_fine_elems, σ_fine)
-  interior_global = lazy_map(get_interior_indices_direct, patch_fine_node_ids)
-  boundary_global = lazy_map(get_boundary_indices_direct, patch_fine_node_ids)
+  interior_global = BroadcastVector(get_interior_indices_direct, patch_fine_node_ids)
+  boundary_global = BroadcastVector(get_boundary_indices_direct, patch_fine_node_ids)
   
   # Lastly, obtain the global-local map on each elements
   elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
@@ -171,7 +173,7 @@ function assemble_rect_matrix(Ωms::MultiScaleTriangulation, p::Int64)
   num_fine_cells = num_cells(Ωms.Ωf.trian)
   n_monomials = (p+1)^2
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
-  coarse_dofs = lazy_map(elem_to_dof, 1:num_coarse_cells)
+  coarse_dofs = BroadcastVector(elem_to_dof, 1:num_coarse_cells)
   L = spzeros(Float64, num_nodes(Ωms.Ωf.trian), num_coarse_cells*n_monomials) 
   σ_ref, L_ref = _compute_reference_L(p, (num_coarse_cells |> sqrt |> Int64), (num_fine_cells |> sqrt |> Int64))  
   X1 = combinedimsview(combinedims.(coarse_to_fine_cell_coords));
@@ -261,9 +263,9 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   n_monomials = (p+1)^2
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   coarse_dof_vec = lazy_map(Broadcasting(elem_to_dof), get_coarse_scale_patch_coarse_elem_ids(Ωms));
-  coarse_dofs_mat = lazy_map(combinedims, coarse_dof_vec)
-  coarse_dofs = lazy_map(vec, coarse_dofs_mat)  
-  legendre_poly = lazy_map(elem_to_dof, 1:num_coarse_cells)
+  coarse_dofs_mat = BroadcastVector(combinedims, coarse_dof_vec)
+  coarse_dofs = BroadcastVector(vec, coarse_dofs_mat)  
+  legendre_poly = BroadcastVector(elem_to_dof, 1:num_coarse_cells)
   # Since we have zero boundary conditions, we extract only the interior nodes
   patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms) 
   # Extract the fine scale matrices
@@ -273,9 +275,9 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   Λs = lazy_fill(Λ, num_coarse_cells);
   L_size = lazy_fill(size(L), num_coarse_cells);  
   # Compute the basis 
-  β = lazy_map(get_ms_bases, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  β = BroadcastVector(get_ms_bases, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
   # Store the basis as Sparse Matrices
-  βs = lazy_map(build_global_sparse_matrix_from_basis, β, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  βs = BroadcastVector(build_global_sparse_matrix_from_basis, β, patch_interior_fine_scale_dofs, legendre_poly, L_size)
   # Return the MultiScaleFESpace object
   MultiScaleFESpace(Ωms, p, Uh, βs, (Ks,Ls,Λs))
 end
@@ -299,12 +301,12 @@ function MultiScaleCorrections(Vms::MultiScaleFESpace, p::Int64, fine_scale_matr
   n_monomials_p = (p+1)^2  
   elem_to_dof_p(x) = n_monomials_p*x-n_monomials_p+1:n_monomials_p*x;
   coarse_dof_vec = lazy_map(Broadcasting(elem_to_dof_p), get_coarse_scale_patch_coarse_elem_ids(Ωms));
-  coarse_dofs_mat = lazy_map(combinedims, coarse_dof_vec)
-  coarse_dofs = lazy_map(vec, coarse_dofs_mat)  
+  coarse_dofs_mat = BroadcastVector(combinedims, coarse_dof_vec)
+  coarse_dofs = BroadcastVector(vec, coarse_dofs_mat)  
   # For spanning the new basis of order q
   n_monomials_q = (q+1)^2
   elem_to_dof_q(x) = n_monomials_q*x-n_monomials_q+1:n_monomials_q*x;
-  legendre_poly = lazy_map(elem_to_dof_q, 1:num_coarse_cells)
+  legendre_poly = BroadcastVector(elem_to_dof_q, 1:num_coarse_cells)
   # Global node-ids on patch
   patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)
   # Extract the fine-scale matrices
@@ -315,8 +317,8 @@ function MultiScaleCorrections(Vms::MultiScaleFESpace, p::Int64, fine_scale_matr
   Ms = lazy_fill(M, num_coarse_cells) 
   L_size = lazy_fill(size(L), num_coarse_cells); 
   # Compute the correction bases using the MultiscaleFESpace
-  γ = lazy_map(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
-  γs = lazy_map(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  γ = BroadcastVector(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  γs = BroadcastVector(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
   # Return the multiscale object
   MultiScaleCorrections(Vms, q, γs, fine_scale_matrices)
 end
