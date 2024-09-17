@@ -228,6 +228,7 @@ get_coarse_scale_elem_fine_scale_node_indices(x::MultiScaleTriangulation) = x.pa
 
 struct MultiScaleFESpace <: FESpace
   Ω::MultiScaleTriangulation
+  order::Int64
   Uh::FESpace
   basis_vec_ms
   fine_scale_system
@@ -263,25 +264,72 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   coarse_dofs_mat = lazy_map(combinedims, coarse_dof_vec)
   coarse_dofs = lazy_map(vec, coarse_dofs_mat)  
   legendre_poly = lazy_map(elem_to_dof, 1:num_coarse_cells)
-  
   # Since we have zero boundary conditions, we extract only the interior nodes
   patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms) 
-  
+  # Extract the fine scale matrices
   K, L, Λ = fine_scale_matrices
-  
   Ks = lazy_fill(K, num_coarse_cells);
   Ls = lazy_fill(L, num_coarse_cells);
   Λs = lazy_fill(Λ, num_coarse_cells);
-  
+  L_size = lazy_fill(size(L), num_coarse_cells);  
+  # Compute the basis 
   β = lazy_map(get_ms_bases, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
-  
-  MultiScaleFESpace(Ωms, Uh, (β,patch_interior_fine_scale_dofs,legendre_poly), (Ks,Ls,Λs))
+  # Store the basis as Sparse Matrices
+  βs = lazy_map(build_global_sparse_matrix_from_basis, β, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  # Return the MultiScaleFESpace object
+  MultiScaleFESpace(Ωms, p, Uh, βs, (Ks,Ls,Λs))
+end
+
+struct MultiScaleCorrections
+  Vms::MultiScaleFESpace  
+  order::Int64  
+  ms_corrections
+  fine_scale_system
+end
+
+"""
+Function to obtain the additional corrections for the multiscale basis to improve convergence rates
+"""
+function MultiScaleCorrections(Vms::MultiScaleFESpace, p::Int64, fine_scale_matrices)
+  Ωms = Vms.Ω
+  Ωc = Ωms.Ωc 
+  q = Vms.order  
+  num_coarse_cells = num_cells(Ωc.trian)  
+  # For computing the new basis ⊂ Wₚ
+  n_monomials_p = (p+1)^2  
+  elem_to_dof_p(x) = n_monomials_p*x-n_monomials_p+1:n_monomials_p*x;
+  coarse_dof_vec = lazy_map(Broadcasting(elem_to_dof_p), get_coarse_scale_patch_coarse_elem_ids(Ωms));
+  coarse_dofs_mat = lazy_map(combinedims, coarse_dof_vec)
+  coarse_dofs = lazy_map(vec, coarse_dofs_mat)  
+  # For spanning the new basis of order q
+  n_monomials_q = (q+1)^2
+  elem_to_dof_q(x) = n_monomials_q*x-n_monomials_q+1:n_monomials_q*x;
+  legendre_poly = lazy_map(elem_to_dof_q, 1:num_coarse_cells)
+  # Global node-ids on patch
+  patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)
+  # Extract the fine-scale matrices
+  K, L, M = fine_scale_matrices
+  Ks = lazy_fill(K, num_coarse_cells)
+  Ls = lazy_fill(L, num_coarse_cells)  
+  βs = Vms.basis_vec_ms
+  Ms = lazy_fill(M, num_coarse_cells) 
+  L_size = lazy_fill(size(L), num_coarse_cells); 
+  # Compute the correction bases using the MultiscaleFESpace
+  γ = lazy_map(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  γs = lazy_map(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  # Return the multiscale object
+  MultiScaleCorrections(Vms, q, γs, fine_scale_matrices)
+end
+
+function build_global_sparse_matrix_from_basis(B::AbstractMatrix{Float64}, Ms, Ns, shape::NTuple{2,Int64})
+  Is = Ms' .* ones(length(Ns))
+  Js = ones(length(Ms))' .* Ns
+  sparse(vec(Is), vec(Js), vec(B'), shape...)  
 end
 
 """
 Function to obtain the multiscale bases functions
 """
-
 function get_ms_bases(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float64}, rhsmat::AbstractMatrix{Float64}, interior_dofs, coarse_dofs, legendre_poly)
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
@@ -290,19 +338,44 @@ function get_ms_bases(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float
 end
 
 """
+Function to obtain the multiscale bases corrections
+"""
+function get_ms_bases_corrections(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float64}, massma::AbstractMatrix{Float64}, rhsmat::AbstractMatrix{Float64}, interior_dofs, coarse_dofs, legendre_poly)
+  patch_stima = stima[interior_dofs, interior_dofs]
+  patch_lmat = lmat[interior_dofs, coarse_dofs]
+  patch_rhs_1 = massma[interior_dofs, interior_dofs]*rhsmat[interior_dofs, legendre_poly]
+  patch_rhs_2 = zeros(length(coarse_dofs), length(legendre_poly))  
+  solve_schur_complement(patch_stima, patch_lmat, patch_rhs_1, patch_rhs_2)
+end
+
+"""
+Function to solve the saddle point system: 
+      x = LHS⁻¹RHS
+where
+      LHS = [K  L; L'  Λ]
+      RHS = [f₁; f₂]
+"""
+function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Float64}, f₁::AbstractVecOrMat{Float64}, f₂::AbstractVecOrMat{Float64})
+  luK = lu(K)
+  L₁ = collect(L)
+  F₁ = collect(f₁)
+  F₂ = collect(f₂)
+  Σ = -L₁'*(luK\L₁);  
+  τ = F₂ - L₁'*(luK\F₁)
+  Σ⁻¹τ = Σ\τ
+  luK\(-L*Σ⁻¹τ + F₁)
+end
+
+"""
 Function to solve the saddle point system: 
       x = LHS⁻¹RHS
 where
       LHS = [K  L; L'  0]
-      RHS = [0; Λ]
+      RHS = [0; f₂]
 """
 function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Float64}, f₂::AbstractVecOrMat{Float64})
-  luK = lu(K)
-  L₁ = collect(L)
-  Σ = -L'*(luK\L₁);
-  τ = collect(f₂)
-  Σ⁻¹τ = Σ\τ
-  luK\(-L*Σ⁻¹τ)
+  f₁ = spzeros(Float64, size(K,1), size(f₂,2))
+  solve_schur_complement(K, L, f₁, f₂)
 end
 
 function get_boundary_indices_direct(σ)

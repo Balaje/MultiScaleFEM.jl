@@ -21,8 +21,8 @@ domain = (0.0, 1.0, 0.0, 1.0);
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^7;
-  nc = 2^3;
-  p = 2;
+  nc = 2^4;
+  p = 1;
   l = 5; # Patch size parameter
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
@@ -33,7 +33,7 @@ f(x) = sin(3π*x[1])*sin(5π*x[2])
 FineScale = FineTriangulation(domain, nf);
 reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
-K = assemble_stima(V₀, A, 0);
+K = assemble_stima(V₀, A, 4);
 F = assemble_loadvec(V₀, f, 4);
 
 # Coarse scale discretization
@@ -45,24 +45,26 @@ L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 
 Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
-basis_vec_ms, patch_interior_fine_scale_dofs, coarse_dofs = Vₘₛ.basis_vec_ms;
+basis_vec_ms = Vₘₛ.basis_vec_ms;
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
-# Lazy fill the fine-scale vector
-Fs = lazy_fill(F, num_cells(CoarseScale.trian));
 
 t1 = MPI.Wtime()
 mpi_rank = MPI.Comm_rank(comm);
-n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size)
-B = zeros(Float64, size(L,1), n_cells_per_proc*(p+1)^2)
-@showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)  
-  B[patch_interior_fine_scale_dofs[i], coarse_dofs[i] .- mpi_rank*n_cells_per_proc*(p+1)^2] = basis_vec_ms[i];  
+(mpi_rank == 0) && println("Computing basis functions...")
+B = zero(L)
+n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);
+@showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+  global B += basis_vec_ms[i];  
 end
-B = MPI.Gather(B, comm);
+BI, BJ, BV = findnz(B);
+BI = MPI.Gather(BI, comm);
+BJ = MPI.Gather(BJ, comm);
+BV = MPI.Gather(BV, comm);
 t2 = MPI.Wtime()
-(mpi_rank == 0) && println("Elasped time = $(t2-t1)");
+(mpi_rank == 0) && println("Elasped time = $(t2-t1)\n");
 
 if(mpi_rank == 0)
-  B = reshape(B, size(L)...)
+  B = sparse(BI, BJ, BV, size(L)...); 
   Kₘₛ = assemble_ms_matrix(B, K);
   Fₘₛ = assemble_ms_loadvec(B, F);
   solₘₛ = Kₘₛ\Fₘₛ;

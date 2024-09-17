@@ -13,6 +13,7 @@ using MultiscaleFEM.MultiscaleBases: CoarseTriangulation, FineTriangulation, Mul
 using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale_patch_fine_scale_boundary_node_indices
 using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
 using MultiscaleFEM.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
+using MultiscaleFEM.MultiscaleBases: MultiScaleCorrections
 
 
 # Export all modules
@@ -26,6 +27,7 @@ export CoarseTriangulation, FineTriangulation, MultiScaleTriangulation, MultiSca
 export get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale_patch_fine_scale_boundary_node_indices
 export get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
 export assemble_rect_matrix, assemble_lm_l2_matrix
+export MultiScaleCorrections
 
 
 end # module MultiscaleFEM
