@@ -31,7 +31,7 @@ if(length(ARGS)==0)
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
-f(x,t) = sin(3π*x[1])*sin(5π*x[2])*sin(t)
+f(x,t) = (cos(t) + 2π^2*sin(t))*sin(π*x[1])*sin(π*x[2]); #sin(3π*x[1])*sin(5π*x[2])*sin(t)
 u₀(x) = 0.0
 
 # Background fine scale discretization
@@ -65,7 +65,7 @@ t1 = MPI.Wtime()
 B = zero(L); B₂ = zero(L₀)
 build_basis_functions!((B,B₂), (Vₘₛ,Wₘₛ), comm);
 t2 = MPI.Wtime()
-(mpi_rank == 0) && println("Elasped time = $(t2-t1)\n");
+(mpi_rank == 0) && println("Elasped time = $(t2-t1)");
 
 if(mpi_rank == 0)
   Kₘₛ = assemble_ms_matrix(B, K);
@@ -123,7 +123,6 @@ if(mpi_rank == 0)
   Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);  
   
   # Compute the reference solution with the BDFk scheme
-  println("")
   println("Computing reference solution ...");
   Vh = TestFESpace(Ωₘₛ.Ωf.trian, reffe, conformity=:H1, dirichlet_tags="boundary");
   Vh0 = TrialFESpace(Vh, 0.0);
@@ -169,7 +168,6 @@ if(mpi_rank == 0)
   # Uex = CellField(x->sin(π*x[1])*sin(π*x[2]), FineScale.trian);
   # dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
   L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
-  H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
-  println("")
+  H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))  
   println("$L²Error, $H¹Error")
 end

@@ -28,7 +28,7 @@ if(length(ARGS)==0)
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
-f(x) = sin(3π*x[1])*sin(5π*x[2])
+f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]); #sin(3π*x[1])*sin(5π*x[2])
 
 # Background fine scale discretization
 FineScale = FineTriangulation(domain, nf);

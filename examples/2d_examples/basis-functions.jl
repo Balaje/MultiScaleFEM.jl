@@ -22,8 +22,8 @@ domain = (0.0, 1.0, 0.0, 1.0);
 # Fine scale space description
 nf = 2^7;
 nc = 2^2;
-p = 1;
-l = 5; # Patch size parameter
+p = 3;
+l = 8; # Patch size parameter
 
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
@@ -65,10 +65,13 @@ fine_coords = FineScale.trian.grid.node_coords;
 
 # Visualize the patch/element data
 function plot_patch_data!(plt, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, alpha)
-  #Plots.scatter!(plt, Tuple.(fine_coords[Zi[el]]), ms=0.75, label="", msw=0.0, ma=alpha)
-  #Plots.scatter!(plt, Tuple.(fine_coords[Zb[el]]), ms=1.5 , label="", msw=0.0, ma=alpha)
+  Plots.scatter!(plt, Tuple.(fine_coords[Zi[el]]), ms=0.75, label="", msw=0.0, ma=alpha)
+  Plots.scatter!(plt, Tuple.(fine_coords[Zb[el]]), ms=1.5 , label="", msw=0.0, ma=alpha)
   Plots.scatter!(plt, Tuple.(combinedims(coarse_coords[Zpatch[el]])) |> vec, label="", msw=0.0, size=(600,600), ma=alpha)
   Plots.scatter!(plt, Tuple.(coarse_coords[el]) |> vec, label="Element $el, l=$l", msw=0.0, size=(600,600), ma=alpha)
+  # nc = length(coarse_coords) |> sqrt |> Int64
+  # Plots.hline!(plt, LinRange(0,1,nc+1), alpha=0.5)
+  # Plots.vline!(plt, LinRange(0,1,nc+1), alpha=0.5)
   Plots.xlims!((-0.1,1.1))
   Plots.ylims!((-0.1,1.1))
   plt
@@ -77,10 +80,13 @@ end
 # Visualize the basis functions
 function plot_basis_function!(plt1, V, el, j, p)
   @assert 1 ≤ j ≤ (p+1)^2
-  i = (el-1)*(p+1)^2+1
+  i = (el-1)*(p+1)^2+j
   b = get_basis_functions(V)[el][:,i];  
   nf = size(b,1) |> sqrt |> Int64
-  Plots.contour!(plt1, LinRange(0,1,nf), LinRange(0,1,nf), reshape(b, (nf,nf))')
+  # nc = sqrt(size(get_basis_functions(V),1)) |> Int64  
+  Plots.contour!(plt1, LinRange(0,1,nf), LinRange(0,1,nf), reshape(b, (nf,nf))', rightmargin=1.5Plots.cm)
+  # Plots.hline!(plt1, LinRange(0,1,nc+1), alpha=0.5)
+  # Plots.vline!(plt1, LinRange(0,1,nc+1), alpha=0.5)
   Plots.xlims!((-0.1,1.1))
   Plots.ylims!((-0.1,1.1))
   plt1
@@ -90,20 +96,22 @@ end
 # Plotting handles. Uncomment for plotting.
 ##### ##### ###### ##### ###### ##### ###### 
 # using Plots
-# plt = Plots.plot()
+# plt = Plots.plot();
 # plt1 = Plots.plot();
 # plt2 = Plots.plot();
 # plt3 = Plots.plot();
-
-# el = 20
+# el = 6
+# jp = 2
+# jq = (q+1)^2
+# # el = 10
 # plot_patch_data!(plt, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 1)
 # # Plot the multiscale basis and corrections
 # plot_patch_data!(plt1, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt1, Vₘₛ, el, 1, p);
+# plot_basis_function!(plt1, Vₘₛ, el, jp, p);
 # plot_patch_data!(plt2, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt2, Vₘₛ′, el, 1, q);
+# plot_basis_function!(plt2, Vₘₛ′, el, jq, q);
 # plot_patch_data!(plt3, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt3, Wₘₛ, el, 1, q);
+# plot_basis_function!(plt3, Wₘₛ, el, jq, q);
 
 B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
 B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)
