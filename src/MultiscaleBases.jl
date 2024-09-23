@@ -393,7 +393,7 @@ function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
   (mpi_rank==0) && println("Using $mpi_size process(es) to compute the solution")
   for (V,B) in zip(Vs, Bs)
     CoarseScale = V.Ω.Ωc
-    n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);  
+    n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);  
     @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
       B .= B + get_basis_functions(V)[i]    
     end
