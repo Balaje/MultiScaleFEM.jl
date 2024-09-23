@@ -31,7 +31,7 @@ if(length(ARGS)==0)
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
-f(x,t) = (cos(t) + 2π^2*sin(t))*sin(π*x[1])*sin(π*x[2]); #sin(3π*x[1])*sin(5π*x[2])*sin(t)
+f(x,t) = sin(π*x[1])*sin(π*x[1])*(sin(t))^4
 u₀(x) = 0.0
 
 # Background fine scale discretization
@@ -80,8 +80,10 @@ if(mpi_rank == 0)
   global 𝐊 = [Kₘₛ Pₘₛ; 
               Pₘₛ' Kₘₛ′]
 
-  sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
-  sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  # sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  # sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  sM = 𝐌
+  sK = 𝐊
 
   # Begin solving the heat equation in rank 0
   println("Solving multiscale problem...")
@@ -90,7 +92,7 @@ if(mpi_rank == 0)
     L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4)
     [B'*L; B₂'*L]
   end
-  Δt = 10^-3
+  Δt = 2^-7
   tf = 1.0
   ntime = ceil(Int, tf/Δt)
   BDF = 4

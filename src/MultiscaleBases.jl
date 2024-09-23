@@ -390,10 +390,11 @@ get_basis_functions(V::MultiScaleCorrections) = V.ms_corrections
 function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
   mpi_size = MPI.Comm_size(comm)
   mpi_rank = MPI.Comm_rank(comm)
+  (mpi_rank==0) && println("Using $mpi_size process(es) to compute the solution")
   for (V,B) in zip(Vs, Bs)
     CoarseScale = V.Ω.Ωc
     n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);  
-    for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+    @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
       B .= B + get_basis_functions(V)[i]    
     end
     BI, BJ, BV = findnz(B);
