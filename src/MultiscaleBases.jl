@@ -30,6 +30,7 @@ using LazyArrays
 using FillArrays
 using ProgressMeter
 using MPI
+using FastGaussQuadrature
 
 # Import functions from other modules
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
@@ -192,17 +193,26 @@ Function to assemble the inner product between the Legendre polynomials on the c
 """
 function assemble_lm_l2_matrix(Ωms::MultiScaleTriangulation, p::Int64)  
   coarse_trian = Ωms.Ωc.trian  
+  n = 2p+1
+  xq, wq = gausslegendre(n)
   coarse_cell_coords = get_cell_coordinates(coarse_trian)
   num_coarse_cells = num_cells(coarse_trian)
   n_monomials = (p+1)^2
-  l2mat = Diagonal(ones(Float64,num_coarse_cells*n_monomials))
+  l2mat = zeros(Float64,num_coarse_cells*n_monomials,num_coarse_cells*n_monomials)
   index = 1
+  αβ = poly_exps(p)
   for t=1:num_coarse_cells
     c = coarse_cell_coords[t]
     nds_x = (c[1][1], c[2][1])
-    h = nds_x[2] - nds_x[1]
-    for i=1:n_monomials
-      l2mat[(index-1)+i, (index-1)+i] = (h/(2*(i-1)+1))*(h/(2*(i-1)+1))
+    nds_y = (c[2][2], c[3][2])           
+    for q₁=1:lastindex(wq), q₂=1:lastindex(wq)      
+      xq1 = (nds_x[2]+nds_x[1])/2 + (nds_x[2]-nds_x[1])/2*xq[q₁]
+      yq1 = (nds_y[2]+nds_y[1])/2 + (nds_y[2]-nds_y[1])/2*xq[q₂]
+      J = (nds_x[2]-nds_x[1])*0.5*(nds_y[2]-nds_y[1])*0.5
+      x1 = Point(xq1, yq1)    
+      for i=1:n_monomials
+        l2mat[(index-1)+i,(index-1)+i] += wq[q₁]*wq[q₂]*Λₖ(x1,nds_x,nds_y,p,αβ[i])*Λₖ(x1,nds_x,nds_y,p,αβ[i])*J        
+      end      
     end
     index = index + n_monomials
   end
@@ -326,7 +336,7 @@ function MultiScaleCorrections(Vms::MultiScaleFESpace, p::Int64, fine_scale_matr
   MultiScaleCorrections(Ωms, Vms, q, γs, fine_scale_matrices)
 end
 
-function build_global_sparse_matrix_from_basis(B::AbstractMatrix{Float64}, Ms, Ns, shape::NTuple{2,Int64})
+function build_global_sparse_matrix_from_basis(B::AbstractVecOrMat{Float64}, Ms, Ns, shape::NTuple{2,Int64})
   Is = Ms' .* ones(length(Ns))
   Js = ones(length(Ms))' .* Ns
   sparse(vec(Is), vec(Js), vec(B'), shape...)  
@@ -380,17 +390,19 @@ get_basis_functions(V::MultiScaleCorrections) = V.ms_corrections
 function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
   mpi_size = MPI.Comm_size(comm)
   mpi_rank = MPI.Comm_rank(comm)
-  for (Vₘₛ,B) in zip(Vs, Bs)
-    CoarseScale = Vₘₛ.Ω.Ωc
+  for (V,B) in zip(Vs, Bs)
+    CoarseScale = V.Ω.Ωc
     n_cells_per_proc = Int64(num_cells(CoarseScale.trian)/mpi_size);  
-    @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
-      B .= B + get_basis_functions(Vₘₛ)[i]    
+    for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+      B .= B + get_basis_functions(V)[i]    
     end
     BI, BJ, BV = findnz(B);
-    BI = MPI.Gather(BI, comm);
-    BJ = MPI.Gather(BJ, comm);
-    BV = MPI.Gather(BV, comm);
-    if(mpi_rank == 0) 
+    if(mpi_size > 1)
+      BI = MPI.Gather(BI, comm);
+      BJ = MPI.Gather(BJ, comm);
+      BV = MPI.Gather(BV, comm);
+    end
+    if(mpi_rank == 0)      
       B .= sparse(BI, BJ, BV, size(B)...)
     end
   end
