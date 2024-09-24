@@ -14,6 +14,7 @@ using SplitApplyCombine
 using MPI
 comm = MPI.COMM_WORLD
 MPI.Init()
+mpi_rank = MPI.Comm_rank(comm)
 
 # include("./time-dependent.jl")
 
@@ -26,12 +27,21 @@ p = 3;
 l = 8; # Patch size parameter
 
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
-A(x) = 1.0
-
 # Background fine scale discretization
 FineScale = FineTriangulation(domain, nf);
 reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
+epsilon = 2^5
+repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
+a₁,b₁ = (0.5,1.5)
+if(mpi_rank==0)
+  rand_vals = rand(epsilon^2);
+else
+  rand_vals = zeros(epsilon^2);
+end
+MPI.Bcast!(rand_vals, 0, comm)
+vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
+A = CellField(vec(vals_epsilon), FineScale.trian)
 K = assemble_stima(V₀, A, 4);
 M = assemble_massma(V₀, x->1.0, 4);
 
@@ -113,11 +123,13 @@ end
 # plot_patch_data!(plt3, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
 # plot_basis_function!(plt3, Wₘₛ, el, jq, q);
 
-# B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
-# B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)
+B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
+B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)
 
-# build_basis_functions!((B,B₁), (Vₘₛ,Wₘₛ), comm);
+build_basis_functions!((B,B₁), (Vₘₛ,Wₘₛ), comm);
 
-println("a-Orthogonality a(Vₘₛ,Wₘₛ) = $(norm(B'*K*B₁)) ≈ 0.0");
-println("a-Orthogonality a(Vₘₛ,Vₘₛ) = $(norm(B'*K*B)) ≂̸ 0.0");
-println("L²-Orthogonality (Vₘₛ,Wₘₛ) = $(norm(B'*M*B₁)) ≂̸ 0.0 ");
+if(mpi_rank==0)
+  println("a-Orthogonality a(Vₘₛ,Wₘₛ) = $(norm(B'*K*B₁)) ≈ 0.0");
+  println("a-Orthogonality a(Vₘₛ,Vₘₛ) = $(norm(B'*K*B)) ≂̸ 0.0");
+  println("L²-Orthogonality (Vₘₛ,Wₘₛ) = $(norm(B'*M*B₁)) ≂̸ 0.0 ");
+end
