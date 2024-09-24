@@ -349,7 +349,12 @@ function get_ms_bases(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
   patch_rhs = rhsmat[coarse_dofs, legendre_poly]
-  solve_schur_complement(patch_stima, patch_lmat, patch_rhs)
+  # solve_schur_complement(patch_stima, patch_lmat, patch_rhs)
+  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(length(coarse_dofs), length(coarse_dofs))]
+  RHS = [zeros(length(interior_dofs), length(legendre_poly)); patch_rhs]
+  SOL = LHS\RHS
+  res = SOL[1:length(interior_dofs), :]
+  res
 end
 
 """
@@ -358,27 +363,14 @@ Function to obtain the multiscale bases corrections
 function get_ms_bases_corrections(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float64}, massma::AbstractMatrix{Float64}, rhsmat::AbstractMatrix{Float64}, interior_dofs, coarse_dofs, legendre_poly)
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
-  patch_rhs_1 = massma[interior_dofs, interior_dofs]*rhsmat[interior_dofs, legendre_poly]
+  patch_rhs_1 = collect(massma[interior_dofs, interior_dofs]*rhsmat[interior_dofs, legendre_poly])
   patch_rhs_2 = zeros(length(coarse_dofs), length(legendre_poly))  
-  solve_schur_complement(patch_stima, patch_lmat, patch_rhs_1, patch_rhs_2)
-end
-
-"""
-Function to solve the saddle point system: 
-      x = LHS⁻¹RHS
-where
-      LHS = [K  L; L'  Λ]
-      RHS = [f₁; f₂]
-"""
-function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Float64}, f₁::AbstractVecOrMat{Float64}, f₂::AbstractVecOrMat{Float64})
-  luK = lu(K)
-  L₁ = collect(L)
-  F₁ = collect(f₁)
-  F₂ = collect(f₂)
-  Σ = -L₁'*(luK\L₁);  
-  τ = F₂ - L₁'*(luK\F₁)
-  Σ⁻¹τ = Σ\τ
-  luK\(-L*Σ⁻¹τ + F₁)
+  # solve_schur_complement(patch_stima, patch_lmat, patch_rhs_1, patch_rhs_2)
+  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(length(coarse_dofs), length(coarse_dofs))]
+  RHS = [patch_rhs_1; patch_rhs_2]
+  SOL = LHS\RHS
+  res = SOL[1:length(interior_dofs), :]
+  res
 end
 
 """
@@ -390,37 +382,31 @@ get_basis_functions(V::MultiScaleCorrections) = V.ms_corrections
 function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
   mpi_size = MPI.Comm_size(comm)
   mpi_rank = MPI.Comm_rank(comm)
-  (mpi_rank==0) && println("Using $mpi_size process(es) to compute the solution")
+  isroot = mpi_rank == 0
+  (mpi_rank==0) && println("Using $mpi_size process(es) to compute the multiscale bases")
   for (V,B) in zip(Vs, Bs)
     CoarseScale = V.Ω.Ωc
-    n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);  
+    n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);
+    num_cell_counts = zeros(Int32, mpi_size)
     @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
-      B .= B + get_basis_functions(V)[i]    
+      B .= B + get_basis_functions(V)[i]  
     end
     BI, BJ, BV = findnz(B);
-    if(mpi_size > 1)
-      BI = MPI.Gather(BI, comm);
-      BJ = MPI.Gather(BJ, comm);
-      BV = MPI.Gather(BV, comm);
-    end
+    num_cell_counts[mpi_rank+1] = nnz(B)
+    num_cell_counts = MPI.Allreduce(num_cell_counts, MPI.SUM, comm)
+    # Create full vectors to store all the non-zero indices
+    BI_f = zeros(Int64, sum(num_cell_counts))
+    BJ_f = zeros(Int64, sum(num_cell_counts))
+    BV_f = zeros(Float64, sum(num_cell_counts))
+    # Gather all the non-zero entries from the different ranks to root
+    MPI.Gatherv!(BI, isroot ? VBuffer(BI_f, num_cell_counts) : nothing, comm; root=0)
+    MPI.Gatherv!(BJ, isroot ? VBuffer(BJ_f, num_cell_counts) : nothing, comm; root=0)
+    MPI.Gatherv!(BV, isroot ? VBuffer(BV_f, num_cell_counts) : nothing, comm; root=0)
     if(mpi_rank == 0)      
-      B .= sparse(BI, BJ, BV, size(B)...)
+      B .= sparse(BI_f, BJ_f, BV_f, size(B)...)
     end
   end
   Bs  
-end
-
-
-"""
-Function to solve the saddle point system: 
-      x = LHS⁻¹RHS
-where
-      LHS = [K  L; L'  0]
-      RHS = [0; f₂]
-"""
-function solve_schur_complement(K::AbstractMatrix{Float64}, L::AbstractMatrix{Float64}, f₂::AbstractVecOrMat{Float64})
-  f₁ = spzeros(Float64, size(K,1), size(f₂,2))
-  solve_schur_complement(K, L, f₁, f₂)
 end
 
 function get_boundary_indices_direct(σ)

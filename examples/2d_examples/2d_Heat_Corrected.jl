@@ -25,9 +25,9 @@ domain = (0.0, 1.0, 0.0, 1.0);
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^7;
-  nc = 2^2;
-  p = 1;
-  l = 5; # Patch size parameter
+  nc = 2^4;
+  p = 3;
+  l = 6; # Patch size parameter
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 A(x) = 1.0
@@ -80,10 +80,10 @@ if(mpi_rank == 0)
   global 𝐊 = [Kₘₛ Pₘₛ; 
               Pₘₛ' Kₘₛ′]
 
-  # sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
-  # sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
-  sM = 𝐌
-  sK = 𝐊
+  sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  # sM = 𝐌
+  # sK = 𝐊
 
   # Begin solving the heat equation in rank 0
   println("Solving multiscale problem...")
@@ -102,7 +102,7 @@ if(mpi_rank == 0)
     t = 0.0
     # Starting BDF steps (1...k-1) 
     fcache = (V₀, B, B₂) 
-    for i=1:BDF-1
+    @showprogress for i=1:BDF-1
       dlcache = get_dl_cache(i)
       cache = dlcache, fcache
       U₁ = BDFk!(cache, t, U₀, Δt, sK, sM, fₙ, i)
