@@ -29,8 +29,6 @@ if(length(ARGS)==0)
   p = 3;
   l = 6; # Patch size parameter
 end
-# A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
-A(x) = 1.0
 f(x,t) = sin(π*x[1])*sin(π*x[1])*(sin(t))^4
 u₀(x) = 0.0
 
@@ -38,6 +36,15 @@ u₀(x) = 0.0
 FineScale = FineTriangulation(domain, nf);
 reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
+# D(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1 # Oscillatory field
+# D(x) = 1.0 # Constant field
+# A = CellField(D, FineScale.trian)
+# Random field
+epsilon = 2^5
+repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
+a₁,b₁ = (0.5,1.5)
+vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand(epsilon^2), (epsilon, epsilon)), inner=repeat_dims)
+A = CellField(vec(vals_epsilon), FineScale.trian)
 K = assemble_stima(V₀, A, 4);
 M = assemble_massma(V₀, x->1.0, 4);
 
@@ -92,7 +99,7 @@ if(mpi_rank == 0)
     L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4)
     [B'*L; B₂'*L]
   end
-  Δt = 2^-7
+  Δt = 2^-8
   tf = 1.0
   ntime = ceil(Int, tf/Δt)
   BDF = 4
