@@ -185,5 +185,5 @@ if(mpi_rank == 0)
   # dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
   L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
   H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))  
-  println("$L²Error, $H¹Error")
+  println("$L²Error   $H¹Error;")
 end
