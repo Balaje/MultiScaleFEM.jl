@@ -49,7 +49,6 @@ else
   rand_vals = zeros(epsilon^2);
 end
 MPI.Bcast!(rand_vals, 0, comm)
-vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
 # vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
 vals_epsilon = readdlm("./coefficient.txt");
 A = CellField(vec(vals_epsilon), FineScale.trian)
