@@ -25,11 +25,11 @@ domain = (0.0, 1.0, 0.0, 1.0);
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^7;
-  nc = 2^2;
-  p = 0;
-  l = 5; # Patch size parameter
+  nc = 2^1;
+  p = 1;
+  l = 3; # Patch size parameter
 end
-f(x,t) = sin(π*x[1])*sin(π*x[1])*(sin(t))^4
+f(x,t) = sin(π*x[1])*sin(π*x[2])*(sin(t))^4
 u₀(x) = 0.0
 
 # Background fine scale discretization
@@ -50,7 +50,8 @@ else
 end
 MPI.Bcast!(rand_vals, 0, comm)
 vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
-A = CellField(vec(vals_epsilon), FineScale.trian)
+# vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
+vals_epsilon = readdlm("./coefficient.txt");
 A = CellField(vec(vals_epsilon), FineScale.trian)
 K = assemble_stima(V₀, A, 4);
 M = assemble_massma(V₀, x->1.0, 4);
