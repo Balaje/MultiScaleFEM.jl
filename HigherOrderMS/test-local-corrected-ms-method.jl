@@ -5,11 +5,16 @@ include("corrected_basis.jl");
 Problem data
 =#
 domain = (0.0,1.0)
-# Random diffusion coefficient
-Neps = 2^12
+# Random diffusio# n coefficient
+Neps = 2^10
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
-function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
+diffusion_micro = 0.05 .+ 1.95*rand(Neps+1)
+# Felix's diffusion coefficient
+# diffusion_micro = rand(Neps+1)*4
+# diffusion_micro_new = zero(diffusion_micro)
+# diffusion_micro_new[diffusion_micro .< 3.5] .= 1
+# diffusion_micro_new[diffusion_micro .>= 3.5] = sin.(1e5*LinRange(1,2,size(diffusion_micro[diffusion_micro .>= 3.5],1))) .+ 9
+function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T}) where T<:Number
   n = size(nds_micro, 1)
   for i=1:n
     if(nds_micro[i] < x < nds_micro[i+1])      
@@ -24,20 +29,21 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
   end
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-# A(x) = (2 + cos(2π*x[1]/2^-10))^-1 # Oscillatory diffusion coefficient
+# A(x) = (0.55 + 0.45*cos(8π*x[1]*Neps))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
-f(x,t) = sin(3π*x[1])^2*sin(t)^2
+# f(x,t) = 100*sin(π*x[1])*sin(t)
+f(x,t) = (sin(t))^4
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
 
 # Problem parameters
-nf = 2^15
+nf = 2^12
 q = 1
 qorder = 6
 # Temporal parameters
-Δt = 1e-3
+Δt = 2^-8
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
@@ -89,11 +95,13 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = [1,2,4,8,16,32]
+N = 2 .^(0:7);
+# N = [2^7]
+nds_coarse = LinRange(0,1,N[1]+1)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 4;
+p = 2;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -108,8 +116,9 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for p′ = [2]
-for l = [9]
+for p′ = [0]
+for l = [N[end]]
+  println("s, p, q = $BDF, $p, $p′")
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -120,7 +129,11 @@ for l = [9]
 
       # Compute the multiscale basis
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p′));
-      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, p′);      
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, p′; ntimes=1);      
+
+      α = basis_vec_ms₁
+      β = basis_vec_ms₂
+      println("nc = $nc, norm(α) = $( norm(α,Inf) ), norm(β) = $( norm(β,Inf) )");
 
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
@@ -132,8 +145,14 @@ for l = [9]
                   Lₘₛ'  Mₘₛ];
       global 𝐊 = [Kₘₛ′ Pₘₛ; 
                   Pₘₛ' Kₘₛ]
-      sM = SchurComplementMatrix(𝐌, (nc*(p′+1), nc*(p+1)))
-      sK = SchurComplementMatrix(𝐊, (nc*(p′+1), nc*(p+1)))
+      # global sM = SchurComplementMatrix(𝐌, (nc*(p′+1), nc*(p+1)))
+      # global sK = SchurComplementMatrix(𝐊, (nc*(p′+1), nc*(p+1)))
+      global sM = 𝐌 |> collect 
+      global sK = 𝐊 |> collect
+      println("cond(sM) = $(cond(sM |> collect)), cond(sK) = $(cond(sK |> collect))\n")
+      
+      # sM = 𝐌
+      # sK = 𝐊 
                 
       # Time marching
       let 
@@ -174,12 +193,13 @@ for l = [9]
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
 
-      println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
+      # println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
+      # println("nc = $nc, norm(α) = $( sum(∫(∇(α)⋅∇(α))dΩ) ), norm(β) = $( sum(∫(∇(β)⋅∇(β))dΩ) )");      
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L\$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L\$^2\$ (l="*string(l)*")", lw=2, ls=:solid)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=2, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end
@@ -218,7 +238,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[9]
+for l=[N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))

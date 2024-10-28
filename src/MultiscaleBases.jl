@@ -419,4 +419,43 @@ function get_interior_indices_direct(σ)
   [k for (k,v) in zip(c.indices,c.values) if (v==4)]
 end
 
+struct n_MultiscaleCorrections
+  Ω::MultiScaleTriangulation
+  Vhat::MultiScaleCorrections
+  order::Int64  
+  basis_vec_ms
+  fine_scale_system
+end
+
+function n_MultiscaleCorrections(Vhat::MultiScaleCorrections, p::Int64, fine_scale_matrices)
+  Ωms = Vhat.Ω
+  Ωc = Ωms.Ωc 
+  q = Vhat.order  
+  num_coarse_cells = num_cells(Ωc.trian)  
+  # For computing the new basis ⊂ Wₚ
+  n_monomials_p = (p+1)^2  
+  elem_to_dof_p(x) = n_monomials_p*x-n_monomials_p+1:n_monomials_p*x;
+  coarse_dof_vec = lazy_map(Broadcasting(elem_to_dof_p), get_coarse_scale_patch_coarse_elem_ids(Ωms));
+  coarse_dofs_mat = BroadcastVector(combinedims, coarse_dof_vec)
+  coarse_dofs = BroadcastVector(vec, coarse_dofs_mat)  
+  # For spanning the new basis of order q
+  n_monomials_q = (q+1)^2
+  elem_to_dof_q(x) = n_monomials_q*x-n_monomials_q+1:n_monomials_q*x;
+  legendre_poly = BroadcastVector(elem_to_dof_q, 1:num_coarse_cells)
+  # Global node-ids on patch
+  patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)
+  # Extract the fine-scale matrices
+  K, L, M, L₀ = fine_scale_matrices
+  Ks = lazy_fill(K, num_coarse_cells)
+  Ls = lazy_fill(L, num_coarse_cells)  
+  βs = Vhat.ms_corrections
+  Ms = lazy_fill(M, num_coarse_cells) 
+  L_size = lazy_fill(size(L₀), num_coarse_cells); 
+  # Compute the correction bases using the MultiscaleFESpace
+  γ = BroadcastVector(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  γs = BroadcastVector(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  # Return the multiscale object
+  n_MultiScaleCorrections(Ωms, Vhat, q, γs, fine_scale_matrices)
+end
+
 end
