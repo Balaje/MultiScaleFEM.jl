@@ -4,12 +4,13 @@ include("corrected_basis.jl");
 #=
 Problem data
 =#
-domain = (0.0,1.0)
+T₁ = Float64
+domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
-Neps = 2^12
+Neps = 2^7
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.05 .+ 0.05*rand(Neps+1)
-function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
+diffusion_micro = 0.2 .+ (1-0.2)*rand(T₁,Neps+1)
+function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T}) where T<:Number
   n = size(nds_micro, 1)
   for i=1:n
     if(nds_micro[i] < x < nds_micro[i+1])      
@@ -24,26 +25,26 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
   end
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-# A(x) = (2 + cos(2π*x[1]/2^-10))^-1 # Oscillatory diffusion coefficient
+# A(x) = (2 + cos(2π*x[1]/2^1))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 0.5 # Constant diffusion coefficient
-f(x,t) = sin(3π*x[1])^2*sin(t)^2
-u₀(x) = 0.0
+f(x,t) = T₁(10*sin(π*x[1])*(sin(t))^4)
+u₀(x) = T₁(0.0)
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
 
 # Problem parameters
-nf = 2^15
+nf = 2^8
 q = 1
 qorder = 6
 # Temporal parameters
-Δt = 1e-3
+Δt = 2^-7
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
 # Solve the fine scale problem onfce for exact solution
-fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
+fine_scale_space = FineScaleSpace(domain, q, qorder, nf; T=T₁)
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 stima = assemble_stiffness_matrix(fine_scale_space, A)
 massma = assemble_mass_matrix(fine_scale_space, x->1.0)
@@ -65,10 +66,10 @@ let
   for i=1:BDF-1
     dlcache = get_dl_cache(i)
     cache = dlcache, fcache
+    println("Done t = "*string(t))
     U₁ = BDFk!(cache, t, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, i)
     U₀ = hcat(U₁, U₀)
     t += Δt
-    (i%(ntime/10) ≈ 0.0) && println("Done t = "*string(t))
   end
   # Remaining BDF steps
   dlcache = get_dl_cache(BDF)
@@ -78,7 +79,7 @@ let
     U₀[:,2:BDF] = U₀[:,1:BDF-1]
     U₀[:,1] = U₁
     t += Δt
-    (i%(ntime/10) ≈ 0.0) && println("Done t = "*string(t))
+    (i%(ntime/2^4) == 0) && println("Done t = "*string(t))
   end
   Uex = U₀[:,1] # Final time solution
 end
@@ -89,7 +90,7 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = [1,2,4,8,16,32]
+N = 2 .^(0:4)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
@@ -98,8 +99,8 @@ p = 4;
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
-L²Error = zeros(Float64,size(N));
-H¹Error = zeros(Float64,size(N));
+L²Error = zeros(T₁,size(N));
+H¹Error = zeros(T₁,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
   # "A Computationally Efficient Method"
@@ -108,19 +109,20 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for p′ = [2]
-for l = [9]
+for ntimes = [1,2]
+for p′ = [p-2,p-1,p]
+for l = [N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
     let            
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
-      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices);
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices; T=T₁);
 
       # Compute the multiscale basis
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p′));
-      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, p′);      
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices, p′; T=T₁, ntimes=ntimes);      
 
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
@@ -132,15 +134,20 @@ for l = [9]
                   Lₘₛ'  Mₘₛ];
       global 𝐊 = [Kₘₛ′ Pₘₛ; 
                   Pₘₛ' Kₘₛ]
-      sM = SchurComplementMatrix(𝐌, (nc*(p′+1), nc*(p+1)))
-      sK = SchurComplementMatrix(𝐊, (nc*(p′+1), nc*(p+1)))
+      # global 𝐌 = Mₘₛ′
+      # global 𝐊 = Kₘₛ′
+
+      # sM = SchurComplementMatrix(𝐌, (nc*(p′+1), nc*(p+1)))
+      # sK = SchurComplementMatrix(𝐊, (nc*(p′+1), nc*(p+1)))
+      global sM = collect(𝐌);
+      global sK = collect(𝐊);
                 
       # Time marching
       let 
         # Project initial condition onto the multiscale space
         
         # "A Computationally Efficient Method"
-        U₀ = [zeros(Float64, (p′+1)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
+        U₀ = [zeros(T₁, ntimes*(p′+1)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
         fcache = fine_scale_space, basis_vec_ms₁, basis_vec_ms₂
         global U = zero(U₀)  
         t = 0.0
@@ -150,22 +157,24 @@ for l = [9]
           cache = dlcache, fcache
           U₁ = BDFk!(cache, t, U₀, Δt, sK, sM, fₙ!, i)
           U₀ = hcat(U₁, U₀)
-          t += Δt          
+          t += Δt   
+          # println("Done t = "*string(t))       
         end
         # Remaining BDF steps
         dlcache = get_dl_cache(BDF)
-        cache = dlcache, fcache, (nc*(p′+1), nc*(p+1))
+        cache = dlcache, fcache
         for i=BDF:ntime
           U₁ = BDFk!(cache, t+Δt, U₀, Δt, sK, sM, fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
-          t += Δt          
+          t += Δt  
+          # println("Done t = "*string(t))        
         end
         U = U₀[:,1] # Final time solution
       end      
 
       # "A Computationally Efficient Method"            
-      U_fine_scale = basis_vec_ms₁*U[(p′+1)*nc+1:end] + basis_vec_ms₂*U[1:(p′+1)*nc]
+      U_fine_scale = basis_vec_ms₁*U[ntimes*(p′+1)*nc+1:end] + basis_vec_ms₂*U[1:ntimes*(p′+1)*nc]
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -174,16 +183,22 @@ for l = [9]
       L²Error[itr] = sqrt(sum(∫(e*e)dΩ));
       H¹Error[itr] = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
 
-      println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
+      # println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
+      println("nc = $nc, norm(basis_vec_ms₁) = $(norm(basis_vec_ms₁)), norm(basis_vec_ms₂) = $(norm(basis_vec_ms₂))")
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*") L\$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*") Energy (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) L\$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) Energy (l="*string(l)*")", lw=1, ls=:solid)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
+  
+  # Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+  # Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);  
 end
 println("Done q = "*string(p′)) 
+end
+println("Done ntimes = $ntimes")
 end
 
 ev = eigvals(collect(𝐌 + Δt*𝐊));
@@ -218,7 +233,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[9]
+for l=[N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -242,7 +257,7 @@ for l=[9]
         for i=1:BDF-1
           dlcache = get_dl_cache(i)
           cache = dlcache, fcache
-          U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, i)
+          U₁ = BDFk!(cache, t, U₀, Δt, collect(Kₘₛ), collect(Mₘₛ), fₙ!, i)
           U₀ = hcat(U₁, U₀)
           t += Δt        
         end
@@ -250,7 +265,7 @@ for l=[9]
         dlcache = get_dl_cache(BDF)
         cache = dlcache, fcache
         for i=BDF:ntime
-          U₁ = BDFk!(cache, t+Δt, U₀, Δt,  Kₘₛ, Mₘₛ, fₙ!, BDF)
+          U₁ = BDFk!(cache, t+Δt, U₀, Δt, collect(Kₘₛ), collect(Mₘₛ), fₙ!, BDF)
           U₀[:,2:BDF] = U₀[:,1:BDF-1]
           U₀[:,1] = U₁
           t += Δt          
@@ -277,9 +292,11 @@ for l=[9]
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
+Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+#Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(2.5), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+#Plots.plot!(plt, 1 ./N, L²Error[1][1]*(1 ./N).^(2.5), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
-Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 
 # Plot the rates along with the diffusion coefficient
 # plt2 = Plots.plot(plt, plt1, layout=(1,2))

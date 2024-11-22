@@ -4,32 +4,37 @@
 include("HigherOrderMS.jl");
 
 function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
-                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64)                                     
+                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64; T=Float64, ntimes=1)                                     
   ### To build the basis functions
   nf = fine_scale_space.nf
   q = fine_scale_space.q
-  basis_vec_ms = spzeros(Float64,q*nf+1,(p′+1)*nc) # To store the multiscale basis functions
-  _, L, _ = get_saddle_point_problem(fine_scale_space, D, p, nc)
+  basis_vec_ms = spzeros(T, q*nf+1, ntimes*(p′+1)*nc) # To store the multiscale basis functions
+  _, L, Λ  = get_saddle_point_problem(fine_scale_space, D, p, nc)
   K = assemble_stiffness_matrix(fine_scale_space, D)
   M = assemble_mass_matrix(fine_scale_space, x->1.0)
   β = compute_ms_basis(fine_scale_space, D, p′, nc, l, patch_indices_to_global_indices)  
   index = 1
-  for t=1:nc
-    fullnodes₁ = patch_indices_to_global_indices[t]    
-    bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]        
-    freenodes₁ = setdiff(fullnodes₁, bnodes₁)    
-    start₁ = max(1,t-l); last₁ = min(nc,t+l)    
-    gn₁ = start₁*(p+1)-p:last₁*(p+1)    
-    stima_el = K[freenodes₁,freenodes₁]
-    lmat_el = L[freenodes₁,gn₁]
-    for _=1:p′+1
-      fvecs_el = [M[freenodes₁,freenodes₁]*β[freenodes₁,index]; zeros(Float64,length(gn₁))]
-      lhs = [stima_el lmat_el; (lmat_el)'  spzeros(Float64, length(gn₁), length(gn₁))]
-      rhs = fvecs_el           
-      sol = lhs\collect(rhs)
-      basis_vec_ms[freenodes₁, index] = sol[1:length(freenodes₁)]
-      index += 1   
+  for corr = 1:ntimes
+    index_1 = 1
+    for t=1:nc
+      fullnodes₁ = patch_indices_to_global_indices[t]    
+      bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]        
+      freenodes₁ = setdiff(fullnodes₁, bnodes₁)    
+      start₁ = max(1,t-l); last₁ = min(nc,t+l)    
+      gn₁ = start₁*(p+1)-p:last₁*(p+1)    
+      stima_el = K[freenodes₁,freenodes₁]
+      lmat_el = L[freenodes₁,gn₁]
+      for _=1:p′+1
+        fvecs_el = [M[freenodes₁,freenodes₁]*β[freenodes₁,index_1]; zeros(T,length(gn₁))]        
+        lhs = [stima_el lmat_el; (lmat_el)'  spzeros(T, length(gn₁), length(gn₁))]
+        rhs = fvecs_el           
+        sol = lhs\collect(rhs)
+        basis_vec_ms[freenodes₁, index] = sol[1:length(freenodes₁)]
+        index += 1   
+        index_1 += 1
+      end
     end
+    β = norm(basis_vec_ms[:,1])^-1*basis_vec_ms[:,1+(corr-1)*((p′+1)*nc):(corr)*(nc*(p′+1))]
   end
   basis_vec_ms
 end

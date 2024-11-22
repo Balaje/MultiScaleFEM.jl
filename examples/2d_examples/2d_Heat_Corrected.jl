@@ -26,9 +26,9 @@ domain = (0.0, 1.0, 0.0, 1.0);
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^7;
-  nc = 2^1;
-  p = 1;
-  l = 3; # Patch size parameter
+  nc = 2^2;
+  p = 3;
+  l = nc; # Patch size parameter
 end
 f(x,t) = sin(π*x[1])*sin(π*x[2])*(sin(t))^4
 u₀(x) = 0.0
@@ -50,8 +50,8 @@ else
   rand_vals = zeros(epsilon^2);
 end
 MPI.Bcast!(rand_vals, 0, comm)
-# vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
-vals_epsilon = readdlm("./coefficient.txt");
+vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
+# vals_epsilon = readdlm("./coefficient.txt");
 A = CellField(vec(vals_epsilon), FineScale.trian)
 K = assemble_stima(V₀, A, 4);
 M = assemble_massma(V₀, x->1.0, 4);
@@ -95,10 +95,10 @@ if(mpi_rank == 0)
   global 𝐊 = [Kₘₛ Pₘₛ; 
               Pₘₛ' Kₘₛ′]
 
-  sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
-  sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
-  # sM = 𝐌
-  # sK = 𝐊
+  # sM = SchurComplementMatrix(𝐌, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  # sK = SchurComplementMatrix(𝐊, (num_cells(CoarseScale.trian)*(p+1)^2, num_cells(CoarseScale.trian)*(q+1)^2))
+  sM = 𝐌
+  sK = 𝐊
 
   # Begin solving the heat equation in rank 0
   println("Solving multiscale problem...")
@@ -107,7 +107,7 @@ if(mpi_rank == 0)
     L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4)
     [B'*L; B₂'*L]
   end
-  Δt = 2^-8
+  Δt = 2^-7
   tf = 1.0
   ntime = ceil(Int, tf/Δt)
   BDF = 4

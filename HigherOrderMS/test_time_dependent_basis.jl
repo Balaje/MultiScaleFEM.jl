@@ -88,8 +88,8 @@ end
 """
 Modified BDF-k routine
 """
-function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64, 
-  K::AbstractMatrix{Float64}, M::Vector{T}, f!::Function, k::Int64) where T <: AbstractMatrix{Float64}
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T1}, Δt::Float64, 
+  K::AbstractMatrix{T1}, M::Vector{T}, f!::Function, k::Int64) where {T <: AbstractMatrix{Float64}, T1 <: Number}
   # U should be arranged in descending order (n+k), (n+k-1), ...
   # M should be arranged in descending order (n+k), (n+k-1), ...
   @assert (size(U,2) == k) # Check if it is the right BDF-k
@@ -121,7 +121,7 @@ end
 """
 Function to setup the initial condition
 """
-function setup_initial_condition(u₀::Function, Λ::NTuple{2,SparseMatrixCSC{Float64,Int64}}, fspace::FineScaleSpace)
+function setup_initial_condition(u₀::Function, Λ::NTuple{2,SparseMatrixCSC{T,Int64}}, fspace::FineScaleSpace) where T<:Number
   Λᵣ, Λₜ = Λ
   massma = assemble_mass_matrix(fspace, x->1.0)
   loadvec = assemble_load_vector(fspace, u₀)

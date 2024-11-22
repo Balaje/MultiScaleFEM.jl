@@ -123,13 +123,13 @@ end
 # plot_patch_data!(plt3, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
 # plot_basis_function!(plt3, Wₘₛ, el, jq, q);
 
-B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
-B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)
+# B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
+# B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)
 
-build_basis_functions!((B,B₁), (Vₘₛ,Wₘₛ), comm);
+# build_basis_functions!((B,B₁), (Vₘₛ,Wₘₛ), comm);
 
-if(mpi_rank==0)
-  println("a-Orthogonality a(Vₘₛ,Wₘₛ) = $(norm(B'*K*B₁)) ≈ 0.0");
-  println("a-Orthogonality a(Vₘₛ,Vₘₛ) = $(norm(B'*K*B)) ≂̸ 0.0");
-  println("L²-Orthogonality (Vₘₛ,Wₘₛ) = $(norm(B'*M*B₁)) ≂̸ 0.0 ");
-end
+# if(mpi_rank==0)
+#   println("a-Orthogonality a(Vₘₛ,Wₘₛ) = $(norm(B'*K*B₁)) ≈ 0.0");
+#   println("a-Orthogonality a(Vₘₛ,Vₘₛ) = $(norm(B'*K*B)) ≂̸ 0.0");
+#   println("L²-Orthogonality (Vₘₛ,Wₘₛ) = $(norm(B'*M*B₁)) ≂̸ 0.0 ");
+# end

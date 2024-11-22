@@ -4,6 +4,8 @@ using SparseArrays
 using Gridap
 using BenchmarkTools
 
+using DoubleFloats
+
 using PyPlot
 using Plots
 pyplot()
