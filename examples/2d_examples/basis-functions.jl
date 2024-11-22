@@ -22,9 +22,9 @@ domain = (0.0, 1.0, 0.0, 1.0);
 
 # Fine scale space description
 nf = 2^7;
-nc = 2^2;
+nc = 2^4;
 p = 3;
-l = 8; # Patch size parameter
+l = 32; # Patch size parameter
 
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
 # Background fine scale discretization
@@ -105,23 +105,23 @@ end
 ##### ##### ###### ##### ###### ##### ###### 
 # Plotting handles. Uncomment for plotting.
 ##### ##### ###### ##### ###### ##### ###### 
-# using Plots
-# plt = Plots.plot();
-# plt1 = Plots.plot();
-# plt2 = Plots.plot();
-# plt3 = Plots.plot();
-# el = 6
-# jp = 2
-# jq = (q+1)^2
-# # el = 10
-# plot_patch_data!(plt, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 1)
-# # Plot the multiscale basis and corrections
-# plot_patch_data!(plt1, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt1, Vₘₛ, el, jp, p);
-# plot_patch_data!(plt2, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt2, Vₘₛ′, el, jq, q);
-# plot_patch_data!(plt3, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
-# plot_basis_function!(plt3, Wₘₛ, el, jq, q);
+using Plots
+plt = Plots.plot();
+plt1 = Plots.plot();
+plt2 = Plots.plot();
+plt3 = Plots.plot();
+el = 1
+jp = 1
+jq = (q+1)^2
+# el = 10
+plot_patch_data!(plt, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 1)
+# Plot the multiscale basis and corrections
+plot_patch_data!(plt1, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
+plot_basis_function!(plt1, Vₘₛ, el, jp, p);
+plot_patch_data!(plt2, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
+plot_basis_function!(plt2, Vₘₛ′, el, jq, q);
+plot_patch_data!(plt3, Zb, Zi, Zpatch, coarse_coords, fine_coords, el, l, 0.5)
+plot_basis_function!(plt3, Wₘₛ, el, jq, q);
 
 # B = spzeros(Float64, length(fine_coords), num_coarse_cells*(p+1)^2)
 # B₁ = spzeros(Float64, length(fine_coords), num_coarse_cells*(q+1)^2)

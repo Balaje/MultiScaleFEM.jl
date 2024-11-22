@@ -94,7 +94,7 @@ N = 2 .^(0:4)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 4;
+p = 2;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
