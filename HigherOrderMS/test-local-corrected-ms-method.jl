@@ -4,10 +4,10 @@ include("corrected_basis.jl");
 #=
 Problem data
 =#
-T₁ = Float64
+T₁ = Double64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
-Neps = 2^7
+Neps = 2^8
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.2 .+ (1-0.2)*rand(T₁,Neps+1)
 function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T}) where T<:Number
@@ -34,7 +34,7 @@ u₀(x) = T₁(0.0)
 # u₀(x) = sin(π*x[1])
 
 # Problem parameters
-nf = 2^8
+nf = 2^9
 q = 1
 qorder = 6
 # Temporal parameters
@@ -94,7 +94,7 @@ N = 2 .^(0:4)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 2;
+p = 5;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -109,8 +109,8 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for ntimes = [1,2]
-for p′ = [p-2,p-1,p]
+for ntimes = [3]
+for p′ = [p-2,p]
 for l = [N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
