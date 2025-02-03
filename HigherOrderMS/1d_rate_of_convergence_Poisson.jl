@@ -50,12 +50,12 @@ for l=[3,4,5,6,7]
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute MS bases
       basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices)
-      # if(nc > 1)
-      #   γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
-      #   basis_vec_ms[:, 1:(p+1):(p+1)*nc] = γ;
-      #   global lw = 2
-      #   global ls = :solid
-      # end
+      if(nc > 1)
+        γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
+        basis_vec_ms[:, 1:(p+1):(p+1)*nc] = γ;
+        global lw = 2
+        global ls = :solid
+      end
       # Compute boundary contributions
       Pₕug = compute_boundary_correction_matrix(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
       boundary_contrib = apply_boundary_correction(Pₕug, bnodes, bvals, patch_indices_to_global_indices, p, nc, l, fine_scale_space);

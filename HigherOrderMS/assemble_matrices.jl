@@ -77,7 +77,7 @@ function assemble_lm_l2_matrix(nds::AbstractVector{T}, elem::Matrix{Int64}, p::I
   for t=1:nc
     h = nds[elem[t,2]] - nds[elem[t,1]]
     for i=1:p+1
-      l2mat[(index-1)+i, (index-1)+i] = 1.0
+      l2mat[(index-1)+i, (index-1)+i] = h/(2*(i-1)+1)
     end
     index = index + (p+1)
   end

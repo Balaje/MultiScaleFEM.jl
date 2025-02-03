@@ -161,14 +161,17 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
 
       # Source term
       fullnodes₁ = elem_indices_to_global_indices[u1] 
+      bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]
+      K[bnodes₁,bnodes₁]/=2      
       
       iota = ιₖ.(nds_fine, Ref(P), Ref(u))[fullnodes₁]   
 
       loadvec = zeros(T, length(nds_fine)) 
       Kel = K[fullnodes₁, fullnodes₁]             
-      if(u1!=1) Kel[1,1]/=2; end
-      if(u1!=nc) Kel[end,end]/=2; end
+      # if(u1!=1) Kel[1,1]/=2; end
+      # if(u1!=nc) Kel[end,end]/=2; end
       loadvec[fullnodes₁] = Kel*iota        
+      # (t==8) && droptol!(sparse(loadvec[freenodes]), 1e-10) |> display
       lhs = [stima_el lmat_el; (lmat_el)' spzeros(T, length(gn), length(gn))]  
       rhs = [-loadvec[freenodes]; zeros(T, length(gn))]    
       sol = lhs\rhs
@@ -176,13 +179,14 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
       #(t==1) && display(droptol!(sparse(sol[1:length(freenodes)]), 1e-10))
       basis_vec_ms[fullnodes,t] += [0.0; sol[1:length(freenodes)]; 0.0] 
       # basis_vec_ms[fullnodes₁,t] += iota
+      K[bnodes₁,bnodes₁]*=2
     end    
     basis_vec_ms[:,t] += ιₖ.(nds_fine, Ref(nds), Ref(nds_patch))
 
     C = vec(_c(nc, t, p; T=T))
     βi = β[:, start*(p+1)-p:last*(p+1)]   
     sol1 = βi*C
-
+    
     basis_vec_ms[:,t] += sol1
   end
   basis_vec_ms
