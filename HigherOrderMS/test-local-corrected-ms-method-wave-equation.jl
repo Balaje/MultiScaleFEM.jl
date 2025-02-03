@@ -8,7 +8,7 @@ domain = (0.0,1.0)
 ## Random wave speed
 Neps = 2^7
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-wave_speed_micro = 0.5 .+ 4.5*rand(Neps+1)
+wave_speed_micro = 0.5 .+ 0.5*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
   n = size(nds_micro, 1)
   for i=1:n
@@ -19,12 +19,12 @@ function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vec
     end 
   end
 end
-c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
+# c²(x; nds_micro = nds_micro, diffusion_micro = wave_speed_micro) = _D(x[1], nds_micro, diffusion_micro)
 ## Oscillatory wave speed
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2^-5))^-1
 # c²(x) = (0.25 + 0.125*cos(2π*x[1]/2e-2))^-1
 ## Constant wave speed
-# c²(x) = 1.0
+c²(x) = 1.0
 u₀(x) = 0.0
 # uₜ₀(x) = π*sin(π*x[1])
 uₜ₀(x) = 0.0
@@ -38,8 +38,8 @@ q = 1
 qorder = 4
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
 # Temporal parameters
-Δt = 10^-3
-tf = 1.5
+Δt = 1e-4
+tf = 0.5
 ntime = ceil(Int, tf/Δt)
 
 # Solve the fine scale problem for exact solution
@@ -55,6 +55,7 @@ function fₙϵ!(cache, tₙ::Float64)
   F[freenodes]
   #zeros(Float64, length(freenodes))
 end
+
 # Time marching
 let 
   U₀ = u₀.(nds_fine[freenodes])
@@ -87,49 +88,54 @@ uₕ = FEFunction(Uₕ, vcat(0.0,U,0.0))
 
 ##### Now begin solving using the multiscale method #####
 # Create empty plots
-N = [1,2,4,8,16,32,64]
-# plt = plot();
-# plt1 = plot();
-p = 3;
+N = [1,2,4,8,16,32]
+plt = Plots.plot();
+plt1 = Plots.plot();
+p = 2;
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
 function fₙ!(cache, tₙ::Float64)
-  fspace, basis_vec_ms = cache
+  # "A Computationally Efficient Method"
+  fspace, basis_vec_ms, z1 = cache
   loadvec = assemble_load_vector(fspace, y->f(y,tₙ))
-  basis_vec_ms'*loadvec
-  #zeros(Float64, size(basis_vec_ms, 2))
+  [z1; basis_vec_ms'*loadvec]
 end   
 
+δ = 1;
+p′ = 1;
 for l=[8]
 # for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
     let
-      # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       # Compute the multiscale basis
-      basis_vec_ms = compute_ms_basis(fine_scale_space, c², p, nc, l, patch_indices_to_global_indices);
+      global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, c², p, nc, l, patch_indices_to_global_indices);     
+            
+      patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(δ*nc, nf, δ*l, (q,p′));
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, c², p′, δ*nc, δ*l, patch_indices_to_global_indices);      
+
       # Assemble the stiffness, mass matrices
-      Kₘₛ = basis_vec_ms'*stima*basis_vec_ms
-      Mₘₛ = basis_vec_ms'*massma*basis_vec_ms   
-      # Add the corrected version of the basis
-      KLΛ = stima, massma*basis_vec_ms, Mₘₛ
-      l′ = l+5;
-      # basis_vec_ms′ = compute_corrected_basis_function(fine_scale_space, KLΛ, p, nc, l, l′)      
-      basis_vec_ms′ = basis_vec_ms
-      Kₘₛ′ = basis_vec_ms′'*stima*basis_vec_ms′
-      Mₘₛ′ = basis_vec_ms′'*massma*basis_vec_ms′
+      Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
+      Kₘₛ′ = basis_vec_ms₂'*stima*basis_vec_ms₂; Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂; 
+      Lₘₛ = basis_vec_ms₂'*massma*basis_vec_ms₁
+      Pₘₛ = basis_vec_ms₂'*stima*basis_vec_ms₁
+      
+      global 𝐌 = [Mₘₛ′ Lₘₛ; 
+                  Lₘₛ'  Mₘₛ];
+      global 𝐊 = [Kₘₛ′ zero(Lₘₛ); 
+                  Pₘₛ'   Kₘₛ] 
       # basis_vec_ms = basis_vec_ms′
       # Kₘₛ = Kₘₛ′
       # Mₘₛ = Mₘₛ′
       # Time marching
       let 
-        U₀ = setup_initial_condition(u₀, basis_vec_ms′, fine_scale_space)
-        V₀ = setup_initial_condition(uₜ₀, basis_vec_ms′, fine_scale_space)
+        U₀ = [zeros(Float64, (p′+1)*(δ)*nc); setup_initial_condition(u₀, basis_vec_ms₁, fine_scale_space)]
+        V₀ = [zeros(Float64, (p′+1)*(δ)*nc); setup_initial_condition(uₜ₀, basis_vec_ms₁, fine_scale_space)]
         global U = zero(U₀)
-        cache = fine_scale_space, basis_vec_ms
+        cache = fine_scale_space, basis_vec_ms₁, zeros(Float64, (p′+1)*(δ)*nc)
         #= # Crank Nicolson Method
         t = 0.0
         for i=1:ntime
@@ -142,16 +148,16 @@ for l=[8]
         # Leap-frog method from the Newmark scheme with β=0, γ=0.25
         # Crank Nicolson Method with β = 1/4, γ = 1/2
         t = 0.0
-        U₁ = NM1!(cache, U₀, V₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, 0.25, 0.5)
+        U₁ = NM1!(cache, U₀, V₀, Δt, 𝐊, 𝐌, fₙ!, 0.25, 0.5)
         t += Δt
         for i=2:ntime
-          U = NM!(cache, t, U₁, U₀, Δt, Kₘₛ′, Mₘₛ′, fₙ!, 0.25, 0.5)
+          U = NM!(cache, t, U₁, U₀, Δt, 𝐊, 𝐌, fₙ!, 0.25, 0.5)
           U₀ = U₁
           U₁ = U
           t += Δt
         end                
       end
-      U_fine_scale = basis_vec_ms′*U
+      U_fine_scale = basis_vec_ms₁*U[(p′+1)*(δ)*nc+1:end] + basis_vec_ms₂*U[1:(δ)*(p′+1)*nc]
       
       # Compute the errors
       dΩ = Measure(get_triangulation(Uₕ), qorder)
@@ -172,9 +178,3 @@ end
 
 plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-
-# Also plot the reference lines with slope 2,3 to check the reduced rate
-# plot!(plt, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-# plot!(plt, 1 ./N, (1 ./N).^3, label="Order 3", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-# plot!(plt1, 1 ./N, (1 ./N).^1, label="Order 1", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);
-# plot!(plt1, 1 ./N, (1 ./N).^2, label="Order 2", ls=:dash, lc=:black, xaxis=:log10, yaxis=:log10);

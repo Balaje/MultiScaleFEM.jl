@@ -4,6 +4,8 @@ using SparseArrays
 using Gridap
 using BenchmarkTools
 
+using DoubleFloats
+
 using PyPlot
 using Plots
 pyplot()
@@ -18,3 +20,4 @@ include("basis-functions.jl")
 include("assemble_matrices.jl")
 include("multiscale_basis-functions.jl")
 include("time-dependent.jl")
+include("./schur_complement.jl")

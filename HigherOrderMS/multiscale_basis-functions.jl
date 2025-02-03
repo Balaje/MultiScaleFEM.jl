@@ -4,12 +4,12 @@
 # 2) the matrix-vector contributions.        #
 #### ##### ##### ##### ##### ##### ##### #####
 function compute_ms_basis(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
-  patch_indices_to_global_indices::Vector{AbstractVector{Int64}})
+  patch_indices_to_global_indices::Vector{AbstractVector{Int64}}; T=Float64)
   nf = fspace.nf
   q = fspace.q
-  basis_vec_ms = spzeros(Float64,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
+  basis_vec_ms = spzeros(T,q*nf+1,(p+1)*nc) # To store the multiscale basis functions
   K, L, Λ = get_saddle_point_problem(fspace, D, p, nc)
-  f1 = zeros(Float64,size(K,1))
+  f1 = zeros(T,size(K,1))
   index = 1
   for t=1:nc
     fullnodes = patch_indices_to_global_indices[t]
@@ -24,7 +24,7 @@ function compute_ms_basis(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int
     loadvec_el = (f1 - K[:,bnodes]*bvals)
     for _=1:p+1
       fvecs_el = [loadvec_el[freenodes]; Λ[gn, index]]
-      lhs = [stima_el lmat_el; (lmat_el)' spzeros(Float64, length(gn), length(gn))]
+      lhs = [stima_el lmat_el; (lmat_el)' spzeros(T, length(gn), length(gn))]
       rhs = fvecs_el           
       sol = lhs\rhs                 
       basis_vec_ms[freenodes,index] = sol[1:length(freenodes)]
@@ -50,7 +50,7 @@ The function gₕ is defined as gₕ ∈ P₁(𝒯ₕ) with
 Compute the boundary  projection matrix
 """
 function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64,
-  patch_indices_to_global_indices::Vector{AbstractVector{Int64}})
+  patch_indices_to_global_indices::Vector{AbstractVector{Int64}}; T=Float64)
   # Compute the projection (solve the saddle point problems) only on the boundary elements
   boundary_elems = [1,nc]
   n_boundary_elems = 1:length(boundary_elems)
@@ -59,7 +59,7 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
   q = fspace.q
   start, last = max(1,1-l), min(nc,1+l)
   dims = ((last-start+1)*(p+1)+2) # ( ((l+1)*(p+1) = No of patch elements) + (2 = Boundary contribution of stima))
-  boundary_correction = spzeros(Float64, q*nf+1, dims*length(boundary_elems)) # 2 patch elements
+  boundary_correction = spzeros(T, q*nf+1, dims*length(boundary_elems)) # 2 patch elements
   K, L, _ = get_saddle_point_problem(fspace, D, p, nc)
   # Begin solving 
   for (t,i) in zip(boundary_elems,n_boundary_elems)
@@ -69,9 +69,9 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
     start = max(1,t-l)
     last = min(nc,t+l)
     gn = start*(p+1)-p:last*(p+1)    
-    lhs = -[K[fn,fn] L[fn,gn]; L[fn,gn]' spzeros((last-start+1)*(p+1),(last-start+1)*(p+1))]
+    lhs = -[K[fn,fn] L[fn,gn]; L[fn,gn]' spzeros(T,(last-start+1)*(p+1),(last-start+1)*(p+1))]
     # Boundary contributions of the LHS
-    rhs = collect([K[fn,bn] zero(L[fn,gn]); (zero(L[bn,gn]))' spzeros((last-start+1)*(p+1), (last-start+1)*(p+1))])
+    rhs = collect([K[fn,bn] zero(L[fn,gn]); (zero(L[bn,gn]))' spzeros(T, (last-start+1)*(p+1), (last-start+1)*(p+1))])
     # Invert to compute the projection matrix
     boundary_correction[fn,(dims)*i-(dims-1):dims*i] = (lhs\rhs)[1:length(fn),:] 
   end

@@ -3,3 +3,4 @@
 *.vscode
 *.vtu
 *.vtk
+*.ipynb_checkpoints/

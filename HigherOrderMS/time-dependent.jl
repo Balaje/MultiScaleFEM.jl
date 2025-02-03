@@ -53,14 +53,14 @@ end
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
-function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64, 
-  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, k::Int64)
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, 
+  K::AbstractMatrix{T}, M::AbstractMatrix{T}, f!::Function, k::Int64) where T<:Number
   # U should be arranged in descending order (n+k), (n+k-1), ...
   @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
   coeffs = dl!(dl_cache, k)
-  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))  
-  for i=0:k-1
+  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))    
+  for i=0:k-1    
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end 
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
@@ -99,15 +99,15 @@ end
 """
 Function to setup the initial condition by evaluating the L² projection on the MS-space.
 """
-function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{Float64,Int64}, fspace::FineScaleSpace)
+function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{T,Int64}, fspace::FineScaleSpace) where T<:Number
   massma = assemble_mass_matrix(fspace, x->1.0)
   loadvec = assemble_load_vector(fspace, u₀)
   Mₘₛ = basis_vec_ms'*massma*basis_vec_ms  
   Lₘₛ = basis_vec_ms'*loadvec
-  Mₘₛ\Lₘₛ
+  collect(Mₘₛ)\Lₘₛ
 end 
 
-function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{Float64,Int64}, fspace::FineScaleSpace, A::Function)
+function setup_initial_condition(u₀::Function, basis_vec_ms::SparseMatrixCSC{T,Int64}, fspace::FineScaleSpace, A::Function) where T<:Number
   stima = assemble_stiffness_matrix(fspace, A)
   # loadvec = assemble_load_vector(fspace, u₀)
   Ω = get_triangulation(fspace.U)
