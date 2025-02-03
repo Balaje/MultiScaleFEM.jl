@@ -77,6 +77,7 @@ function compute_boundary_correction_matrix(fspace::FineScaleSpace, D::Function,
   end
   boundary_correction
 end
+
 """
 Apply the boundary projection matrix to the Dirichlet boundary condition
 """
@@ -102,4 +103,87 @@ function apply_boundary_correction(BC::SparseMatrixCSC{Float64,Int64}, bnodes::V
   end
   boundary_correction[bnodes] = bvals # Fill in the DBC values
   boundary_correction
+end
+
+"""
+Compute the correction of ιₖ(x) + νₖ(x)
+"""
+function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64; T=Float64)
+  domain = fspace.domain
+  nf = fspace.nf
+  q = fspace.q
+  basis_vec_ms = spzeros(T,q*nf+1,nc) # To store the stabilized basis functions (to return)  
+  nds_fine = LinRange(domain...,q*nf+1)
+  K, L, _ = get_saddle_point_problem(fspace, D, p, nc)  
+  # We need this to obtain the 1-patch and the element for the ιₖ component
+  elem_coarse = [i+j for i=1:nc, j=0:1]
+  nds_coarse = LinRange(domain..., nc+1) 
+  elem_indices_to_global_indices = coarse_space_to_fine_space(nc, nf, 0, (1,p))[1]; 
+  patch_indices_to_global_indices = coarse_space_to_fine_space(nc, nf, l, (1,p))[1];
+  # Compute the old multiscale bases for the νₖ component
+  β = compute_ms_basis(fspace, D, p, nc, l, patch_indices_to_global_indices; T=T)
+
+  for t=1:nc 
+    start = max(1,t-1); last = min(nc, t+1); # N¹(G)
+    # Get the N¹(K) patch
+    # start₁ = max(1,t-1); last₁ = min(nc, t+1); # N¹(G)
+    if(t==1 || t==nc) 
+      P = Tuple(nds_coarse[elem_coarse[start,:]]), 
+          Tuple(nds_coarse[elem_coarse[last,:]])
+    else
+      P = Tuple(nds_coarse[elem_coarse[start,:]]), 
+          Tuple(nds_coarse[elem_coarse[t,:]]), 
+          Tuple(nds_coarse[elem_coarse[last,:]])
+    end  
+    nds_patch = (P[1][1], P[end][2])
+    nds = Tuple(nds_coarse[elem_coarse[t,:]])
+
+    if(t==1)
+      inds_1 = [t,t+1]
+      inds_2 = [1,2]
+    elseif(t==nc)
+      inds_1 = [t-1,t]
+      inds_2 = [1,2]
+    else
+      inds_1 = [t-1,t,t,t+1]
+      inds_2 = [1,2,3,4]
+    end
+    for (u,u1)=zip(inds_2,inds_1)
+      # G ∈ {K-1, K, K+1}
+      startᵤ = max(1,u1-l); lastᵤ = min(nc, u1+l); # Nˡ(G)               
+      
+      fullnodes = patch_indices_to_global_indices[u1]
+      bnodes = [fullnodes[1], fullnodes[end]]
+      freenodes = setdiff(fullnodes, bnodes)
+      gn = startᵤ*(p+1)-p:lastᵤ*(p+1)          
+      stima_el = K[freenodes,freenodes]
+      lmat_el = L[freenodes,gn]
+
+      # Source term
+      fullnodes₁ = elem_indices_to_global_indices[u1] 
+      
+      iota = ιₖ.(nds_fine, Ref(P), Ref(u))[fullnodes₁]   
+
+      loadvec = zeros(T, length(nds_fine)) 
+      Kel = K[fullnodes₁, fullnodes₁]             
+      if(u1!=1) Kel[1,1]/=2; end
+      if(u1!=nc) Kel[end,end]/=2; end
+      loadvec[fullnodes₁] = Kel*iota        
+      lhs = [stima_el lmat_el; (lmat_el)' spzeros(T, length(gn), length(gn))]  
+      rhs = [-loadvec[freenodes]; zeros(T, length(gn))]    
+      sol = lhs\rhs
+
+      #(t==1) && display(droptol!(sparse(sol[1:length(freenodes)]), 1e-10))
+      basis_vec_ms[fullnodes,t] += [0.0; sol[1:length(freenodes)]; 0.0] 
+      # basis_vec_ms[fullnodes₁,t] += iota
+    end    
+    basis_vec_ms[:,t] += ιₖ.(nds_fine, Ref(nds), Ref(nds_patch))
+
+    C = vec(_c(nc, t, p; T=T))
+    βi = β[:, start*(p+1)-p:last*(p+1)]   
+    sol1 = βi*C
+
+    basis_vec_ms[:,t] += sol1
+  end
+  basis_vec_ms
 end

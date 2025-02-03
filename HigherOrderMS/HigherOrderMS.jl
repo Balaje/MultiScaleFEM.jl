@@ -5,6 +5,7 @@ using Gridap
 using BenchmarkTools
 
 using DoubleFloats
+using Quadmath
 
 using PyPlot
 using Plots

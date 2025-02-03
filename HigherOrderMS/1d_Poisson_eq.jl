@@ -1,16 +1,18 @@
 include("HigherOrderMS.jl");
 
+gr()
+
 domain = (0.0,1.0)
 
 D(x) = (1.0 + 0.8*cos(2π*x[1]/2^-5))^-1
 # D(x) = 1.0
 f(x) = π^2*sin(π*x[1])
 
-nc = 2^2
+nc = 2^4
 nf = 2^15
 q = 1
-p = 1
-l = 7
+p = 3
+l = 4
 qorder = 2
 
 nds_fine = LinRange(domain[1], domain[2], q*nf+1)
@@ -22,6 +24,8 @@ fine_scale_space = FineScaleSpace(domain, q, qorder, nf)
 patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
 # Compute Multiscale bases
 basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
+γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
+basis_vec_ms[:, 1:p+1:(p+1)*nc] = γ
 # Construct the full stiffness and load vectors
 stima = assemble_stiffness_matrix(fine_scale_space, D)
 loadvec = assemble_load_vector(fine_scale_space, f)

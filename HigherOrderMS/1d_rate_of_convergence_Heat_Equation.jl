@@ -6,7 +6,7 @@ Problem data
 =#
 domain = (0.0,1.0)
 # Random diffusion coefficient
-Neps = 2^12
+Neps = 2^10
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.1 .+ 0.1*rand(Neps+1)
 function _D(x::Float64, nds_micro::AbstractVector{Float64}, diffusion_micro::Vector{Float64})
@@ -27,17 +27,17 @@ A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_mi
 # A(x) = (2 + cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion coefficient
 # A(x) = (2 + cos(2π*x[1]/2^0))^-1 # Smooth Diffusion coefficient
 # A(x) = 1.0 # Constant diffusion coefficient
-f(x,t) = sin(π*x[1])*sin(π*t)
+f(x,t) = t
 u₀(x) = 0.0
 # f(x,t) = 0.0
 # u₀(x) = sin(π*x[1])
 
 # Problem parameters
-nf = 2^15
+nf = 2^12
 q = 1
 qorder = 6
 # Temporal parameters
-Δt = 1e-3
+Δt = 2^-8
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
@@ -86,9 +86,9 @@ uₕ = FEFunction(Uₕ, vcat(0.0,Uex,0.0))
 ##### Now begin solving using the multiscale method #####
 N = [1,2,4,8,16,32]
 # Create empty plots
-# plt = Plots.plot();
-# plt1 = Plots.plot();
-p = 3;
+plt = Plots.plot();
+plt1 = Plots.plot();
+
 L²Error = zeros(Float64,size(N));
 H¹Error = zeros(Float64,size(N));
 # Define the projection of the load vector onto the multiscale space
@@ -98,6 +98,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
+for p = [0,1,2,3,4];
 for l=[8]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
@@ -150,14 +151,17 @@ for l=[8]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L² (l="*string(l)*")", lw=2)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L\$^2\$ (l="*string(l)*")", lw=2)
   Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*"), Energy (l="*string(l)*")", lw=2)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
+Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+end
 
-Plots.plot!(plt1, 1 ./N, (1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
-Plots.plot!(plt, 1 ./N, (1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt1, 1 ./N, (1/5)*H¹Error[1]*(1 ./N).^1.5, label="Order 1.5", ls=:dash, lc=:black, lw=3, xaxis=:log10, yaxis=:log10);
+Plots.plot!(plt, 1 ./N, (1/5)*L²Error[1]*(1 ./N).^2.5, label="Order 2.5", ls=:dash, lc=:black, lw=3, xaxis=:log10, yaxis=:log10);
 
 # Plot the rates along with the diffusion coefficient
 plt2 = Plots.plot(plt, plt1, layout=(1,2))
