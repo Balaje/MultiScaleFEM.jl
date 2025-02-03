@@ -7,7 +7,7 @@ plt1 = Plots.plot();
 #=
 Problem data
 =#
-T₁ = Float64
+T₁ = Double64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
 Neps = 2^8
@@ -95,7 +95,9 @@ println(" ")
 
 N = 2 .^(0:4)
 # Create empty plots
-p = 3;
+plt = Plots.plot();
+plt1 = Plots.plot();
+p = 5;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -110,8 +112,8 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for ntimes = [1,2]
-for p′ = [p]
+for ntimes = [3]
+for p′ = [p-2,p]
 for l = [N[end]]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
