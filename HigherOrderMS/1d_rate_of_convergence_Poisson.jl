@@ -10,8 +10,8 @@ plt2 = Plots.plot()
 Problem data
 =#
 domain = (0.0,1.0)
-D(x) = 1.0 # Smooth Diffusion coefficient
-# D(x) = (1.0 + 0.5*cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion
+# D(x) = 1.0 # Smooth Diffusion coefficient
+D(x) = (1.0 + 0.5*cos(2π*x[1]/2^-6))^-1 # Oscillatory diffusion
 f(x) = π^2*sin(π*x[1])
 bvals = [0.0,0.0];
 
@@ -55,21 +55,13 @@ for l=[3,4,5,6,7]
         basis_vec_ms[:, 1:(p+1):(p+1)*nc] = γ;
         global lw = 2
         global ls = :solid
-      end
-      # Compute boundary contributions
-      Pₕug = compute_boundary_correction_matrix(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
-      boundary_contrib = apply_boundary_correction(Pₕug, bnodes, bvals, patch_indices_to_global_indices, p, nc, l, fine_scale_space);
-      # Solve the problem
-      # stima = assemble_stiffness_matrix(fine_scale_space, D)
-      # loadvec = assemble_load_vector(fine_scale_space, f)
-      # Kₘₛ = basis_vec_ms'*stima[:,freenodes]*basis_vec_ms[freenodes,:];
-      # Fₘₛ = basis_vec_ms'*loadvec - basis_vec_ms'*(stima[:,bnodes]*bvals);
+      end      
       # Solve the problem
       Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
       Fₘₛ = basis_vec_ms'*loadvec;
       sol2 = Kₘₛ\Fₘₛ;
       #Apply the boundary correction
-      global sol_fine_scale = basis_vec_ms*sol2 + boundary_contrib
+      global sol_fine_scale = basis_vec_ms*sol2
 
       # Compute the errors
       dΩ = Measure(get_triangulation(U), qorder)

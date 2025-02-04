@@ -134,9 +134,7 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
       P = Tuple(nds_coarse[elem_coarse[start,:]]), 
           Tuple(nds_coarse[elem_coarse[t,:]]), 
           Tuple(nds_coarse[elem_coarse[last,:]])
-    end  
-    nds_patch = (P[1][1], P[end][2])
-    nds = Tuple(nds_coarse[elem_coarse[t,:]])
+    end
 
     if(t==1)
       inds_1 = [t,t+1]
@@ -148,7 +146,7 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
       inds_1 = [t-1,t,t,t+1]
       inds_2 = [1,2,3,4]
     end
-    for (u,u1)=zip(inds_2,inds_1)
+    for (u,u1)=zip(inds_2,inds_1)      
       # G ∈ {K-1, K, K+1}
       startᵤ = max(1,u1-l); lastᵤ = min(nc, u1+l); # Nˡ(G)               
       
@@ -159,34 +157,33 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
       stima_el = K[freenodes,freenodes]
       lmat_el = L[freenodes,gn]
 
-      # Source term
+      # Extract the fine-scale node in the element
+      loadvec = zeros(T, length(nds_fine)); # To store the RHS
       fullnodes₁ = elem_indices_to_global_indices[u1] 
       bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]
-      K[bnodes₁,bnodes₁]/=2      
-      
-      iota = ιₖ.(nds_fine, Ref(P), Ref(u))[fullnodes₁]   
-
-      loadvec = zeros(T, length(nds_fine)) 
+      # Source term
+      K[bnodes₁,bnodes₁]/=2            
+      iota = ιₖ.(nds_fine, Ref(P), Ref(u))[fullnodes₁]# ιₖ function on the element
       Kel = K[fullnodes₁, fullnodes₁]             
-      # if(u1!=1) Kel[1,1]/=2; end
-      # if(u1!=nc) Kel[end,end]/=2; end
-      loadvec[fullnodes₁] = Kel*iota        
-      # (t==8) && droptol!(sparse(loadvec[freenodes]), 1e-10) |> display
+      loadvec[fullnodes₁] = Kel*iota      
+      K[bnodes₁,bnodes₁]*=2  
+    
+      # Solve the saddle point problem
       lhs = [stima_el lmat_el; (lmat_el)' spzeros(T, length(gn), length(gn))]  
       rhs = [-loadvec[freenodes]; zeros(T, length(gn))]    
       sol = lhs\rhs
 
-      #(t==1) && display(droptol!(sparse(sol[1:length(freenodes)]), 1e-10))
+      # basis_vec_ms = (1-Cˡₖ)ι
       basis_vec_ms[fullnodes,t] += [0.0; sol[1:length(freenodes)]; 0.0] 
-      # basis_vec_ms[fullnodes₁,t] += iota
-      K[bnodes₁,bnodes₁]*=2
+      basis_vec_ms[fullnodes₁[2:end],t] += iota[2:end]            
     end    
-    basis_vec_ms[:,t] += ιₖ.(nds_fine, Ref(nds), Ref(nds_patch))
 
+    # Coefficients for νₖ
     C = vec(_c(nc, t, p; T=T))
     βi = β[:, start*(p+1)-p:last*(p+1)]   
+
+    # basis_vec_ms += ΣcₖΛ̃ₖ
     sol1 = βi*C
-    
     basis_vec_ms[:,t] += sol1
   end
   basis_vec_ms
