@@ -1,23 +1,36 @@
-using MultiscaleFEM
+module Stabilization
+
 using Gridap
 using SparseArrays
+using StaticArrays
 using SplitApplyCombine
 using LazyArrays
-using MultiscaleFEM.MultiscaleBases
+using MPI
 using LinearAlgebra
 
+using MultiscaleFEM.MultiscaleBases: get_basis_functions
+using MultiscaleFEM.MultiscaleBases: CoarseTriangulation, FineTriangulation, MultiScaleTriangulation, MultiScaleFESpace, lazy_fill
+using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale_patch_fine_scale_boundary_node_indices
+using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
+using MultiscaleFEM.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
+using MultiscaleFEM.MultiscaleBases: MultiScaleCorrections, get_basis_functions, build_basis_functions!
+using MultiscaleFEM.MultiscaleBases: get_patch_coarse_elem
+
+using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
+
 using MPI
-comm = MPI.COMM_WORLD
-MPI.Init()
-mpi_size = MPI.Comm_size(comm)
-mpi_rank = MPI.Comm_rank(comm)
+# comm = MPI.COMM_WORLD
+# MPI.Init()
+# mpi_size = MPI.Comm_size(comm)
+# mpi_rank = MPI.Comm_rank(comm)
+
 
 """
 A distance metric to check whether the elements are connected.
 """
 function dist_fun(x::AbstractVector, y)
   dist = abs(x[1] - y)
-  for i=1:lastindex(x), j=1:lastindex(y)
+  for i=1:lastindex(x)
     dist = min(dist, abs(x[i]-y))
   end
   dist
@@ -30,7 +43,7 @@ Function to return the element indices in the patch of K contributing to the bas
 """
 function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain) 
   num_coarse_cells = num_cells(Ωc.trian)
-  patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
+  patch_coarse_elems = BroadcastVector(get_patch_coarse_elem, 
                         lazy_fill(Ωc.trian, num_coarse_cells), 
                         lazy_fill(Ωc.tree, num_coarse_cells), 
                         lazy_fill(1, num_coarse_cells), 
@@ -112,17 +125,17 @@ The 2D basis function on the reference domain
 """
 function ϕᵣ(x)    
   if((-1 <= x[1] <= 1) && (-1 <= x[2] <= 1) )
-    return [1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
+    return @SVector[1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
   else
-    return [0.0, 0.0, 0.0, 0.0]
+    return @SVector[0.0, 0.0, 0.0, 0.0]
   end
 end
 
 function ϕᵣ¹(x)    
   if((-1 < x[1] <= 1) && (-1 <= x[2] < 1) )
-    return [1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
+    return @SVector[1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
   else
-    return [0.0, 0.0, 0.0, 0.0]
+    return @SVector[0.0, 0.0, 0.0, 0.0]
   end
 end
 
@@ -167,7 +180,7 @@ end
 """
 Return the cell-wise lazy array of (1-Cˡ)ιₖ
 """
-function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain)
+function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain, A)
   # Coarse Scale
   Ωc = Ωms.Ωc
   coarse_trian = Ωc.trian  
@@ -218,24 +231,24 @@ function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_sca
     combinedimsview(res,1)  
   end
 
-  global_local_ids = broadcast(find_elements_in_patch, Ref(Ωc), 1:num_coarse_cells, Ref(domain))
+  global_local_ids = BroadcastVector(find_elements_in_patch, Ref(Ωc), 1:num_coarse_cells, Ref(domain))
   println("Computing ι functions on the fine scale ...")
 
-  iota_vals1 = broadcast(I1, Ref(nds_fine), Ref(Ωc), global_local_ids)
-  iota_vals2 = broadcast(I2, Ref(nds_fine), Ref(Ωc), global_local_ids)   
+  iota_vals1 = BroadcastVector(I1, Ref(nds_fine), Ref(Ωc), global_local_ids)
+  iota_vals2 = BroadcastVector(I2, Ref(nds_fine), Ref(Ωc), global_local_ids)   
 
   println("Done.")
                               
   _get_elem_contribs(X, inds) = X[inds]
 
-  elem_wise_contribs = broadcast(_get_elem_contribs, lazy_fill(iwq,num_coarse_cells), elem_fine)
-  elem_wise_stima = broadcast(_my_assembler, elem_wise_contribs, elem_fine_node_ids, Ks)                              
+  elem_wise_contribs = BroadcastVector(_get_elem_contribs, Ref(iwq), elem_fine)
+  elem_wise_stima = BroadcastVector(_my_assembler, elem_wise_contribs, elem_fine_node_ids, Ks)                              
   
   Ω_ms = lazy_fill(Ωms, num_coarse_cells)
   domains = lazy_fill(domain, num_coarse_cells)
   BroadcastVector(_compute_stabilization_term, Ks, Ls, P, C, 
-                  lazy_fill(elem_wise_stima, num_coarse_cells), 
-                  Ω_ms, 1:num_coarse_cells, domains, iota_vals1, iota_vals2)
+                  Ref(elem_wise_stima), Ω_ms, 1:num_coarse_cells, 
+                  domains, iota_vals1, iota_vals2)
 end
 
 function _my_assembler(cell_vals, conn_matrix, stima)  
@@ -280,11 +293,11 @@ function _compute_stabilization_term(stima, lmat, patch_interior_dofs,
     # Compute (-Cˡ)ι = Σₖ (-Cˡₖ)ι
     β[patch_interior_dofs[el]] += SOL[1:length(patch_interior_dofs[el])]      
   end
-  # iota = ιₖ¹.(nds_fine, Ref(Ωc), Ref(el_ind), Ref(domain))   
-  # iota_mat = combinedims(iota,1)  
   # Add the iota function to get (1-Cˡ)ι  
   β += sum(iota2, dims=2)[:,1]
-  β
+  res = spzeros(Float64, size(stima,1), num_cells(Ωc.trian))
+  res[:, el_ind] = β
+  res
 end
 
 """
@@ -296,7 +309,7 @@ function Cˡνₖ(β, Ωms::MultiScaleTriangulation, p::Int64)
   Cmap = x->_c2d(Ωc, x, p);
   lazy_C = lazy_map(Cmap, 1:num_cells(Ωc.trian))  
   num_coarse_cells = num_cells(Ωc.trian) 
-  patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
+  patch_coarse_elems = BroadcastVector(get_patch_coarse_elem, 
                       lazy_fill(Ωc.trian, num_coarse_cells), 
                       lazy_fill(Ωc.tree, num_coarse_cells), 
                       lazy_fill(1, num_coarse_cells), 
@@ -320,7 +333,7 @@ function _c_times_basis(C, β, patch_coarse_elems, p, el)
     patch_coarse_elem = patch_coarse_elems[i]    
     γ[:, el] += βi[i][:, elem_to_dof(patch_coarse_elem)]*C[:,i]
   end
-  γ[:,el]
+  γ
 end
 
 """
@@ -328,7 +341,7 @@ Coefficients for the νₖ functions
 """
 function _c2d(Ωc, el, p; T=Float64)
   num_coarse_cells = num_cells(Ωc.trian) 
-  patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
+  patch_coarse_elems = BroadcastVector(get_patch_coarse_elem, 
                       lazy_fill(Ωc.trian, num_coarse_cells), 
                       lazy_fill(Ωc.tree, num_coarse_cells), 
                       lazy_fill(1, num_coarse_cells), 
@@ -413,12 +426,15 @@ struct StabilizedMultiScaleFESpace <: FESpace
   fine_scale_system
 end
 
-function StabilizedMultiScaleFESpace(α, Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64})
+function StabilizedMultiScaleFESpace(α, Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64}, A)
   K, L = fine_scale_matrices  
-  β = Cˡιₖ(Ωms, p, Uh, (K, L), domain);
-  γ = Cˡνₖ(α, Ωms, p);
-  β + γ
+  β = Cˡιₖ(Ωms, p, Uh, (K, L), domain, A);
+  γ = Cˡνₖ(α, Ωms, p);  
+  basis_vec_ms = β + γ
+  StabilizedMultiScaleFESpace(Ωms, p, Uh, basis_vec_ms, fine_scale_matrices)
 end
 
-import MultiscaleFEM.get_basis_functions
+import MultiscaleFEM.MultiscaleBases: get_basis_functions
 get_basis_functions(V::StabilizedMultiScaleFESpace) = V.basis_vec_ms
+
+end
