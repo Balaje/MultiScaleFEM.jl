@@ -22,16 +22,31 @@ domain = (0.0, 1.0, 0.0, 1.0);
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^7;
-  nc = 2^4;
-  p = 1;
-  l = 5; # Patch size parameter
+  nc = 2^2;
+  p = 0;
+  l = 1; # Patch size parameter
 end
 # A(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1
-A(x) = 1.0
+# A(x) = 1.0
+# Random field
+
+epsilon = 2^5
+repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
+a₁,b₁ = (0.5,1.5)
+if(mpi_rank==0)
+  # rand_vals = rand(epsilon^2);
+  rand_vals = ones(epsilon^2)  
+else
+  rand_vals = zeros(epsilon^2);
+end
+MPI.Bcast!(rand_vals, 0, comm)
+vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
+
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]); #sin(3π*x[1])*sin(5π*x[2])
 
 # Background fine scale discretization
 FineScale = FineTriangulation(domain, nf);
+A = CellField(vec(vals_epsilon), FineScale.trian)
 reffe = ReferenceFE(lagrangian, Float64, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
 K = assemble_stima(V₀, A, 4);
@@ -47,12 +62,17 @@ L = assemble_rect_matrix(Ωₘₛ, p);
 
 Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 basis_vec_ms = Vₘₛ.basis_vec_ms;
+γ = StabilizedMultiScaleFESpace(basis_vec_ms, Ωₘₛ, p, V₀, (K, L, Λ), domain);
 Ks, Ls, Λs = Vₘₛ.fine_scale_system;
 
 (mpi_rank == 0) && println("Computing basis functions...")
 t1 = MPI.Wtime()
 B = zero(L)
 build_basis_functions!((B,), (Vₘₛ,), comm);
+elem_to_dof(x) = (p+1)^2*x-(p+1)^2+1
+@showprogress for i=1:num_cells(Ωₘₛ.Ωc.trian)
+  B[:, elem_to_dof(i)] = γ[i]
+end
 t2 = MPI.Wtime()
 (mpi_rank == 0) && println("Elasped time = $(t2-t1)\n");
 
@@ -75,7 +95,7 @@ if(mpi_rank == 0)
   dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
   L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
   H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
-  println("$L²Error, $H¹Error")
+  println("$L²Error $H¹Error;")
 end
 
 # # # Multiscale Stiffness and RHS

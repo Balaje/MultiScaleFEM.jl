@@ -1,34 +1,20 @@
+using MultiscaleFEM
+using Gridap
+using SparseArrays
+using SplitApplyCombine
 using LazyArrays
 using MultiscaleFEM.MultiscaleBases
+using LinearAlgebra
 
-domain = (0.0, 1.0, 0.0, 1.0);
+using MPI
+comm = MPI.COMM_WORLD
+MPI.Init()
+mpi_size = MPI.Comm_size(comm)
+mpi_rank = MPI.Comm_rank(comm)
 
-
-nf = 2^7;
-nc = 2^2;
-p = 1;
-l = 5; # Patch size parameter
-
-# Background fine scale discretization
-FineScale = FineTriangulation(domain, nf);
-reffe = ReferenceFE(lagrangian, Float64, 1);
-
-# Coarse scale discretization
-CoarseScale = CoarseTriangulation(domain, nc, l);
-
-# Multiscale Triangulation
-Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
-
-Ωc = Ωₘₛ.Ωc
-num_coarse_cells = nc^2
-patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
-                    lazy_fill(Ωc.trian, num_coarse_cells), 
-                    lazy_fill(Ωc.tree, num_coarse_cells), 
-                    lazy_fill(1, num_coarse_cells), 
-                    1:num_coarse_cells);
-
-σ_coarse = Gridap.Geometry.get_cell_node_ids(Ωc.trian);
-patch_node_ids = lazy_map(Broadcasting(Reindex(σ_coarse)), patch_coarse_elems);
+"""
+A distance metric to check whether the elements are connected.
+"""
 function dist_fun(x::AbstractVector, y)
   dist = abs(x[1] - y)
   for i=1:lastindex(x), j=1:lastindex(y)
@@ -37,14 +23,18 @@ function dist_fun(x::AbstractVector, y)
   dist
 end
 
+"""
+Let K be the element we are interested in. 
+Function to return the element indices in the patch of K contributing to the basis functions on K
+(Could be simplified)
+"""
 function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain) 
-  nc = num_cells(Ωc.trian) 
-  num_coarse_cells = nc^2
+  num_coarse_cells = num_cells(Ωc.trian)
   patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
-                                    lazy_fill(Ωc.trian, num_coarse_cells), 
-                                    lazy_fill(Ωc.tree, num_coarse_cells), 
-                                    lazy_fill(1, num_coarse_cells), 
-                                    1:num_coarse_cells);
+                        lazy_fill(Ωc.trian, num_coarse_cells), 
+                        lazy_fill(Ωc.tree, num_coarse_cells), 
+                        lazy_fill(1, num_coarse_cells), 
+                        1:num_coarse_cells);
   σ_coarse = Gridap.Geometry.get_cell_node_ids(Ωc.trian);
   cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian);
   patch_node_ids = lazy_map(Broadcasting(Reindex(σ_coarse)), patch_coarse_elems);
@@ -55,8 +45,6 @@ function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain)
       node_ids = patch_node_ids[el]
       el_node_ids = node_ids[5]      
       distances = dist_fun.(node_ids, Ref(el_node_ids[i]))      
-      # el_ids[:,i] = setdiff(patch_coarse_elems[el][findall(distances .≈ 0)], el)
-      # el_ids_local[:,i] = sort(setdiff(1:4, i), rev=true)
       el_ids[:,i] = patch_coarse_elems[el][findall(distances .≈ 0)]      
       el_ids_local[:,i] = sort(1:4, rev=true)
     end    
@@ -86,8 +74,6 @@ function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain)
     el_node_ids = node_ids[local_el][local_inds]                   
     for (i,j)=zip(1:4,local_inds)      
       distances = dist_fun.(node_ids, Ref(el_node_ids[i]))            
-      # el_ids[:,i] = setdiff(patch_coarse_elems[el][findall(distances .≈ 0)], el)
-      # el_ids_local[:,i] = sort(setdiff(1:4, j), rev=true)
       el_ids[:,i] = patch_coarse_elems[el][findall(distances .≈ 0)]      
       el_ids_local[:,i] = sort(1:4, rev=true)
     end
@@ -97,7 +83,7 @@ function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain)
     cell_coord = cell_coords[el]  
     x_coord_1, y_coord_1 = cell_coord[1]; x_coord_4, y_coord_4 = cell_coord[4]
     x_coord_2, y_coord_2 = cell_coord[2]; x_coord_3, y_coord_3 = cell_coord[3]
-
+    
     if((x_coord_1,y_coord_1)==(domain[1],domain[3]))
       local_inds = 4
       local_el = 1
@@ -111,26 +97,38 @@ function find_elements_in_patch(Ωc::CoarseTriangulation, el::Integer, domain)
       local_inds = 1
       local_el = 4
     end
-
+    
     node_ids = patch_node_ids[el]
     el_node_ids = node_ids[local_el][local_inds]
-    distances = dist_fun.(node_ids, Ref(el_node_ids))
-    # el_ids = setdiff(patch_coarse_elems[el][findall(distances .≈ 0)], el)
-    # el_ids_local = sort(setdiff(1:4, local_inds), rev=true)    
+    distances = dist_fun.(node_ids, Ref(el_node_ids))  
     el_ids = patch_coarse_elems[el][findall(distances .≈ 0)]      
     el_ids_local = sort(1:4, rev=true)
     return reshape(el_ids,:,1), reshape(el_ids_local,:,1)
   end
 end
 
+"""
+The 2D basis function on the reference domain
+"""
 function ϕᵣ(x)    
-  if((-1 < x[1] <= 1) && (-1 < x[2] <= 1) )
-    return (1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2]))
+  if((-1 <= x[1] <= 1) && (-1 <= x[2] <= 1) )
+    return [1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
   else
-    return (0.0, 0.0, 0.0, 0.0)
+    return [0.0, 0.0, 0.0, 0.0]
   end
 end
 
+function ϕᵣ¹(x)    
+  if((-1 < x[1] <= 1) && (-1 <= x[2] < 1) )
+    return [1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
+  else
+    return [0.0, 0.0, 0.0, 0.0]
+  end
+end
+
+"""
+Transform the physical coordinate to the reference domain
+"""
 function χ(x, cell_coord)  
   x₁,x₂ = cell_coord[1][1], cell_coord[4][1]
   y₁,y₂ = cell_coord[2][2], cell_coord[3][2]
@@ -139,17 +137,288 @@ function χ(x, cell_coord)
   (x̂, ŷ)
 end
 
-function ϕ(x, Ωc::CoarseTriangulation, el, domain, lel)
-  cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian);
-  global_elem_ids, local_node_ids = find_elements_in_patch(Ωc, el, domain)
+"""
+The ιₖ(x) function for an element k
+"""
+function ιₖ(x, Ωc::CoarseTriangulation, global_local_ids)
+  cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian);  
+  global_elem_ids, local_node_ids =  global_local_ids
   M, N = size(global_elem_ids)
-  res = zeros(Float64, M, N)
-  # res = 0.0
-  for j=1:N
-    for i=1:M
-      cell_coord = cell_coords[global_elem_ids[i,j]]     
-      res[i,j] += (ϕᵣ(χ(x, cell_coord)))[local_node_ids[i,j]]         
-    end
+  res = zeros(Float64, M, N)  
+  for j=1:N, i=1:M
+    cell_coord = cell_coords[global_elem_ids[i,j]]     
+    res[i,j] += (ϕᵣ(χ(x, cell_coord)))[local_node_ids[i,j]]    
   end
-  sum(res[:,lel])
+  0.25*vec(res) 
 end
+
+function ιₖ¹(x, Ωc::CoarseTriangulation, global_local_ids)
+  cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian); 
+  global_elem_ids, local_node_ids =  global_local_ids
+  M, N = size(global_elem_ids)
+  res = zeros(Float64, M, N)  
+  for j=1:N, i=1:M
+    cell_coord = cell_coords[global_elem_ids[i,j]]     
+    res[i,j] += (ϕᵣ¹(χ(x, cell_coord)))[local_node_ids[i,j]]    
+  end
+  0.25*vec(res) 
+end
+
+"""
+Return the cell-wise lazy array of (1-Cˡ)ιₖ
+"""
+function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain)
+  # Coarse Scale
+  Ωc = Ωms.Ωc
+  coarse_trian = Ωc.trian  
+  num_coarse_cells = num_cells(coarse_trian)  
+  n_monomials = (p+1)^2
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  coarse_dof_vec = lazy_map(Broadcasting(elem_to_dof), get_coarse_scale_patch_coarse_elem_ids(Ωms));
+  coarse_dofs_mat = BroadcastVector(combinedims, coarse_dof_vec)
+  coarse_dofs = BroadcastVector(vec, coarse_dofs_mat)    
+  
+  # Fine Triangulation
+  Ωf = Ωms.Ωf.trian
+  σ_fine = Gridap.Geometry.get_cell_node_ids(Ωf) |> vec
+  num_fine_cells = num_cells(Ωf)  
+    
+  # 1) Get the element-wise map between the coarse and fine-scales
+  nsteps = (num_fine_cells/num_coarse_cells) |> sqrt |> log2 |> Int64
+  coarse_to_fine_elems = coarsen(num_fine_cells, nsteps) |> vec
+
+  elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
+  elem_fine_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)  
+
+  Qₕ = CellQuadrature(Ωf, 4);
+  du = get_trial_fe_basis(Uh); dv = get_fe_basis(Uh);
+  iwq = ∫( A*∇(du) ⊙ ∇(dv) )Qₕ
+  
+  # Extract the fine scale matrices
+  K, L = fine_scale_matrices
+  Ks = lazy_fill(K, num_coarse_cells);
+  Ls = lazy_fill(L, num_coarse_cells);  
+
+  patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)                                         
+    
+  P = lazy_fill(patch_interior_fine_scale_dofs, num_coarse_cells)
+  C = lazy_fill(coarse_dofs, num_coarse_cells)
+
+  # Extract the iota function only on the coarse    
+  nds_fine = vec(Gridap.Geometry.get_node_coordinates(Ωf))
+
+
+  function I1(nds_fine, Ωc, global_local_ids) 
+    res = ιₖ.(nds_fine, Ref(Ωc), Ref(global_local_ids))
+    combinedimsview(res,1)  
+  end
+
+  function I2(nds_fine, Ωc, global_local_ids) 
+    res = ιₖ¹.(nds_fine, Ref(Ωc), Ref(global_local_ids))
+    combinedimsview(res,1)  
+  end
+
+  global_local_ids = broadcast(find_elements_in_patch, Ref(Ωc), 1:num_coarse_cells, Ref(domain))
+  println("Computing ι functions on the fine scale ...")
+
+  iota_vals1 = broadcast(I1, Ref(nds_fine), Ref(Ωc), global_local_ids)
+  iota_vals2 = broadcast(I2, Ref(nds_fine), Ref(Ωc), global_local_ids)   
+
+  println("Done.")
+                              
+  _get_elem_contribs(X, inds) = X[inds]
+
+  elem_wise_contribs = broadcast(_get_elem_contribs, lazy_fill(iwq,num_coarse_cells), elem_fine)
+  elem_wise_stima = broadcast(_my_assembler, elem_wise_contribs, elem_fine_node_ids, Ks)                              
+  
+  Ω_ms = lazy_fill(Ωms, num_coarse_cells)
+  domains = lazy_fill(domain, num_coarse_cells)
+  BroadcastVector(_compute_stabilization_term, Ks, Ls, P, C, 
+                  lazy_fill(elem_wise_stima, num_coarse_cells), 
+                  Ω_ms, 1:num_coarse_cells, domains, iota_vals1, iota_vals2)
+end
+
+function _my_assembler(cell_vals, conn_matrix, stima)  
+  res = zero(stima)
+  for i=1:lastindex(cell_vals)
+    res[conn_matrix[i], conn_matrix[i]] += cell_vals[i]
+  end
+  res
+end
+
+"""
+Compute (1-Cˡ)ιₖ function
+"""
+function _compute_stabilization_term(stima, lmat, patch_interior_dofs, 
+                        coarse_dofs, elem_wise_stima, Ωms, el_ind, domain, iota1, iota2)
+  Ωc = Ωms.Ωc
+  fine_trian = Ωms.Ωf.trian  
+  nds_fine = vec(Gridap.Geometry.get_node_coordinates(fine_trian))
+  
+  elems_in_patch = find_elements_in_patch(Ωc, el_ind, domain)[1]
+  
+  elems_in_patch = vec(elems_in_patch)  
+  n = size(elems_in_patch,1)
+  β = spzeros(length(nds_fine))  
+  
+  for i=1:n
+    el = elems_in_patch[i]     
+    
+    # Extract the submatrices from the global matrices
+    patch_stima = stima[patch_interior_dofs[el], patch_interior_dofs[el]]
+    patch_lmat = lmat[patch_interior_dofs[el], coarse_dofs[el]]  
+    
+    # Compute the right hand side of the corrector problem     
+    loadvec = -elem_wise_stima[el]*iota1[:,i] 
+    
+    # Solve the saddle point system
+    Z = spzeros(length(coarse_dofs[el]), length(coarse_dofs[el]))      
+    LHS = [patch_stima patch_lmat; patch_lmat' Z]
+    RHS = [loadvec[patch_interior_dofs[el]]; zeros(length(coarse_dofs[el]))]      
+    SOL = LHS\RHS      
+    
+    # Compute (-Cˡ)ι = Σₖ (-Cˡₖ)ι
+    β[patch_interior_dofs[el]] += SOL[1:length(patch_interior_dofs[el])]      
+  end
+  # iota = ιₖ¹.(nds_fine, Ref(Ωc), Ref(el_ind), Ref(domain))   
+  # iota_mat = combinedims(iota,1)  
+  # Add the iota function to get (1-Cˡ)ι  
+  β += sum(iota2, dims=2)[:,1]
+  β
+end
+
+"""
+Return the cell-wise lazy array of (1-Cˡ)Pₕνₖ
+"""
+function Cˡνₖ(β, Ωms::MultiScaleTriangulation, p::Int64)
+  # β = get_basis_functions(Vms)
+  Ωc = Ωms.Ωc;
+  Cmap = x->_c2d(Ωc, x, p);
+  lazy_C = lazy_map(Cmap, 1:num_cells(Ωc.trian))  
+  num_coarse_cells = num_cells(Ωc.trian) 
+  patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
+                      lazy_fill(Ωc.trian, num_coarse_cells), 
+                      lazy_fill(Ωc.tree, num_coarse_cells), 
+                      lazy_fill(1, num_coarse_cells), 
+                      1:num_coarse_cells);         
+  BroadcastVector(_c_times_basis, lazy_C, lazy_fill(β, num_coarse_cells), 
+                  patch_coarse_elems, lazy_fill(p,  num_coarse_cells), 
+                  1:num_coarse_cells)  
+end
+
+"""
+Compute (1-Cˡ)Pₕνₖ = ∑ₖ ∑ⱼ (cⱼ,ₖ Λ̃ⱼ,ₖ)
+"""
+function _c_times_basis(C, β, patch_coarse_elems, p, el)
+  βi = β[patch_coarse_elems]
+  num_dofs = size(βi[1],2)    
+  n_monomials = (p+1)^2
+  num_cells = Int64(num_dofs/n_monomials)
+  γ = spzeros(Float64, size(βi[1],1), num_cells)  
+  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
+  for i=1:lastindex(βi)
+    patch_coarse_elem = patch_coarse_elems[i]    
+    γ[:, el] += βi[i][:, elem_to_dof(patch_coarse_elem)]*C[:,i]
+  end
+  γ[:,el]
+end
+
+"""
+Coefficients for the νₖ functions
+"""
+function _c2d(Ωc, el, p; T=Float64)
+  num_coarse_cells = num_cells(Ωc.trian) 
+  patch_coarse_elems = BroadcastVector(MultiscaleBases.get_patch_coarse_elem, 
+                      lazy_fill(Ωc.trian, num_coarse_cells), 
+                      lazy_fill(Ωc.tree, num_coarse_cells), 
+                      lazy_fill(1, num_coarse_cells), 
+                      1:num_coarse_cells);  
+  cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian);
+  domain = (cell_coords[1][1][1], cell_coords[end][end][1], cell_coords[1][1][2], cell_coords[end][end][2])
+  cell_coord = cell_coords[el] 
+  Tᵦ⁺ = [-T(1/2) -T(1/2); 
+         -T(1/6) T(1/6)] 
+  Tᵦ⁻ = [-T(1/2) -T(1/2); 
+        -T(1/6) T(1/6)]
+  Tᵢ = [-T(1/2) T(-1) -T(1/2); 
+        -T(1/6) T(0) T(1/6)]  
+  Kᵦ⁰ = [T(2) T(0); 
+        T(0) T(0)]
+  Kᵦᴺ = [T(0) T(2); 
+        T(0) T(0)]
+  Kᵢ = [T(0) T(2) T(0); 
+        T(0) T(0) T(0)]
+  if(length(patch_coarse_elems[el]) == 6)     
+    x_coord_1 = cell_coord[1][1]; x_coord_4 = cell_coord[4][1]
+    y_coord_2 = cell_coord[2][2]; y_coord_3 = cell_coord[3][2]
+    if(x_coord_1 == domain[1]) # LEFT
+      C₁¹ = Kᵦ⁰;  C₁² = Tᵦ⁺
+      C₂¹ = Kᵢ;  C₂² = Tᵢ
+    elseif(x_coord_4 == domain[2]) # RIGHT
+      C₁¹ = Kᵦᴺ; C₁² = Tᵦ⁻
+      C₂¹ = Kᵢ; C₂² = Tᵢ
+    elseif(y_coord_2 == domain[3]) # BOTTOM 
+      C₁¹ = Kᵢ; C₁² = Tᵢ
+      C₂¹ = Kᵦ⁰; C₂² = Tᵦ⁺
+    elseif(y_coord_3 == domain[4]) # TOP
+      C₁¹ = Kᵢ; C₁² = Tᵢ
+      C₂¹ = Kᵦᴺ; C₂² = Tᵦ⁻
+    end
+  elseif(length(patch_coarse_elems[el]) == 4)    
+    x_coord_1, y_coord_1 = cell_coord[1]; x_coord_4, y_coord_4 = cell_coord[4]
+    x_coord_2, y_coord_2 = cell_coord[2]; x_coord_3, y_coord_3 = cell_coord[3]    
+    if((x_coord_1,y_coord_1)==(domain[1],domain[3])) # LEFT
+      C₁¹ = Kᵦ⁰; C₁² = Tᵦ⁺
+      C₂¹ = Kᵦ⁰; C₂² = Tᵦ⁺     
+    elseif((x_coord_2,y_coord_2)==(domain[2],domain[3])) # RIGHT
+      C₁¹ = Kᵦᴺ; C₁² = Tᵦ⁻
+      C₂¹ = Kᵦ⁰; C₂² = Tᵦ⁺
+    elseif((x_coord_3,y_coord_3)==(domain[1],domain[4])) # BOTTOM
+      C₁¹ = Kᵦ⁰; C₁² = Tᵦ⁺  
+      C₂¹ = Kᵦᴺ; C₂² = Tᵦ⁻
+    elseif((x_coord_4,y_coord_4)==(domain[2],domain[4])) # TOP      
+      C₁¹ = Kᵦᴺ; C₁² = Tᵦ⁻
+      C₂¹ = Kᵦᴺ; C₂² = Tᵦ⁻
+    end
+  else
+    C₁¹ = C₂¹ = Kᵢ
+    C₁² = C₂² = Tᵢ
+  end  
+  if(p>=2)
+    Z₁¹ = spzeros(T, p-1, size(C₁¹,2))
+    Z₂¹ = spzeros(T, p-1, size(C₂¹,2))
+    Z₁² = spzeros(T, p-1, size(C₁²,2))
+    Z₂² = spzeros(T, p-1, size(C₂²,2))    
+    C₁¹ = [C₁¹; Z₁¹]
+    C₂¹ = [C₂¹; Z₂¹]
+    C₁² = [C₁²; Z₁²]
+    C₂² = [C₂²; Z₂²]
+  end         
+  res = kron(C₂¹, C₁¹) - kron(C₂², C₁²)  
+  res[1:(p+1)*(p+1),:]/length(patch_coarse_elems[el])
+end
+
+"""
+The stabilized multiscale finite element space in 2d.
+
+StabilizedMultiScaleFESpace(Ωms::MultiScaleTriangulation, 
+                            q::Int64, p::Int64, A::CellField, 
+                            qorder::Int64)
+"""
+struct StabilizedMultiScaleFESpace <: FESpace
+  Ω::MultiScaleTriangulation
+  order::Int64
+  Uh::FESpace
+  basis_vec_ms
+  fine_scale_system
+end
+
+function StabilizedMultiScaleFESpace(α, Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64})
+  K, L = fine_scale_matrices  
+  β = Cˡιₖ(Ωms, p, Uh, (K, L), domain);
+  γ = Cˡνₖ(α, Ωms, p);
+  β + γ
+end
+
+import MultiscaleFEM.get_basis_functions
+get_basis_functions(V::StabilizedMultiScaleFESpace) = V.basis_vec_ms
