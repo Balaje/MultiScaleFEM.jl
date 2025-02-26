@@ -10,7 +10,7 @@ Problem data
 T₁ = Double64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
-Neps = 2^8
+Neps = 2^7
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
 diffusion_micro = 0.2 .+ (1-0.2)*rand(T₁,Neps+1)
 function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) where {T<:Number, T1<:Number}
@@ -93,11 +93,11 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = 2 .^(0:4)
+N = 2 .^(0:5)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
-p = 5;
+p = 1;
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the new multiscale method and compare the convergence rates #
@@ -112,21 +112,32 @@ function fₙ!(cache, tₙ::Float64)
   [basis_vec_ms₂'*loadvec; basis_vec_ms'*loadvec]
 end   
 
-for ntimes = [3]
-for p′ = [p-2,p]
-for l = [N[end]]
+for ntimes = [1]
+for p′ = [p]
+for l = [3,5]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
+    global lw = 1
+    global ls = :dash
+    global isStab = false
     let            
       nc′ = nc
       # Obtain the map between the coarse and fine scale
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices; T=T₁);
+      # Compute the stabilized basis functions
+      # if(nc > 1)
+      #   γ = Cˡιₖ(fine_scale_space, A, p, nc, l; T=T₁);
+      #   basis_vec_ms₁[:, 1:(p+1):(p+1)*nc] = γ;
+      #   global lw = 2
+      #   global ls = :solid
+      #   global isStab = true
+      # end      
 
       # Compute the multiscale basis
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc′, nf, l, (q,p′));
-      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc′, l, patch_indices_to_global_indices, p′; T=T₁, ntimes=ntimes);      
+      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc′, l, patch_indices_to_global_indices, p′; T=T₁, ntimes=ntimes, isStab=isStab);      
 
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
@@ -192,10 +203,10 @@ for l = [N[end]]
     end
   end
   println("Done l = "*string(l))
-  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) L\$^2\$ (l="*string(l)*")", lw=1, ls=:solid)
-  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) Energy (l="*string(l)*")", lw=1, ls=:solid)
-  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
-  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
+  Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) L\$^2\$ (l="*string(l)*")", lw=lw, ls=ls)
+  Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) Energy (l="*string(l)*")", lw=lw, ls=ls)
+  Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2, xaxis=:log2, yaxis=:log10)
+  Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best, xaxis=:log2, yaxis=:log10)
   
   # Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
   # Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);  
@@ -224,6 +235,7 @@ println(" ")
 println("Solving old MS problem...")
 println(" ")
 
+#=
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the old multiscale method and compare the convergence rates #
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
@@ -296,6 +308,7 @@ for l=[N[end]]
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
+=#
 Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 #Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(2.5), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);

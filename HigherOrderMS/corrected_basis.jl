@@ -4,7 +4,7 @@
 include("HigherOrderMS.jl");
 
 function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
-                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64; T=Float64, ntimes=1)                                     
+                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64; T=Float64, ntimes=1, isStab=false)                                     
   ### To build the basis functions
   nf = fine_scale_space.nf
   q = fine_scale_space.q
@@ -13,6 +13,10 @@ function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Functi
   K = assemble_stiffness_matrix(fine_scale_space, D)
   M = assemble_mass_matrix(fine_scale_space, x->1.0)
   β = compute_ms_basis(fine_scale_space, D, p′, nc, l, patch_indices_to_global_indices)  
+  if(nc > 1 && isStab)
+    γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
+    β[:, 1:(p+1):(p+1)*nc] = γ
+  end
   index = 1
   for corr = 1:ntimes
     index_1 = 1
@@ -34,7 +38,7 @@ function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Functi
         index_1 += 1
       end
     end
-    β = norm(basis_vec_ms[:,1])^-1*basis_vec_ms[:,1+(corr-1)*((p′+1)*nc):(corr)*(nc*(p′+1))]
+    β = basis_vec_ms[:,1+(corr-1)*((p′+1)*nc):(corr)*(nc*(p′+1))]
   end
   basis_vec_ms
 end

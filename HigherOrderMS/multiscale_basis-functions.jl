@@ -114,7 +114,7 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
   q = fspace.q
   basis_vec_ms = spzeros(T,q*nf+1,nc) # To store the stabilized basis functions (to return)  
   nds_fine = LinRange(domain...,q*nf+1)
-  K, L, _ = get_saddle_point_problem(fspace, D, p, nc)  
+  K, L, _ = get_saddle_point_problem(fspace, D, p, nc; T=T)  
   # We need this to obtain the 1-patch and the element for the ιₖ component
   elem_coarse = [i+j for i=1:nc, j=0:1]
   nds_coarse = LinRange(domain..., nc+1) 
@@ -163,7 +163,7 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
       bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]
       # Source term
       K[bnodes₁,bnodes₁]/=2            
-      iota = ιₖ.(nds_fine, Ref(P), Ref(u))[fullnodes₁]# ιₖ function on the element
+      iota = ιₖ.(nds_fine, Ref(P), Ref(u); T=T)[fullnodes₁]# ιₖ function on the element
       Kel = K[fullnodes₁, fullnodes₁]             
       loadvec[fullnodes₁] = Kel*iota      
       K[bnodes₁,bnodes₁]*=2  
