@@ -231,13 +231,10 @@ function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_sca
     combinedimsview(res,1)  
   end
 
-  global_local_ids = BroadcastVector(find_elements_in_patch, Ref(Ωc), 1:num_coarse_cells, Ref(domain))
-  println("Computing ι functions on the fine scale ...")
+  global_local_ids = BroadcastVector(find_elements_in_patch, Ref(Ωc), 1:num_coarse_cells, Ref(domain))  
 
   iota_vals1 = BroadcastVector(I1, Ref(nds_fine), Ref(Ωc), global_local_ids)
-  iota_vals2 = BroadcastVector(I2, Ref(nds_fine), Ref(Ωc), global_local_ids)   
-
-  println("Done.")
+  iota_vals2 = BroadcastVector(I2, Ref(nds_fine), Ref(Ωc), global_local_ids)     
                               
   _get_elem_contribs(X, inds) = X[inds]
 
@@ -426,12 +423,22 @@ struct StabilizedMultiScaleFESpace <: FESpace
   fine_scale_system
 end
 
-function StabilizedMultiScaleFESpace(α, Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64}, A)
+function StabilizedMultiScaleFESpace(Vms::T, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64}, A) where T<:FESpace
+  Ωms = Vms.Ω
+  α = get_basis_functions(Vms)
   K, L = fine_scale_matrices  
   β = Cˡιₖ(Ωms, p, Uh, (K, L), domain, A);
-  γ = Cˡνₖ(α, Ωms, p);  
-  basis_vec_ms = β + γ
+  γ = Cˡνₖ(α, Ωms, p);    
+  δ = copy(α)
+  num_coarse_cells = num_cells(Ωms.Ωc.trian)
+  basis_vec_ms = BroadcastVector(_replace_new_basis!, δ, β + γ, p, 1:num_coarse_cells)
   StabilizedMultiScaleFESpace(Ωms, p, Uh, basis_vec_ms, fine_scale_matrices)
+end
+
+function _replace_new_basis!(α, γ, p, i)
+  elem_to_dof(x) = (p+1)^2*x-(p+1)^2+1
+  α[:, elem_to_dof(i)] = γ[:, i]  
+  α
 end
 
 import MultiscaleFEM.MultiscaleBases: get_basis_functions

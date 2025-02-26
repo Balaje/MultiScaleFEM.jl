@@ -294,7 +294,7 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   MultiScaleFESpace(Ωms, p, Uh, βs, (Ks,Ls,Λs))
 end
 
-struct MultiScaleCorrections{T}
+struct MultiScaleCorrections{T} <: FESpace
   Ω::MultiScaleTriangulation
   Vms::T  
   order::Int64  
@@ -305,7 +305,7 @@ end
 """
 Function to obtain the additional corrections for the multiscale basis to improve convergence rates
 """
-function MultiScaleCorrections(Vms::T, p::Int64, fine_scale_matrices) where T <: Union{MultiScaleFESpace, MultiScaleCorrections}
+function MultiScaleCorrections(Vms::T, p::Int64, fine_scale_matrices) where T <: FESpace
   Ωms = Vms.Ω
   Ωc = Ωms.Ωc 
   q = Vms.order  
@@ -388,7 +388,7 @@ function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
     CoarseScale = V.Ω.Ωc
     n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);
     num_cell_counts = zeros(Int32, mpi_size)
-    @showprogress for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+    @showprogress dt=1 desc="Computing..." for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
       B .= B + get_basis_functions(V)[i]  
     end
     BI, BJ, BV = findnz(B);
@@ -405,6 +405,18 @@ function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
     if(mpi_rank == 0)      
       B .= sparse(BI_f, BJ_f, BV_f, size(B)...)
     end
+  end
+  Bs  
+end
+
+function build_basis_functions!(Bs, Vs)  
+  println("Computing basis functions...")
+  for (V,B) in zip(Vs, Bs)
+    CoarseScale = V.Ω.Ωc
+    n_cells = num_cells(CoarseScale.trian);    
+    @showprogress dt=1 desc="Computing..." for i=1:n_cells
+      B .= B + get_basis_functions(V)[i]  
+    end    
   end
   Bs  
 end
