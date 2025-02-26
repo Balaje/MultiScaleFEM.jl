@@ -8,7 +8,7 @@
 
 ### 1D:
 
-The two examples are located in the main folder `HigherOrderMS\`. Run `global-corrected-ms-method.jl` for the method with the additional corrections on the fine scale, i.e., $D\tilde{z}_H \in W_h \subset H^1_0(\Omega) \cap \ker \Pi_H$. This would be **MS Method + Global Method (Corrections)**. Run `local-corrected-ms-method.jl` for the method with the basis for the additional corrrection. This would be **MS Method + MS Method (Corrections)** for the additional corrections. Here is a summary:
+The two examples are located in the main folder `HigherOrderMS/`. Run [`global-corrected-ms-method.jl`](https://github.com/Balaje/MultiScaleFEM.jl/blob/bubble_functions/HigherOrderMS/global-corrected-ms-method.jl) for the method with the additional corrections on the fine scale, i.e., $D\tilde{z}_H \in W_h \subset H^1_0(\Omega) \cap \ker \Pi_H$. This would be **MS Method + Global Method (Corrections)**. Run [`local-corrected-ms-method.jl`](https://github.com/Balaje/MultiScaleFEM.jl/blob/bubble_functions/HigherOrderMS/local-corrected-ms-method.jl) for the method with the basis for the additional corrrection. This would be **MS Method + MS Method (Corrections)** for the additional corrections. Here is a summary:
 
 File | Additional Corrections | Stabilization |
 --- | --- | --- |
@@ -23,7 +23,7 @@ Oscillatory Diffusion (p=1) | Oscillatory Diffusion (p=3) |
 
 ### 2D:
 
-The examples are located in `HigherOrderMS_2d/examples/2d_examples/`. Run `2d_Heat.jl` for the method without the additional corrections. So, this would just be the **MS Method $\pm$ Stabilization**. Run `2d_Heat_Corrected.jl` for the method with the additional corrections with/without stabilization. This would be method that we are interested in: **MS Method + MS Method (Corrections) $\pm$ Stabilization**. I left comments about how to enable/disable the stabilization part. Here is a summary:
+The examples are located in `HigherOrderMS_2d/examples/2d_examples/`. Run [`2d_Heat.jl`](https://github.com/Balaje/MultiScaleFEM.jl/blob/bubble_functions/HigherOrderMS_2d/examples/2d_examples/2d_Heat.jl) for the method without the additional corrections. So, this would just be the **MS Method $\pm$ Stabilization**. Run [`2d_Heat_Corrected.jl`](https://github.com/Balaje/MultiScaleFEM.jl/blob/bubble_functions/HigherOrderMS_2d/examples/2d_examples/2d_Heat_Corrected.jl) for the method with the additional corrections with/without stabilization. This would be method that we are interested in: **MS Method + MS Method (Corrections) $\pm$ Stabilization**. I left comments about how to enable/disable the stabilization part. Here is a summary:
 
 File | Additional Corrections | Stabilization |
 --- | --- | --- |
@@ -38,7 +38,7 @@ Poisson Equation | Heat Equation |
 
 ## What's missing?
 
-- In 1D, the stabilization part is available only in the Poisson problem code `(1d_rate_of_convergence_Poisson.jl)`.
+- In 1D, the stabilization part is available only in the Poisson problem code [`1d_rate_of_convergence_Poisson.jl`](https://github.com/Balaje/MultiScaleFEM.jl/blob/bubble_functions/HigherOrderMS/1d_rate_of_convergence_Poisson.jl).
 - High-precision arithmetic for 2D.
 - Better Documentation.
 - Merge the 1D and 2D implementation into a single package. The 2D version is already in the form of a package, and the 1D version simply needs to be moved in. (Optional for now.)
