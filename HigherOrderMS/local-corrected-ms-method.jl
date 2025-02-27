@@ -7,12 +7,12 @@ plt1 = Plots.plot();
 #=
 Problem data
 =#
-T₁ = Double64
+T₁ = Float64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
 Neps = 2^7
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.2 .+ (1-0.2)*rand(T₁,Neps+1)
+diffusion_micro = 0.5 .+ (1-0.5)*rand(T₁,Neps+1)
 function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) where {T<:Number, T1<:Number}
   n = size(nds_micro, 1)
   for i=1:n
@@ -37,7 +37,7 @@ u₀(x) = T₁(0.0)
 # u₀(x) = sin(π*x[1])
 
 # Problem parameters
-nf = 2^9
+nf = 2^11
 q = 1
 qorder = 6
 # Temporal parameters
@@ -93,7 +93,7 @@ println(" ")
 println("Solving new MS problem...")
 println(" ")
 
-N = 2 .^(0:5)
+N = 2 .^(0:6)
 # Create empty plots
 plt = Plots.plot();
 plt1 = Plots.plot();
@@ -114,7 +114,7 @@ end
 
 for ntimes = [1]
 for p′ = [p]
-for l = [3,5]
+  for l = [6,7]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -127,6 +127,7 @@ for l = [3,5]
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (q,p));
       global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices; T=T₁);
       # Compute the stabilized basis functions
+      # Comment out the `if` statement if you do not want stabilization.
       # if(nc > 1)
       #   γ = Cˡιₖ(fine_scale_space, A, p, nc, l; T=T₁);
       #   basis_vec_ms₁[:, 1:(p+1):(p+1)*nc] = γ;
@@ -235,7 +236,6 @@ println(" ")
 println("Solving old MS problem...")
 println(" ")
 
-#=
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
 # Begin solving using the old multiscale method and compare the convergence rates #
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### ###### 
@@ -249,7 +249,7 @@ function fₙ!(cache, tₙ::Float64)
   basis_vec_ms'*loadvec
 end   
 
-for l=[N[end]]
+for l = [6,7]
   fill!(L²Error, 0.0)
   fill!(H¹Error, 0.0)
   for (nc,itr) in zip(N, 1:lastindex(N))
@@ -308,7 +308,6 @@ for l=[N[end]]
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best)
 end 
-=#
 Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
 #Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(2.5), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
