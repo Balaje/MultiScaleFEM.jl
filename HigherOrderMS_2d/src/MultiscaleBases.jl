@@ -294,6 +294,11 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   MultiScaleFESpace(Ωms, p, Uh, βs, (Ks,Ls,Λs))
 end
 
+import Base.collect
+function collect(X::MultiScaleFESpace)
+  MultiScaleFESpace(X.Ω, X.order, X.Uh, collect(X.basis_vec_ms), X.fine_scale_system)
+end
+
 struct MultiScaleCorrections{T} <: FESpace
   Ω::MultiScaleTriangulation
   Vms::T  

@@ -62,11 +62,11 @@ L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 
 # Multiscale Space without stabilization
-γₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
+# γₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ)) |> collect;
 
 # # Multiscale Space with the stabilization
-# Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
-# γₘₛ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, A);
+Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ)) |> collect;
+γₘₛ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, A);
 
 # Multiscale Additional Corrections for the heat equation
 Wₘₛ = MultiScaleCorrections(γₘₛ, p, (K, L, M, L)); 

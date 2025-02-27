@@ -3,8 +3,8 @@
 ###### ######## ######## ######## ######## ######## # 
 
 # Run this the first time
-# using Pkg
-# Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 
 using Gridap
 using MultiscaleFEM
@@ -14,9 +14,9 @@ using ProgressMeter
 domain = (0.0, 1.0, 0.0, 1.0);
 
 nf = 2^7; # Fine scale discretization 
-nc = 2^1; # Coarse scale discretization
+nc = 2^4; # Coarse scale discretization
 p = 1; # Polynomial order
-l = 1; # Patch size parameter
+l = 4; # Patch size parameter
 
 # Fine Scale discretization
 FineScale = FineTriangulation(domain, nf);
@@ -28,7 +28,7 @@ a₁,b₁ = (0.5,1.5)
 rand_vals = rand(epsilon^2);
 vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
 # Diffusion Coefficient
-A = CellField(vec(vals_epsilon), FineScale.trian)
+D = CellField(vec(vals_epsilon), FineScale.trian)
 
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]);
 
@@ -42,7 +42,7 @@ CoarseScale = CoarseTriangulation(domain, nc, l);
 Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
 
 # Assemble the fine-scale matrices
-K = assemble_stima(V₀, A, 4);
+K = assemble_stima(V₀, D, 4);
 L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 F = assemble_loadvec(V₀, f, 4);
@@ -51,8 +51,9 @@ F = assemble_loadvec(V₀, f, 4);
 # γ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 
 # Multiscale space along with stabilization
-Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
-γ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, A);
+Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ)) |> collect;
+# Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
+γ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, D);
 
 # Convert the cell-wise basis function to a sparse matrix
 B = zero(L)
@@ -63,21 +64,21 @@ Kₘₛ = assemble_ms_matrix(B, K);
 Fₘₛ = assemble_ms_loadvec(B, F);
 solₘₛ = Kₘₛ\Fₘₛ;
 Uₘₛ = B*solₘₛ;
-Uₘₛʰ = FEFunction(Vₘₛ.Uh, Uₘₛ);      
+Uₘₛʰ = FEFunction(γ.Uh, Uₘₛ);      
   
 # Reference solution
 Vh = TestFESpace(Ωₘₛ.Ωf.trian, reffe, conformity=:H1, dirichlet_tags="boundary");
 Vh0 = TrialFESpace(Vh, 0.0);
 dΩ = Measure(Ωₘₛ.Ωf.trian, 5);
-a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ;
+a(u,v) = ∫(D*(∇(v)⊙∇(u)))dΩ;
 b(v) = ∫(v*f)dΩ;
 op = AffineFEOperator(a,b,Vh0,Vh);
 Uex = solve(op);
 
 # Compute the L²-and-H¹- Errors
-dΩ = Measure(get_triangulation(Vₘₛ.Uh), 4);
+dΩ = Measure(get_triangulation(γ.Uh), 4);
 L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
-H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
+H¹Error = sqrt(sum( ∫(D*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(D*∇(Uex)⊙∇(Uex))dΩ ))
 println("Done computing the solutions...")
 println("L²Error    H¹Error:")
 println("$L²Error   $H¹Error;")
