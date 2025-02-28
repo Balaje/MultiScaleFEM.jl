@@ -2,6 +2,10 @@
 # Program to test the multiscale basis computation #
 ###### ######## ######## ######## ######## ######### 
 
+# Run this the first time
+using Pkg
+Pkg.activate(".")
+
 using Gridap
 using MultiscaleFEM
 using SparseArrays
@@ -26,7 +30,7 @@ BDF = 4
 nf = 2^7;
 nc = 2^4;
 p = 1;
-l = 6; # Patch size parameter
+l = 2; # Patch size parameter
 
 f(x,t) = 2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))
 u₀(x) = 0.0
@@ -173,8 +177,4 @@ dΩ = Measure(get_triangulation(γₘₛ.Uh), 4);
 L²Error = sqrt(sum( ∫((Uₘₛʰ - Uex)*(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫((Uex)*(Uex))dΩ ))
 H¹Error = sqrt(sum( ∫(A*∇(Uₘₛʰ - Uex)⊙∇(Uₘₛʰ - Uex))dΩ ))/sqrt(sum( ∫(A*∇(Uex)⊙∇(Uex))dΩ ))
 println("Done computing the solutions...")
-println("$p, $nc, $l, $L²Error, $H¹Error;")
-data = (p, nc, l, L²Error, H¹Error)
-open("./2d_Heat_Corrected.txt", "a") do io
-  writedlm(io, [data])
-end
+println("$p \t $nc \t $l \t $L²Error \t $H¹Error")

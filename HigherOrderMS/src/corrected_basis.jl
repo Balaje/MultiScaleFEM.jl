@@ -1,9 +1,7 @@
 ##### ###### ###### ###### ###### ###### ###### ###### #
 # Program to implement the corrected basis function
 ##### ###### ###### ###### ###### ###### ###### ###### #
-include("HigherOrderMS.jl");
-
-function compute_l2_orthogonal_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
+function compute_correction_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
                                      patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64; T=Float64, ntimes=1, isStab=false)                                     
   ### To build the basis functions
   nf = fine_scale_space.nf

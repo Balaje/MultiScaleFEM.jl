@@ -1,5 +1,4 @@
-include("HigherOrderMS.jl");
-include("corrected_basis.jl");
+include("./src/HigherOrderMS.jl");
 
 plt = Plots.plot();
 plt1 = Plots.plot();
@@ -128,13 +127,13 @@ for p′ = [p]
       global basis_vec_ms₁ = compute_ms_basis(fine_scale_space, A, p, nc, l, patch_indices_to_global_indices; T=T₁);
       # Compute the stabilized basis functions
       # Comment out the `if` statement if you do not want stabilization.
-      # if(nc > 1)
-      #   γ = Cˡιₖ(fine_scale_space, A, p, nc, l; T=T₁);
-      #   basis_vec_ms₁[:, 1:(p+1):(p+1)*nc] = γ;
-      #   global lw = 2
-      #   global ls = :solid
-      #   global isStab = true
-      # end      
+      if(nc > 1)
+        γ = Cˡιₖ(fine_scale_space, A, p, nc, l; T=T₁);
+        basis_vec_ms₁[:, 1:(p+1):(p+1)*nc] = γ;
+        global lw = 2
+        global ls = :solid
+        global isStab = true
+      end      
 
       # Compute the multiscale basis
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc′, nf, l, (q,p′));
@@ -202,13 +201,17 @@ for p′ = [p]
       # println("nc = "*string(nc)*" cond(Mₘₛ) = "*string(cond(collect(Mₘₛ)))*" cond(Mₘₛ′) = "*string(cond(collect(Mₘₛ′)))*" cond(𝐌) = "*string(cond(SchurComplementMatrix(collect(𝐌 + Δt*𝐊), (nc*(p′+1), nc*(p+1))))))      
       println("nc = $nc, norm(basis_vec_ms₁) = $(norm(basis_vec_ms₁)), norm(basis_vec_ms₂) = $(norm(basis_vec_ms₂))")
     end
+    data = (p, nc, l, L²Error[itr], H¹Error[itr])
+    open("./l2h1errors.txt", "a") do io
+      writedlm(io, [data])
+    end
   end
   println("Done l = "*string(l))
   Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) L\$^2\$ (l="*string(l)*")", lw=lw, ls=ls)
   Plots.plot!(plt1, 1 ./N, H¹Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) Energy (l="*string(l)*")", lw=lw, ls=ls)
   Plots.scatter!(plt, 1 ./N, L²Error, label="", markersize=2, xaxis=:log2, yaxis=:log10)
   Plots.scatter!(plt1, 1 ./N, H¹Error, label="", markersize=2, legend=:best, xaxis=:log2, yaxis=:log10)
-  
+
   # Plots.plot!(plt, 1 ./N, L²Error[1]*(1 ./N).^(p+2), label="Order "*string(p+2), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);
   # Plots.plot!(plt1, 1 ./N, H¹Error[1]*(1 ./N).^(p+3), label="Order "*string(p+3), ls=:dash, lc=:black,  xaxis=:log10, yaxis=:log10);  
 end
@@ -301,6 +304,10 @@ for l = [6,7]
       
       println("Done nc = "*string(nc))
     end    
+    data = (p, nc, l, L²Error[itr], H¹Error[itr])
+    open("./l2h1errors.txt", "a") do io
+      writedlm(io, [data])
+    end
   end  
   println("Done l = "*string(l))
   Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L\$^2\$ (l="*string(l)*")", lw=3, ls=:dash)

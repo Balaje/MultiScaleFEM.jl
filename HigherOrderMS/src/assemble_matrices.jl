@@ -38,7 +38,7 @@ function get_saddle_point_problem(fspace::FineScaleSpace, D::Function, p::Int64,
     end
   end
   # The L² Projection of the Legendre basis
-  Λ = assemble_lm_l2_matrix(nds_coarse, elem_coarse, p)
+  Λ = assemble_lm_matrix(nds_coarse, elem_coarse, p)
   K, L, Λ
 end
 
@@ -70,7 +70,7 @@ end
 """
 Function to assemble the matrix associated with the RHS of the saddle point problem
 """
-function assemble_lm_l2_matrix(nds::AbstractVector{T}, elem::Matrix{Int64}, p::Int64) where T<:Number
+function assemble_lm_matrix(nds::AbstractVector{T}, elem::Matrix{Int64}, p::Int64) where T<:Number
   nc = size(elem,1)  
   l2mat = Diagonal(ones(T,nc*(p+1)))
   index = 1

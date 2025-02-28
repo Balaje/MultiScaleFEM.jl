@@ -14,9 +14,9 @@ using ProgressMeter
 domain = (0.0, 1.0, 0.0, 1.0);
 
 nf = 2^7; # Fine scale discretization 
-nc = 2^4; # Coarse scale discretization
+nc = 2^2; # Coarse scale discretization
 p = 1; # Polynomial order
-l = 4; # Patch size parameter
+l = 1; # Patch size parameter
 
 # Fine Scale discretization
 FineScale = FineTriangulation(domain, nf);
