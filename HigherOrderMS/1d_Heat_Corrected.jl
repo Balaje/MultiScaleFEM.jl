@@ -1,11 +1,9 @@
 include("./src/HigherOrderMS.jl");
 
-plt = Plots.plot();
-plt1 = Plots.plot();
-
 #=
 Problem data
 =#
+
 T₁ = Float64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
@@ -39,7 +37,6 @@ if(length(ARGS)==0)
   l = 5; 
   ntimes = 1;
 end
-
 
 # Temporal discretization parameters
 Δt = 2^-7

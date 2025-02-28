@@ -4,7 +4,9 @@
 
 # Run this the first time
 using Pkg
+
 Pkg.activate(".")
+Pkg.instantiate()
 
 using Gridap
 using MultiscaleFEM
