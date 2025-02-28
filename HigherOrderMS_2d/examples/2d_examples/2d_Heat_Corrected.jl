@@ -27,10 +27,13 @@ BDF = 4
 ##### ##### ##### ##### ##### ##### ##### 
 # Spatial discretization parameters
 ##### ##### ##### ##### ##### ##### ##### 
-nf = 2^7;
-nc = 2^4;
-p = 1;
-l = 2; # Patch size parameter
+(length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
+if(length(ARGS)==0)
+  nf = 2^7;
+  nc = 2^4;
+  p = 1;
+  l = 2; # Patch size parameter
+end
 
 f(x,t) = 2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))
 u₀(x) = 0.0
