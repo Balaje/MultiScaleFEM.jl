@@ -137,7 +137,7 @@ for p′ = [p]
 
       # Compute the multiscale basis
       patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc′, nf, l, (q,p′));
-      global basis_vec_ms₂ = compute_l2_orthogonal_basis(fine_scale_space, A, p, nc′, l, patch_indices_to_global_indices, p′; T=T₁, ntimes=ntimes, isStab=isStab);      
+      global basis_vec_ms₂ = compute_correction_basis(fine_scale_space, A, p, nc′, l, patch_indices_to_global_indices, p′; T=T₁, ntimes=ntimes, isStab=isStab);      
 
       # Assemble the stiffness, mass matrices
       Kₘₛ = basis_vec_ms₁'*stima*basis_vec_ms₁; Mₘₛ = basis_vec_ms₁'*massma*basis_vec_ms₁; 
@@ -202,9 +202,9 @@ for p′ = [p]
       println("nc = $nc, norm(basis_vec_ms₁) = $(norm(basis_vec_ms₁)), norm(basis_vec_ms₂) = $(norm(basis_vec_ms₂))")
     end
     data = (p, nc, l, L²Error[itr], H¹Error[itr])
-    open("./l2h1errors.txt", "a") do io
-      writedlm(io, [data])
-    end
+    # open("./l2h1errors.txt", "a") do io
+    #   writedlm(io, [data])
+    # end
   end
   println("Done l = "*string(l))
   Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*", q="*string(p′)*", j=$ntimes) L\$^2\$ (l="*string(l)*")", lw=lw, ls=ls)
@@ -305,9 +305,9 @@ for l = [6,7]
       println("Done nc = "*string(nc))
     end    
     data = (p, nc, l, L²Error[itr], H¹Error[itr])
-    open("./l2h1errors.txt", "a") do io
-      writedlm(io, [data])
-    end
+    # open("./l2h1errors.txt", "a") do io
+    #   writedlm(io, [data])
+    # end
   end  
   println("Done l = "*string(l))
   Plots.plot!(plt, 1 ./N, L²Error, label="(p="*string(p)*"), L\$^2\$ (l="*string(l)*")", lw=3, ls=:dash)
