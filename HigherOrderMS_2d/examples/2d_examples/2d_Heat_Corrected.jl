@@ -3,12 +3,12 @@
 ###### ######## ######## ######## ######## ######### 
 
 # # Run this the first time
-# using Pkg
-# Pkg.activate(".")
-# Pkg.instantiate()
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
 
-using DoubleFloats
-T₁ = Double64
+using Quadmath
+T₁ = Float128
 
 using Gridap
 using MultiscaleFEM

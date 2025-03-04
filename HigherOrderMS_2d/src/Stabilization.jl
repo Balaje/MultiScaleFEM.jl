@@ -5,7 +5,6 @@ using SparseArrays
 using StaticArrays
 using SplitApplyCombine
 using LazyArrays
-using MPI
 using LinearAlgebra
 
 using MultiscaleFEM.MultiscaleBases: get_basis_functions
@@ -18,7 +17,7 @@ using MultiscaleFEM.MultiscaleBases: get_patch_coarse_elem
 
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
 
-using MPI
+# using MPI
 # comm = MPI.COMM_WORLD
 # MPI.Init()
 # mpi_size = MPI.Comm_size(comm)

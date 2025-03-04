@@ -29,7 +29,7 @@ using LinearAlgebra
 using LazyArrays
 using FillArrays
 using ProgressMeter
-using MPI
+# using MPI
 using FastGaussQuadrature
 
 # Import functions from other modules
@@ -418,35 +418,35 @@ Functions to obtain the basis functions from the object
 get_basis_functions(V::MultiScaleFESpace) = V.basis_vec_ms
 get_basis_functions(V::MultiScaleCorrections) = V.basis_vec_ms
 
-function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
-  mpi_size = MPI.Comm_size(comm)
-  mpi_rank = MPI.Comm_rank(comm)
-  isroot = mpi_rank == 0
-  (mpi_rank==0) && println("Using $mpi_size process(es) to compute the multiscale bases")
-  for (V,B) in zip(Vs, Bs)
-    CoarseScale = V.Ω.Ωc
-    n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);
-    num_cell_counts = zeros(Int32, mpi_size)
-    @showprogress dt=1 desc="Computing..." for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
-      B .= B + get_basis_functions(V)[i]  
-    end
-    BI, BJ, BV = findnz(B);
-    num_cell_counts[mpi_rank+1] = nnz(B)
-    num_cell_counts = MPI.Allreduce(num_cell_counts, MPI.SUM, comm)
-    # Create full vectors to store all the non-zero indices
-    BI_f = zeros(Int64, sum(num_cell_counts))
-    BJ_f = zeros(Int64, sum(num_cell_counts))
-    BV_f = zeros(eltype(B), sum(num_cell_counts))
-    # Gather all the non-zero entries from the different ranks to root
-    MPI.Gatherv!(BI, isroot ? VBuffer(BI_f, num_cell_counts) : nothing, comm; root=0)
-    MPI.Gatherv!(BJ, isroot ? VBuffer(BJ_f, num_cell_counts) : nothing, comm; root=0)
-    MPI.Gatherv!(BV, isroot ? VBuffer(BV_f, num_cell_counts) : nothing, comm; root=0)
-    if(mpi_rank == 0)      
-      B .= sparse(BI_f, BJ_f, BV_f, size(B)...)
-    end
-  end
-  Bs  
-end
+# function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
+#   mpi_size = MPI.Comm_size(comm)
+#   mpi_rank = MPI.Comm_rank(comm)
+#   isroot = mpi_rank == 0
+#   (mpi_rank==0) && println("Using $mpi_size process(es) to compute the multiscale bases")
+#   for (V,B) in zip(Vs, Bs)
+#     CoarseScale = V.Ω.Ωc
+#     n_cells_per_proc = ceil(Int64, num_cells(CoarseScale.trian)/mpi_size);
+#     num_cell_counts = zeros(Int32, mpi_size)
+#     @showprogress dt=1 desc="Computing..." for i=n_cells_per_proc*(mpi_rank)+1:n_cells_per_proc*(mpi_rank+1)
+#       B .= B + get_basis_functions(V)[i]  
+#     end
+#     BI, BJ, BV = findnz(B);
+#     num_cell_counts[mpi_rank+1] = nnz(B)
+#     num_cell_counts = MPI.Allreduce(num_cell_counts, MPI.SUM, comm)
+#     # Create full vectors to store all the non-zero indices
+#     BI_f = zeros(Int64, sum(num_cell_counts))
+#     BJ_f = zeros(Int64, sum(num_cell_counts))
+#     BV_f = zeros(eltype(B), sum(num_cell_counts))
+#     # Gather all the non-zero entries from the different ranks to root
+#     MPI.Gatherv!(BI, isroot ? VBuffer(BI_f, num_cell_counts) : nothing, comm; root=0)
+#     MPI.Gatherv!(BJ, isroot ? VBuffer(BJ_f, num_cell_counts) : nothing, comm; root=0)
+#     MPI.Gatherv!(BV, isroot ? VBuffer(BV_f, num_cell_counts) : nothing, comm; root=0)
+#     if(mpi_rank == 0)      
+#       B .= sparse(BI_f, BJ_f, BV_f, size(B)...)
+#     end
+#   end
+#   Bs  
+# end
 
 function build_basis_functions!(Bs, Vs)  
   println("Computing basis functions...")
