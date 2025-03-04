@@ -2,9 +2,12 @@
 # Program to test the multiscale basis computation  #
 ###### ######## ######## ######## ######## ######## # 
 
-# Run this the first time
-using Pkg
-Pkg.activate(".")
+# # Run this the first time
+# using Pkg
+# Pkg.activate(".")
+
+using DoubleFloats
+T₁ = Double64
 
 using Gridap
 using MultiscaleFEM
@@ -14,7 +17,7 @@ using DelimitedFiles
 
 include("./time-dependent.jl")
 
-domain = (0.0, 1.0, 0.0, 1.0);
+domain = T₁.((0.0, 1.0, 0.0, 1.0));
 
 ##### ##### ##### ##### ##### ##### ##### 
 # Temporal discretization parameters
@@ -29,28 +32,28 @@ BDF = 4
 ##### ##### ##### ##### ##### ##### ##### 
 (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
-  nf = 2^7;
-  nc = 2^4;
+  nf = 2^4;
+  nc = 2^1;
   p = 1;
   l = 2; # Patch size parameter
 end
 
-f(x,t) = 2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))
-u₀(x) = 0.0
+f(x,t) = T₁(2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t)))
+u₀(x) = T₁(0.0)
 
 # Background fine scale discretization
 FineScale = FineTriangulation(domain, nf);
-reffe = ReferenceFE(lagrangian, Float64, 1);
-V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
+reffe = ReferenceFE(lagrangian, T₁, 1);
+V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1; vector_type=Vector{T₁});
 # D(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1 # Oscillatory field
 # D(x) = 1.0 # Constant field
 # A = CellField(D, FineScale.trian)
 
 # Random field
-epsilon = 2^5
+epsilon = 2^2
 repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
-a₁,b₁ = (0.5,1.5)
-rand_vals = ones(epsilon^2)
+a₁,b₁ = T₁.((0.5,1.5))
+rand_vals = ones(T₁,epsilon^2)
 vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
 
 # vals_epsilon = readdlm("./coefficient.txt");
@@ -63,8 +66,8 @@ CoarseScale = CoarseTriangulation(domain, nc, l);
 Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
 
 # Assemble the fine scale matrices
-K = assemble_stima(V₀, A, 4);
-M = assemble_massma(V₀, x->1.0, 4);
+K = assemble_stima(V₀, A, 4; T=T₁);
+M = assemble_massma(V₀, x->1.0, 4; T=T₁);
 L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 
@@ -81,17 +84,17 @@ build_basis_functions!((B,), (γₘₛ,));
 ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
 # Compute the multiscale solution with the BDFk scheme
 ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
-Kₘₛ = assemble_ms_matrix(B, K);
-Mₘₛ = assemble_ms_matrix(B, M);
+Kₘₛ = assemble_ms_matrix(B, K) |> collect;
+Mₘₛ = assemble_ms_matrix(B, M) |> collect;
 
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)
   Vₕ, B = cache
-  L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4)
+  L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4; T=T₁)
   B'*L
 end
 let 
-  U₀ = setup_initial_condition(u₀, B, V₀)  
+  U₀ = setup_initial_condition(u₀, B, V₀; T=T₁)  
   global U = zero(U₀)  
   t = 0.0
   # Starting BDF steps (1...k-1) 
@@ -121,9 +124,9 @@ Uₘₛʰ = FEFunction(γₘₛ.Uh, Uₘₛ);
 # Compute the reference solution with the BDFk scheme
 ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
 println("Computing reference solution ...");
-Vh = TestFESpace(Ωₘₛ.Ωf.trian, reffe, conformity=:H1, dirichlet_tags="boundary");
-Vh0 = TrialFESpace(Vh, 0.0);
-dΩ = Measure(Ωₘₛ.Ωf.trian, 5);
+Vh = TestFESpace(Ωₘₛ.Ωf.trian, reffe, conformity=:H1, dirichlet_tags="boundary"; vector_type=Vector{T₁});
+Vh0 = TrialFESpace(Vh, T₁(0.0));
+dΩ = Measure(Ωₘₛ.Ωf.trian, 5; T=T₁);
 a(u,v) = ∫(A*(∇(v)⊙∇(u)))dΩ;
 m(u,v) = ∫(u⊙v)dΩ;  
 Kₑ  = assemble_matrix(a, Vh0, Vh0);

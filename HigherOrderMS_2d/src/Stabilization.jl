@@ -123,19 +123,21 @@ end
 """
 The 2D basis function on the reference domain
 """
-function ϕᵣ(x)    
+function ϕᵣ(x)
+  el_type = typeof(x[1])    
   if((-1 <= x[1] <= 1) && (-1 <= x[2] <= 1) )
-    return @SVector[1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
+    return @SVector[el_type(1)/el_type(4)*(1-x[1])*(1-x[2]), el_type(1)/el_type(4)*(1+x[1])*(1-x[2]), el_type(1)/el_type(4)*(1-x[1])*(1+x[2]), el_type(1)/el_type(4)*(1+x[1])*(1+x[2])]
   else
-    return @SVector[0.0, 0.0, 0.0, 0.0]
+    return @SVector[el_type(0.0), el_type(0.0), el_type(0.0), el_type(0.0)]
   end
 end
 
 function ϕᵣ¹(x)    
+  el_type = typeof(x[1])
   if((-1 < x[1] <= 1) && (-1 <= x[2] < 1) )
-    return @SVector[1/4*(1-x[1])*(1-x[2]), 1/4*(1+x[1])*(1-x[2]), 1/4*(1-x[1])*(1+x[2]), 1/4*(1+x[1])*(1+x[2])]
+    return @SVector[el_type(1)/el_type(4)*(1-x[1])*(1-x[2]), el_type(1)/el_type(4)*(1+x[1])*(1-x[2]), el_type(1)/el_type(4)*(1-x[1])*(1+x[2]), el_type(1)/el_type(4)*(1+x[1])*(1+x[2])]
   else
-    return @SVector[0.0, 0.0, 0.0, 0.0]
+    return @SVector[el_type(0.0), el_type(0.0), el_type(0.0), el_type(0.0)]
   end
 end
 
@@ -153,11 +155,11 @@ end
 """
 The ιₖ(x) function for an element k
 """
-function ιₖ(x, Ωc::CoarseTriangulation, global_local_ids)
+function ιₖ(x, Ωc::CoarseTriangulation, global_local_ids; T=Float64)
   cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian);  
   global_elem_ids, local_node_ids =  global_local_ids
   M, N = size(global_elem_ids)
-  res = zeros(Float64, M, N)  
+  res = zeros(T, M, N)  
   for j=1:N, i=1:M
     cell_coord = cell_coords[global_elem_ids[i,j]]     
     res[i,j] += (ϕᵣ(χ(x, cell_coord)))[local_node_ids[i,j]]    
@@ -165,11 +167,11 @@ function ιₖ(x, Ωc::CoarseTriangulation, global_local_ids)
   0.25*vec(res) 
 end
 
-function ιₖ¹(x, Ωc::CoarseTriangulation, global_local_ids)
+function ιₖ¹(x, Ωc::CoarseTriangulation, global_local_ids; T=Float64)
   cell_coords = Gridap.Geometry.get_cell_coordinates(Ωc.trian); 
   global_elem_ids, local_node_ids =  global_local_ids
   M, N = size(global_elem_ids)
-  res = zeros(Float64, M, N)  
+  res = zeros(T, M, N)  
   for j=1:N, i=1:M
     cell_coord = cell_coords[global_elem_ids[i,j]]     
     res[i,j] += (ϕᵣ¹(χ(x, cell_coord)))[local_node_ids[i,j]]    
@@ -181,6 +183,7 @@ end
 Return the cell-wise lazy array of (1-Cˡ)ιₖ
 """
 function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_scale_matrices, domain, A)
+  el_type = Ωms.dtype
   # Coarse Scale
   Ωc = Ωms.Ωc
   coarse_trian = Ωc.trian  
@@ -203,7 +206,7 @@ function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_sca
   elem_fine = lazy_map(Broadcasting(Reindex(coarse_to_fine_elems)), 1:num_coarse_cells)
   elem_fine_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)  
 
-  Qₕ = CellQuadrature(Ωf, 4);
+  Qₕ = CellQuadrature(Ωf, 4; T=el_type);
   du = get_trial_fe_basis(Uh); dv = get_fe_basis(Uh);
   iwq = ∫( A*∇(du) ⊙ ∇(dv) )Qₕ
   
@@ -260,7 +263,7 @@ end
 Compute (1-Cˡ)ιₖ function
 """
 function _compute_stabilization_term(stima, lmat, patch_interior_dofs, 
-                        coarse_dofs, elem_wise_stima, Ωms, el_ind, domain, iota1, iota2)
+                        coarse_dofs, elem_wise_stima, Ωms, el_ind, domain, iota1, iota2; T=Float64)
   Ωc = Ωms.Ωc
   fine_trian = Ωms.Ωf.trian  
   nds_fine = vec(Gridap.Geometry.get_node_coordinates(fine_trian))
@@ -269,7 +272,7 @@ function _compute_stabilization_term(stima, lmat, patch_interior_dofs,
   
   elems_in_patch = vec(elems_in_patch)  
   n = size(elems_in_patch,1)
-  β = spzeros(length(nds_fine))  
+  β = spzeros(T,length(nds_fine))  
   
   for i=1:n
     el = elems_in_patch[i]     
@@ -282,9 +285,9 @@ function _compute_stabilization_term(stima, lmat, patch_interior_dofs,
     loadvec = -elem_wise_stima[el]*iota1[:,i] 
     
     # Solve the saddle point system
-    Z = spzeros(length(coarse_dofs[el]), length(coarse_dofs[el]))      
+    Z = spzeros(T, length(coarse_dofs[el]), length(coarse_dofs[el]))      
     LHS = [patch_stima patch_lmat; patch_lmat' Z]
-    RHS = [loadvec[patch_interior_dofs[el]]; zeros(length(coarse_dofs[el]))]      
+    RHS = [loadvec[patch_interior_dofs[el]]; zeros(T, length(coarse_dofs[el]))]      
     SOL = LHS\RHS      
     
     # Compute (-Cˡ)ι = Σₖ (-Cˡₖ)ι
@@ -292,7 +295,7 @@ function _compute_stabilization_term(stima, lmat, patch_interior_dofs,
   end
   # Add the iota function to get (1-Cˡ)ι  
   β += sum(iota2, dims=2)[:,1]
-  res = spzeros(Float64, size(stima,1), num_cells(Ωc.trian))
+  res = spzeros(T, size(stima,1), num_cells(Ωc.trian))
   res[:, el_ind] = β
   res
 end
@@ -319,12 +322,12 @@ end
 """
 Compute (1-Cˡ)Pₕνₖ = ∑ₖ ∑ⱼ (cⱼ,ₖ Λ̃ⱼ,ₖ)
 """
-function _c_times_basis(C, β, patch_coarse_elems, p, el)
+function _c_times_basis(C, β, patch_coarse_elems, p, el; T=Float64)
   βi = β[patch_coarse_elems]
   num_dofs = size(βi[1],2)    
   n_monomials = (p+1)^2
   num_cells = Int64(num_dofs/n_monomials)
-  γ = spzeros(Float64, size(βi[1],1), num_cells)  
+  γ = spzeros(T, size(βi[1],1), num_cells)  
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   for i=1:lastindex(βi)
     patch_coarse_elem = patch_coarse_elems[i]    
@@ -423,7 +426,7 @@ struct StabilizedMultiScaleFESpace <: FESpace
   fine_scale_system
 end
 
-function StabilizedMultiScaleFESpace(Vms::T, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,Float64}, A) where T<:FESpace
+function StabilizedMultiScaleFESpace(Vms::T1, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,T2}, A) where {T1<:FESpace, T2<:Real}
   Ωms = Vms.Ω
   α = get_basis_functions(Vms)
   K, L = fine_scale_matrices  

@@ -4,3 +4,6 @@
 *.vtu
 *.vtk
 *.ipynb_checkpoints/
+*.txt
+Manifest.toml
+*.sh

@@ -3,6 +3,9 @@ Pkg.add("FastGaussQuadrature")
 Pkg.add("DoubleFloats")
 Pkg.add("LaTeXStrings")
 Pkg.add("ColorSchemes")
+Pkg.add("Gridap")
+Pkg.add("DoubleFloats")
+Pkg.add("Plots")
 
 using FastGaussQuadrature
 using LinearAlgebra

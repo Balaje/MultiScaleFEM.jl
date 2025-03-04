@@ -1,6 +1,6 @@
 module MultiscaleBases
 # #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
-# File containing the code to extract the 2d patch and compute the multiscale basis functions  
+# File containing the code to extract the 2 patch and compute the multiscale basis functions  
 # Contains mainly two parts:
 # 1) Some essential functions to extract the patch information
 # 2) Goto Line 154: The main routines:
@@ -45,7 +45,7 @@ lazy_fill(x, n) = Fill(x, n)
 Metric to find the neighbours of the element. Used in BruteTree
 """
 struct ElemDist <: NearestNeighbors.Metric end
-function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector, y::AbstractVector)
+function NearestNeighbors.Distances.evaluate(::ElemDist, x::AbstractVector{T}, y::AbstractVector{T}) where T<:Real
   dist = abs(x[1] - y[1])
   for i=1:lastindex(x), j=1:lastindex(y)
     dist = min(dist, abs(x[i]-y[j]))
@@ -86,38 +86,42 @@ get_patch_global_node_ids(patch_fine_elems, σ_fine) = lazy_map(Broadcasting(Rei
 ######################### END OF ESSENTIAL FUNCTIONS ###############################
 ################## BEGIN INTERFACE FOR THE MULTISCALE BASES COMPUTATION ##################
 
-struct CoarseTriangulation
+struct CoarseTriangulation{T}
   trian::Triangulation
   tree::NNTree
   patch_size::Int64
+  dtype::T
 end
-function CoarseTriangulation(domain::Tuple, nc::Int64, l::Int64)
+function CoarseTriangulation(domain::NTuple{4,T}, nc::Int64, l::Int64) where T<:Real
   model_coarse = CartesianDiscreteModel(domain, (nc,nc))
   Ω_coarse = Triangulation(model_coarse)
   σ_coarse = vec(get_cell_node_ids(Ω_coarse))
   # Store the tree of the coarse mesh for obtaining the patch
   R = vec(map(x->SVector(Tuple(x)), σ_coarse))
   tree = BruteTree(R, ElemDist())
-  CoarseTriangulation(Ω_coarse, tree, l)
+  CoarseTriangulation(Ω_coarse, tree, l, T)
 end
 
-struct FineTriangulation
+struct FineTriangulation{T}
   trian::Triangulation
+  dtype::T
 end
-function FineTriangulation(domain::Tuple, nf::Int64)
+function FineTriangulation(domain::NTuple{4,T}, nf::Int64) where T<:Real
   model = CartesianDiscreteModel(domain, (nf,nf));
   Ω_fine = Triangulation(model);
-  FineTriangulation(Ω_fine)
+  FineTriangulation(Ω_fine, T)
 end
 
 
-struct MultiScaleTriangulation
-  Ωc::CoarseTriangulation
-  Ωf::FineTriangulation
+struct MultiScaleTriangulation{T}
+  Ωc::CoarseTriangulation{T}
+  Ωf::FineTriangulation{T}
   patch_interior_boundary_fine_scale
   patch_local_to_global_map
+  dtype::T
 end
 function MultiScaleTriangulation(coarse_trian::CoarseTriangulation, fine_trian::FineTriangulation)
+  @assert coarse_trian.dtype == fine_trian.dtype "Types need to match"
   # Fine Scale Triangulation
   Ωf = fine_trian.trian
   σ_fine = get_cell_node_ids(Ωf) |> vec
@@ -147,12 +151,11 @@ function MultiScaleTriangulation(coarse_trian::CoarseTriangulation, fine_trian::
   elem_global_node_ids = lazy_map(Broadcasting(Reindex(σ_fine)), elem_fine)
   
   # Return the Object
-  MultiScaleTriangulation(coarse_trian, fine_trian, (interior_global, boundary_global), (patch_coarse_elems, elem_global_node_ids))
+  MultiScaleTriangulation(coarse_trian, fine_trian, (interior_global, boundary_global), (patch_coarse_elems, elem_global_node_ids), coarse_trian.dtype)
 end
 
-function _compute_reference_L(p::Int64, nc::Int64, nf::Int64)
-  ar = Int64(nf/nc)
-  domain = (-1.0, 1.0, -1.0, 1.0)
+function _compute_reference_L(domain::NTuple{4,T}, p::Int64, nc::Int64, nf::Int64) where T<:Real
+  ar = Int64(nf/nc)  
   model = CartesianDiscreteModel(domain, (ar,ar));
   trian = Triangulation(model)
   Vh = TestFESpace(trian, ReferenceFE(lagrangian, Float64, 1), conformity=:H1);
@@ -160,7 +163,7 @@ function _compute_reference_L(p::Int64, nc::Int64, nf::Int64)
   αβ = poly_exps(p) 
   L = zeros(num_nodes(model), n_monomials)
   for i=1:n_monomials
-    b(y) = Λₖ(y, (-1.0,1.0), (-1.0,1.0), p, αβ[i])
+    b(y) = Λₖ(y, (domain[1], domain[2]), (domain[3], domain[4]), p, αβ[i])
     L[:, i] += assemble_loadvec(Vh, b, p+2)
   end
   h = 1/nc
@@ -177,8 +180,10 @@ function assemble_rect_matrix(Ωms::MultiScaleTriangulation, p::Int64)
   n_monomials = (p+1)^2
   elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;
   coarse_dofs = BroadcastVector(elem_to_dof, 1:num_coarse_cells)
-  L = spzeros(Float64, num_nodes(Ωms.Ωf.trian), num_coarse_cells*n_monomials) 
-  σ_ref, L_ref = _compute_reference_L(p, (num_coarse_cells |> sqrt |> Int64), (num_fine_cells |> sqrt |> Int64))  
+  el_type = Ωms.dtype
+  L = spzeros(el_type, num_nodes(Ωms.Ωf.trian), num_coarse_cells*n_monomials)   
+  ref_domain = el_type.((-1.0, 1.0, -1.0, 1.0))
+  σ_ref, L_ref = _compute_reference_L(ref_domain, p, (num_coarse_cells |> sqrt |> Int64), (num_fine_cells |> sqrt |> Int64))  
   X1 = combinedimsview(combinedims.(coarse_to_fine_cell_coords));
   Z1 = combinedimsview(collect(coarse_dofs))
   Z = combinedimsview(σ_ref)  
@@ -192,13 +197,14 @@ end
 Function to assemble the inner product between the Legendre polynomials on the coarse mesh
 """
 function assemble_lm_l2_matrix(Ωms::MultiScaleTriangulation, p::Int64)  
+  el_type = Ωms.dtype
   coarse_trian = Ωms.Ωc.trian  
   n = 2p+1
-  xq, wq = gausslegendre(n)
+  xq, wq = _gausslegendre(n, T=el_type)
   coarse_cell_coords = get_cell_coordinates(coarse_trian)
   num_coarse_cells = num_cells(coarse_trian)
   n_monomials = (p+1)^2
-  l2mat = zeros(Float64,num_coarse_cells*n_monomials,num_coarse_cells*n_monomials)
+  l2mat = zeros(el_type,num_coarse_cells*n_monomials,num_coarse_cells*n_monomials)
   index = 1
   αβ = poly_exps(p)
   for t=1:num_coarse_cells
@@ -217,6 +223,30 @@ function assemble_lm_l2_matrix(Ωms::MultiScaleTriangulation, p::Int64)
     index = index + n_monomials
   end
   l2mat
+end
+@inline function _gausslegendre(n::Integer; T=Float64)
+  if n < 0
+      throw(DomainError(n, "Input n must be a non-negative integer"))
+  elseif n == 0
+      return T[], T[]
+  elseif n == 1
+      return T[0.0], T[2.0]
+  elseif n == 2
+      return [-1 / sqrt(T(3)), 1 / sqrt(T(3))], T[1.0, 1.0]
+  elseif n == 3
+      return [-sqrt(T(3) / T(5)), 0.0, sqrt(T(3) / T(5))], [T(5) / T(9), T(8) / T(9), T(5) / T(9)]
+  elseif n == 4
+      a = T(2) / T(7) * sqrt(T(6) / T(5))
+      return ([-sqrt(T(3) / T(7) + a), -sqrt(T(3)/T(7)-a), sqrt(T(3)/T(7)-a), sqrt(T(3)/T(7)+a)],
+       [(18 - sqrt(T(30))) / 36, (18 + sqrt(T(30))) / 36,
+        (18 + sqrt(T(30))) / 36, (18 - sqrt(T(30))) / 36])
+  elseif n ≥ 5
+      b = 2 * sqrt(T(10) / T(7))
+      return ([-sqrt(5 + b) / 3, -sqrt(5 - b) / 3, T(0.0),
+        sqrt(5 - b) / 3, sqrt(5 + b) / 3],
+       [(322 - 13 * sqrt(70)) / 900, (322 + 13 * sqrt(70)) / 900, 128 / 225,
+        (322 + 13 * sqrt(70)) / 900, (322 - 13 * sqrt(70)) / 900])
+  end
 end
 
 """
@@ -341,22 +371,26 @@ function MultiScaleCorrections(Vms::T, p::Int64, fine_scale_matrices) where T <:
   MultiScaleCorrections(Ωms, Vms, q, γs, fine_scale_matrices)
 end
 
-function build_global_sparse_matrix_from_basis(B::AbstractVecOrMat{Float64}, Ms, Ns, shape::NTuple{2,Int64})
-  Is = Ms' .* ones(length(Ns))
-  Js = ones(length(Ms))' .* Ns
+function collect(X::MultiScaleCorrections)
+  MultiScaleFESpace(X.Ω, X.order, X.Uh, collect(X.basis_vec_ms), X.fine_scale_system)
+end
+
+function build_global_sparse_matrix_from_basis(B::AbstractVecOrMat{T}, Ms, Ns, shape::NTuple{2,Int64}) where T<:Real
+  Is = Ms' .* ones(Int64,length(Ns))
+  Js = ones(Int64,length(Ms))' .* Ns
   sparse(vec(Is), vec(Js), vec(B'), shape...)  
 end
 
 """
 Function to obtain the multiscale bases functions
 """
-function get_ms_bases(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float64}, rhsmat::AbstractMatrix{Float64}, interior_dofs, coarse_dofs, legendre_poly)
+function get_ms_bases(stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
   patch_rhs = rhsmat[coarse_dofs, legendre_poly]
   # solve_schur_complement(patch_stima, patch_lmat, patch_rhs)
-  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(length(coarse_dofs), length(coarse_dofs))]
-  RHS = [zeros(length(interior_dofs), length(legendre_poly)); patch_rhs]
+  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(T, length(coarse_dofs), length(coarse_dofs))]
+  RHS = [zeros(T, length(interior_dofs), length(legendre_poly)); patch_rhs]
   SOL = LHS\RHS
   res = SOL[1:length(interior_dofs), :]
   res
@@ -365,13 +399,13 @@ end
 """
 Function to obtain the multiscale bases corrections
 """
-function get_ms_bases_corrections(stima::AbstractMatrix{Float64}, lmat::AbstractMatrix{Float64}, massma::AbstractMatrix{Float64}, rhsmat::AbstractMatrix{Float64}, interior_dofs, coarse_dofs, legendre_poly)
+function get_ms_bases_corrections(stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, massma::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
   patch_rhs_1 = collect(massma[interior_dofs, interior_dofs]*rhsmat[interior_dofs, legendre_poly])
-  patch_rhs_2 = zeros(length(coarse_dofs), length(legendre_poly))  
+  patch_rhs_2 = zeros(T, length(coarse_dofs), length(legendre_poly))  
   # solve_schur_complement(patch_stima, patch_lmat, patch_rhs_1, patch_rhs_2)
-  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(length(coarse_dofs), length(coarse_dofs))]
+  LHS = [patch_stima patch_lmat; patch_lmat' spzeros(T, length(coarse_dofs), length(coarse_dofs))]
   RHS = [patch_rhs_1; patch_rhs_2]
   SOL = LHS\RHS
   res = SOL[1:length(interior_dofs), :]
@@ -402,7 +436,7 @@ function build_basis_functions!(Bs, Vs, comm::MPI.Comm)
     # Create full vectors to store all the non-zero indices
     BI_f = zeros(Int64, sum(num_cell_counts))
     BJ_f = zeros(Int64, sum(num_cell_counts))
-    BV_f = zeros(Float64, sum(num_cell_counts))
+    BV_f = zeros(eltype(B), sum(num_cell_counts))
     # Gather all the non-zero entries from the different ranks to root
     MPI.Gatherv!(BI, isroot ? VBuffer(BI_f, num_cell_counts) : nothing, comm; root=0)
     MPI.Gatherv!(BJ, isroot ? VBuffer(BJ_f, num_cell_counts) : nothing, comm; root=0)

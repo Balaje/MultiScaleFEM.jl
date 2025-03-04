@@ -2,21 +2,27 @@
 # Program to test the multiscale basis computation  #
 ###### ######## ######## ######## ######## ######## # 
 
-# Run this the first time
-using Pkg
-Pkg.activate(".")
+# # Run this the first time
+# using Pkg
+# Pkg.activate(".")
+
+using DoubleFloats
+T₁ = Double64
 
 using Gridap
 using MultiscaleFEM
 using SparseArrays
 using ProgressMeter
 
-domain = (0.0, 1.0, 0.0, 1.0);
+domain = T₁.((0.0, 1.0, 0.0, 1.0));
 
-nf = 2^7; # Fine scale discretization 
-nc = 2^2; # Coarse scale discretization
-p = 1; # Polynomial order
-l = 1; # Patch size parameter
+(length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
+if(length(ARGS)==0)
+  nf = 2^6;
+  nc = 2^1;
+  p = 1;
+  l = 1; # Patch size parameter
+end
 
 # Fine Scale discretization
 FineScale = FineTriangulation(domain, nf);
@@ -24,16 +30,16 @@ FineScale = FineTriangulation(domain, nf);
 # Random field
 epsilon = 2^5
 repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
-a₁,b₁ = (0.5,1.5)
-rand_vals = rand(epsilon^2);
+a₁,b₁ = T₁.((0.5,1.5))
+rand_vals = ones(T₁,epsilon^2)
 vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)), inner=repeat_dims)
 # Diffusion Coefficient
 D = CellField(vec(vals_epsilon), FineScale.trian)
 
 f(x) = 2π^2*sin(π*x[1])*sin(π*x[2]);
 
-reffe = ReferenceFE(lagrangian, Float64, 1);
-V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1);
+reffe = ReferenceFE(lagrangian, T₁, 1);
+V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1; vector_type=Vector{T₁});
 
 # Coarse scale discretization
 CoarseScale = CoarseTriangulation(domain, nc, l);
@@ -42,16 +48,16 @@ CoarseScale = CoarseTriangulation(domain, nc, l);
 Ωₘₛ = MultiScaleTriangulation(CoarseScale, FineScale);
 
 # Assemble the fine-scale matrices
-K = assemble_stima(V₀, D, 4);
+K = assemble_stima(V₀, D, 4; T=T₁);
 L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
-F = assemble_loadvec(V₀, f, 4);
+F = assemble_loadvec(V₀, f, 4; T=T₁);
 
 # # Multiscale space without stabilization
 # γ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 
 # Multiscale space along with stabilization
-Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ)) |> collect;
+Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 # Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 γ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, D);
 

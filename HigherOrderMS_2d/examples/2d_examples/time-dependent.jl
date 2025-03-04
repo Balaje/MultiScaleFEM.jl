@@ -1,8 +1,7 @@
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
-function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{Float64}, Δt::Float64, 
-  K::AbstractMatrix{Float64}, M::AbstractMatrix{Float64}, f!::Function, k::Int64)
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::AbstractMatrix{T}, M::AbstractMatrix{T}, f!::Function, k::Int64) where T<:Real
   # U should be arranged in descending order (n+k), (n+k-1), ...
   @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
@@ -48,10 +47,10 @@ end
 """
 Function to setup the initial condition by evaluating the L² projection on the MS-space.
 """
-function setup_initial_condition(u₀::Function, B::AbstractMatrix{Float64}, fspace::FESpace)
-  massma = assemble_massma(fspace, x->1.0, 0)
-  loadvec = assemble_loadvec(fspace, u₀, 4)
+function setup_initial_condition(u₀::Function, B::AbstractMatrix{T1}, fspace::FESpace; T=Float64) where T1<:Real
+  massma = assemble_massma(fspace, x->1.0, 0; T=T)
+  loadvec = assemble_loadvec(fspace, u₀, 4; T=T)
   Mₘₛ = B'*massma*B  
   Lₘₛ = B'*loadvec
-  Mₘₛ\Lₘₛ
+  collect(Mₘₛ)\Lₘₛ
 end 

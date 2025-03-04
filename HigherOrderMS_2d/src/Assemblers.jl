@@ -19,9 +19,9 @@ using ProgressMeter
 """
 Function to assemble the standard stiffness matrix given the diffusion coefficient A(x)
 """
-function assemble_stima(fespace::FESpace, A, qorder::Int64)
+function assemble_stima(fespace::FESpace, A, qorder::Int64; T=Float64)
   Ω = get_triangulation(fespace)
-  dΩ = Measure(Ω, qorder)
+  dΩ = Measure(Ω, qorder; T=T)
   a(u,v) = ∫( A*∇(u) ⊙ ∇(v) )dΩ
   assemble_matrix(a, fespace, fespace)  
 end
@@ -29,9 +29,9 @@ end
 """
 Function to assemble the standard mass matrix given the reaction coefficient A(x)
 """
-function assemble_massma(fespace::FESpace, A, qorder::Int64)
+function assemble_massma(fespace::FESpace, A, qorder::Int64; T=Float64)
   Ω = get_triangulation(fespace)
-  dΩ = Measure(Ω, qorder)
+  dΩ = Measure(Ω, qorder; T=T)
   a(u,v) = ∫( A*(u)⋅(v) )dΩ
   assemble_matrix(a, fespace, fespace)  
 end
@@ -40,9 +40,9 @@ end
 """
 Function to assemble the standard load vector given the load f(x)
 """
-function assemble_loadvec(fespace::FESpace, f, qorder::Int64)
+function assemble_loadvec(fespace::FESpace, f, qorder::Int64; T=Float64)
   Ω = get_triangulation(fespace)
-  dΩ = Measure(Ω, qorder)
+  dΩ = Measure(Ω, qorder; T=T)
   l(v) = ∫( f*v )dΩ
   assemble_vector(l, fespace)
 end
@@ -51,12 +51,12 @@ end
 Scaled monomial bases at each coarse rectanles. 
 The L² functions in the higher order MS Method is the tensor product of the Legendre polynomials in the cell
 """
-function Λₖ(x::Point, nds_x::NTuple{2,Float64}, nds_y::NTuple{2,Float64}, p::Int64, αβ::NTuple{2,Int64})  
+function Λₖ(x::Point, nds_x::NTuple{2,T}, nds_y::NTuple{2,T}, p::Int64, αβ::NTuple{2,Int64})  where T<:Real
   α,β = αβ
   Λₖ!(x[1], nds_x, p, α+1)*Λₖ!(x[2], nds_y, p, β+1)
 end
 
-function LP!(cache::Vector{Float64}, x::Float64)
+function LP!(cache::Vector{T}, x::T) where T<:Real
   p = size(cache,1) - 1
   if(p==0)
     cache[1] = 1.0
@@ -75,9 +75,9 @@ end
 """
 Shifted Legendre Polynomial with support (a,b)
 """
-function Λₖ!(x, nds::Tuple{Float64,Float64}, p::Int64, j::Int64)
+function Λₖ!(x, nds::NTuple{2,T}, p::Int64, j::Int64) where T<:Real
   a,b = nds
-  cache = Vector{Float64}(undef, p+1)
+  cache = Vector{T}(undef, p+1)
   fill!(cache,0.0)
   if(a < x <  b)
     xhat = -(b+a)/(b-a) + 2.0*x/(b-a)
