@@ -47,7 +47,7 @@ u₀(x) = T₁(0.0)
 FineScale = FineTriangulation(domain, nf);
 reffe = ReferenceFE(lagrangian, T₁, 1);
 V₀ = TestFESpace(FineScale.trian, reffe, conformity=:H1;vector_type=Vector{T₁});
-# D(x) = (0.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1 # Oscillatory field
+# D(x) = (1.5 + 0.5*cos(2π/2^-5*x[1])*cos(2π/2^-5*x[2]))^-1 # Oscillatory field
 # D(x) = 1.0 # Constant field
 # A = CellField(D, FineScale.trian)
 
@@ -106,8 +106,8 @@ Lₘₛ = assemble_ms_matrix(Bₘₛ, M, Bₘₛ′);
 Kₘₛ′ = assemble_ms_matrix(Bₘₛ′, K);
 Mₘₛ′ = assemble_ms_matrix(Bₘₛ′, M);
 
-sM = [Mₘₛ Lₘₛ; Lₘₛ'  Mₘₛ′] |> collect;
-sK = [Kₘₛ Pₘₛ; Pₘₛ' Kₘₛ′] |> collect;
+sM = [Mₘₛ Lₘₛ; Lₘₛ'  Mₘₛ′];
+sK = [Kₘₛ Pₘₛ; Pₘₛ' Kₘₛ′];
 
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)

@@ -1,5 +1,6 @@
 ###### ######## ######## ######## ######## ######## # 
 # Program to test the multiscale basis computation  #
+# DO NOT RUN: TO BE FINISHED.....                   #
 ###### ######## ######## ######## ######## ######## # 
 
 using Pkg
