@@ -36,6 +36,24 @@ using FastGaussQuadrature
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
 using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, poly_exps, Λₖ
 
+using Quadmath
+using DoubleFloats
+import LinearAlgebra.\
+
+"""
+Define the linear system solution for the higher precision data types
+"""
+function \(A::SparseMatrixCSC{T1}, b::AbstractVecOrMat{T2}) where {T1<:Double64, T2<:Real}
+  LU = copy(A);
+  LU = LinearAlgebra.generic_lufact!(LU)
+  LU\b
+end
+function \(A::SparseMatrixCSC{T1}, b::AbstractVecOrMat{T2}) where {T1<:Float128, T2<:Real}
+  LU = copy(A);
+  LU = LinearAlgebra.generic_lufact!(LU)
+  LU\b
+end
+
 """
 Just repeats x n times.
 """

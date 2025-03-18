@@ -7,7 +7,7 @@
 # Pkg.activate(".")
 
 using DoubleFloats
-T₁ = Double64
+T₁ = Float64
 
 using Gridap
 using MultiscaleFEM
@@ -84,8 +84,8 @@ build_basis_functions!((B,), (γₘₛ,));
 ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
 # Compute the multiscale solution with the BDFk scheme
 ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
-Kₘₛ = assemble_ms_matrix(B, K) |> collect;
-Mₘₛ = assemble_ms_matrix(B, M) |> collect;
+Kₘₛ = assemble_ms_matrix(B, K);
+Mₘₛ = assemble_ms_matrix(B, M);
 
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)

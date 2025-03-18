@@ -16,6 +16,7 @@ using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get
 using MultiscaleFEM.MultiscaleBases: get_patch_coarse_elem
 using MultiscaleFEM.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
 using MultiscaleFEM.MultiscaleBases: MultiScaleCorrections, get_basis_functions, build_basis_functions!
+using MultiscaleFEM.MultiscaleBases: \
 
 using MultiscaleFEM.Stabilization: StabilizedMultiScaleFESpace, get_basis_functions
 
@@ -32,6 +33,7 @@ export get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale
 export get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
 export assemble_rect_matrix, assemble_lm_l2_matrix
 export MultiScaleCorrections,get_basis_functions, build_basis_functions!
+export \
 
 export StabilizedMultiScaleFESpace
 

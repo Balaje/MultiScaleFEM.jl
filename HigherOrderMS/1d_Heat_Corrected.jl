@@ -4,7 +4,11 @@ include("./src/HigherOrderMS.jl");
 Problem data
 =#
 
-T₁ = Float64
+# using Quadmath
+# T₁ = Float128
+
+using DoubleFloats
+T₁ = Double64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
 Neps = 2^7
@@ -31,7 +35,7 @@ u₀(x) = T₁(0.0)
 # Spatial discretization parameters
 (length(ARGS)==5) && begin (nf, nc, p, l, ntimes) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
-  nf = 2^11;
+  nf = 2^9;
   p = 1;
   nc = 2^3;  
   l = 5; 
@@ -131,7 +135,7 @@ Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂;
 Lₘₛ = basis_vec_ms₂'*massma*basis_vec_ms₁
 Pₘₛ = basis_vec_ms₂'*stima*basis_vec_ms₁
 
-𝐌 = [Mₘₛ′ Lₘₛ; Lₘₛ'  Mₘₛ];
+𝐌 = [Mₘₛ′ Lₘₛ; Lₘₛ'  Mₘₛ]
 𝐊 = [Kₘₛ′ Pₘₛ; Pₘₛ' Kₘₛ]
 
 # Time marching
