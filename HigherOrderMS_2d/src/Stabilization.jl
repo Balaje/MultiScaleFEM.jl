@@ -14,6 +14,7 @@ using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get
 using MultiscaleFEM.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
 using MultiscaleFEM.MultiscaleBases: MultiScaleCorrections, get_basis_functions, build_basis_functions!
 using MultiscaleFEM.MultiscaleBases: get_patch_coarse_elem
+using MultiscaleFEM.MultiscaleBases: compute_ms_basis, compute_ms_space, sparsify_ms_basis, sparsify_ms_space
 
 using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
 
@@ -245,9 +246,12 @@ function Cˡιₖ(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace, fine_sca
   
   Ω_ms = lazy_fill(Ωms, num_coarse_cells)
   domains = lazy_fill(domain, num_coarse_cells)
-  BroadcastVector(_compute_stabilization_term, Ks, Ls, P, C, 
+
+  res = [spzeros(eltype(K), size(K,1), num_coarse_cells) for i=1:num_coarse_cells]
+  res1 = BroadcastVector(_compute_stabilization_term!, res, Ks, Ls, P, C, 
                   Ref(elem_wise_stima), Ω_ms, 1:num_coarse_cells, 
-                  domains, iota_vals1, iota_vals2)
+                  domains, iota_vals1, iota_vals2) 
+  res, res1                 
 end
 
 function _my_assembler(cell_vals, conn_matrix, stima)  
@@ -261,20 +265,22 @@ end
 """
 Compute (1-Cˡ)ιₖ function
 """
-function _compute_stabilization_term(stima, lmat, patch_interior_dofs, 
+function _compute_stabilization_term!(res, stima, lmat, patch_interior_dofs, 
                         coarse_dofs, elem_wise_stima, Ωms, el_ind, domain, iota1, iota2; T=Float64)
   Ωc = Ωms.Ωc
-  fine_trian = Ωms.Ωf.trian  
-  nds_fine = vec(Gridap.Geometry.get_node_coordinates(fine_trian))
+  # fine_trian = Ωms.Ωf.trian  
+  # nds_fine = vec(Gridap.Geometry.get_node_coordinates(fine_trian))
   
   elems_in_patch = find_elements_in_patch(Ωc, el_ind, domain)[1]
   
   elems_in_patch = vec(elems_in_patch)  
   n = size(elems_in_patch,1)
-  β = spzeros(T,length(nds_fine))  
+  # β = spzeros(T,length(nds_fine))  
   
-  for i=1:n
+  for i=1:n    
     el = elems_in_patch[i]     
+
+    println("Computing ι(x) of elem-$el, inside patch of elem-$el_ind")
     
     # Extract the submatrices from the global matrices
     patch_stima = stima[patch_interior_dofs[el], patch_interior_dofs[el]]
@@ -290,32 +296,27 @@ function _compute_stabilization_term(stima, lmat, patch_interior_dofs,
     SOL = LHS\RHS      
     
     # Compute (-Cˡ)ι = Σₖ (-Cˡₖ)ι
-    β[patch_interior_dofs[el]] += SOL[1:length(patch_interior_dofs[el])]      
+    res[patch_interior_dofs[el], el_ind] += SOL[1:length(patch_interior_dofs[el])]      
+    # β[patch_interior_dofs[el]] += SOL[1:length(patch_interior_dofs[el])]      
   end
   # Add the iota function to get (1-Cˡ)ι  
-  β += sum(iota2, dims=2)[:,1]
-  res = spzeros(T, size(stima,1), num_cells(Ωc.trian))
-  res[:, el_ind] = β
+  # β += sum(iota2, dims=2)[:,1]
+  res[:, el_ind] += sum(iota2, dims=2)[:,1]
+  # res = spzeros(T, size(stima,1), num_cells(Ωc.trian))
+  # res[:, el_ind] = β
   res
 end
 
 """
 Return the cell-wise lazy array of (1-Cˡ)Pₕνₖ
 """
-function Cˡνₖ(β, Ωms::MultiScaleTriangulation, p::Int64)
-  # β = get_basis_functions(Vms)
-  Ωc = Ωms.Ωc;
-  Cmap = x->_c2d(Ωc, x, p);
-  lazy_C = lazy_map(Cmap, 1:num_cells(Ωc.trian))  
-  num_coarse_cells = num_cells(Ωc.trian) 
-  patch_coarse_elems = BroadcastVector(get_patch_coarse_elem, 
-                      lazy_fill(Ωc.trian, num_coarse_cells), 
-                      lazy_fill(Ωc.tree, num_coarse_cells), 
-                      lazy_fill(1, num_coarse_cells), 
-                      1:num_coarse_cells);         
-  BroadcastVector(_c_times_basis, lazy_C, lazy_fill(β, num_coarse_cells), 
-                  patch_coarse_elems, lazy_fill(p,  num_coarse_cells), 
-                  1:num_coarse_cells)  
+function Cˡνₖ(Vms::MultiScaleFESpace, Ωms::MultiScaleTriangulation, p::Int64, el::Int64)
+  Ωc = Ωms.Ωc;   
+  C = _c2d(Ωc, el, p)  
+  patch_coarse_elem = get_patch_coarse_elem(Ωc.trian, Ωc.tree, 1, el)
+  compute_ms_space(Vms, patch_coarse_elem);
+  sparse_basis_functions = sparsify_ms_space(Vms)
+  _c_times_basis(C, sparse_basis_functions, patch_coarse_elem, p, el)
 end
 
 """
@@ -427,14 +428,28 @@ end
 
 function StabilizedMultiScaleFESpace(Vms::T1, p::Int64, Uh::FESpace, fine_scale_matrices, domain::NTuple{4,T2}, A) where {T1<:FESpace, T2<:Real}
   Ωms = Vms.Ω
-  α = get_basis_functions(Vms)
-  K, L = fine_scale_matrices  
-  β = Cˡιₖ(Ωms, p, Uh, (K, L), domain, A);
-  γ = Cˡνₖ(α, Ωms, p);    
+  K, L = fine_scale_matrices      
+  num_coarse_cells = num_cells(Ωms.Ωc.trian)
+  β, β₁ = Cˡιₖ(Ωms, p, Uh, (K, L), domain, A);
+  γ = BroadcastVector(x->Cˡνₖ(Vms, Ωms, p, x), 1:num_coarse_cells);   
+  α = sparsify_ms_space(Vms)
   δ = copy(α)
   num_coarse_cells = num_cells(Ωms.Ωc.trian)
-  basis_vec_ms = BroadcastVector(_replace_new_basis!, δ, β + γ, p, 1:num_coarse_cells)
-  StabilizedMultiScaleFESpace(Ωms, p, Uh, basis_vec_ms, fine_scale_matrices)
+  StabilizedMultiScaleFESpace(Ωms, p, Uh, (β, β₁, γ, δ), fine_scale_matrices)
+end
+
+function ReplaceBasis(Vms::T1, i::T2) where {T1<:FESpace, T2<:Integer}
+  β, β₁, γ, δ = Vms.basis_vec_ms
+  p = Vms.order;
+  Ωms = Vms.Ω
+  Uh = Vms.Uh
+  fine_scale_matrices = Vms.fine_scale_system  
+  if(norm(β[i]) ≈ 0.0)      
+    _replace_new_basis!(δ[i], β₁[i] + γ[i], p, i)
+  else
+    _replace_new_basis!(δ[i], β[i] + γ[i], p, i)
+  end  
+  StabilizedMultiScaleFESpace(Ωms, p, Uh, (δ, β₁+γ), fine_scale_matrices)
 end
 
 function _replace_new_basis!(α, γ, p, i)
