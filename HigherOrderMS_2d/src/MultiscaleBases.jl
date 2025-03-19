@@ -333,13 +333,18 @@ function MultiScaleFESpace(Ωms::MultiScaleTriangulation, p::Int64, Uh::FESpace,
   Ks = lazy_fill(K, num_coarse_cells);
   Ls = lazy_fill(L, num_coarse_cells);
   Λs = lazy_fill(Λ, num_coarse_cells);
-  β = [zeros(eltype(K), 
-             length(patch_interior_fine_scale_dofs[i]) + length(coarse_dofs[i]), 
-             length(legendre_poly[i])) for i=1:num_coarse_cells];  
+  L_size = lazy_fill(size(L), num_coarse_cells);  
   # Compute the basis 
-  β₁ = BroadcastVector(get_ms_bases!, β, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
-  # β₁ is the formula, β is the result.
-  MultiScaleFESpace(Ωms, p, Uh, (β,β₁), (Ks,Ls,Λs))
+  β = BroadcastVector(get_ms_bases, Ks, Ls, Λs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  # Store the basis as Sparse Matrices
+  βs = BroadcastVector(build_global_sparse_matrix_from_basis, β, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  # Return the MultiScaleFESpace object
+  MultiScaleFESpace(Ωms, p, Uh, βs, (Ks,Ls,Λs))
+end
+
+import Base.collect
+function collect(X::MultiScaleFESpace)
+  MultiScaleFESpace(X.Ω, X.order, X.Uh, collect(X.basis_vec_ms), X.fine_scale_system)
 end
 
 struct MultiScaleCorrections{T} <: FESpace
@@ -371,20 +376,21 @@ function MultiScaleCorrections(Vms::T, p::Int64, fine_scale_matrices) where T <:
   # Global node-ids on patch
   patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ωms)
   # Extract the fine-scale matrices
-  K, L, M = fine_scale_matrices
+  K, L, M, L₀ = fine_scale_matrices
   Ks = lazy_fill(K, num_coarse_cells)
   Ls = lazy_fill(L, num_coarse_cells)  
-  Ms = lazy_fill(M, num_coarse_cells)  
-  β = Vms.basis_vec_ms[1]
-  # @show size(β)
-  γ = [zeros(eltype(K), 
-       length(patch_interior_fine_scale_dofs[i]) + length(coarse_dofs[i]), 
-       length(legendre_poly[i])) for i=1:num_coarse_cells];
-  # Compute the correction bases using the MultiscaleFESpace  
-  γ₁ = BroadcastVector(get_ms_bases_corrections!, γ, Ks, Ls, Ms, β, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)  
-  # # Return the multiscale object
-  γs = (γ, γ₁)
-  MultiScaleCorrections(Ωms, Vms, q, γs, (Ks, Ls, Ms))
+  βs = Vms.basis_vec_ms
+  Ms = lazy_fill(M, num_coarse_cells) 
+  L_size = lazy_fill(size(L₀), num_coarse_cells); 
+  # Compute the correction bases using the MultiscaleFESpace
+  γ = BroadcastVector(get_ms_bases_corrections, Ks, Ls, Ms, βs, patch_interior_fine_scale_dofs, coarse_dofs, legendre_poly)
+  γs = BroadcastVector(build_global_sparse_matrix_from_basis, γ, patch_interior_fine_scale_dofs, legendre_poly, L_size)
+  # Return the multiscale object
+  MultiScaleCorrections(Ωms, Vms, q, γs, fine_scale_matrices)
+end
+
+function collect(X::MultiScaleCorrections)
+  MultiScaleFESpace(X.Ω, X.order, X.Uh, collect(X.basis_vec_ms), X.fine_scale_system)
 end
 
 function build_global_sparse_matrix_from_basis(B::AbstractVecOrMat{T}, Ms, Ns, shape::NTuple{2,Int64}) where T<:Real
@@ -396,32 +402,32 @@ end
 """
 Function to obtain the multiscale bases functions
 """
-function get_ms_bases!(SOL::AbstractMatrix{T}, stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
+function get_ms_bases(stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
   patch_rhs = rhsmat[coarse_dofs, legendre_poly]
   # solve_schur_complement(patch_stima, patch_lmat, patch_rhs)
   LHS = [patch_stima patch_lmat; patch_lmat' spzeros(T, length(coarse_dofs), length(coarse_dofs))]
-  RHS = [zeros(T, length(interior_dofs), length(legendre_poly)); patch_rhs]  
-  LHS1 = copy(LHS)
-  ldiv!(SOL, LinearAlgebra.generic_lufact!(LHS1), RHS)
-  SOL
+  RHS = [zeros(T, length(interior_dofs), length(legendre_poly)); patch_rhs]
+  SOL = LHS\RHS
+  res = SOL[1:length(interior_dofs), :]
+  res
 end
 
 """
 Function to obtain the multiscale bases corrections
 """
-function get_ms_bases_corrections!(SOL::AbstractMatrix{T}, stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, massma::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
+function get_ms_bases_corrections(stima::AbstractMatrix{T}, lmat::AbstractMatrix{T}, massma::AbstractMatrix{T}, rhsmat::AbstractMatrix{T}, interior_dofs, coarse_dofs, legendre_poly) where T<:Real
   patch_stima = stima[interior_dofs, interior_dofs]
   patch_lmat = lmat[interior_dofs, coarse_dofs]
   patch_rhs_1 = collect(massma[interior_dofs, interior_dofs]*rhsmat[interior_dofs, legendre_poly])
   patch_rhs_2 = zeros(T, length(coarse_dofs), length(legendre_poly))  
   # solve_schur_complement(patch_stima, patch_lmat, patch_rhs_1, patch_rhs_2)
   LHS = [patch_stima patch_lmat; patch_lmat' spzeros(T, length(coarse_dofs), length(coarse_dofs))]
-  RHS = [patch_rhs_1; patch_rhs_2]  
-  LHS1 = copy(LHS)
-  ldiv!(SOL, LinearAlgebra.generic_lufact!(LHS1), RHS)
-  SOL
+  RHS = [patch_rhs_1; patch_rhs_2]
+  SOL = LHS\RHS
+  res = SOL[1:length(interior_dofs), :]
+  res
 end
 
 """
@@ -459,46 +465,6 @@ get_basis_functions(V::MultiScaleCorrections) = V.basis_vec_ms
 #   end
 #   Bs  
 # end
-
-function compute_ms_basis(V::T1, i::T) where {T<:Integer, T1<:FESpace}
-  @assert length(V.basis_vec_ms)==2 "Not the right structure"
-  if(norm(V.basis_vec_ms[1][i]) ≈ 0.0)
-    println("Computing $i-th basis ...")
-    V.basis_vec_ms[2][i];
-  else
-    V.basis_vec_ms[1][i]
-  end
-end
-
-function compute_ms_space(lazy_V::T1, inds::Vector{T}) where {T<:Integer, T1<:FESpace}
-  for i=inds
-    compute_ms_basis(lazy_V, i)
-  end
-  return 
-end
-
-function sparsify_ms_basis(B::AbstractMatrix{T1}, i::T2, Ω::MultiScaleTriangulation, shape::NTuple{2,T2}, p::T2) where {T1<:Real, T2<:Integer}
-  Ωc = Ω.Ωc   
-  num_coarse_cells = num_cells(Ωc.trian)
-  n_monomials = (p+1)^2
-  elem_to_dof(x) = n_monomials*x-n_monomials+1:n_monomials*x;  
-  legendre_poly = BroadcastVector(elem_to_dof, 1:num_coarse_cells)
-  # Since we have zero boundary conditions, we extract only the interior nodes
-  patch_interior_fine_scale_dofs = get_coarse_scale_patch_fine_scale_interior_node_indices(Ω)
-  free_dofs = patch_interior_fine_scale_dofs[i]
-  free_polys = legendre_poly[i]
-  B1 = B[1:length(free_dofs), :]
-  build_global_sparse_matrix_from_basis(B1, free_dofs, free_polys, shape)
-end
-
-function sparsify_ms_space(Vms::T) where T<:FESpace
-  Ωms = Vms.Ω
-  p = Vms.order
-  num_coarse_cells = num_cells(Ωms.Ωc.trian)
-  L_size = size(Vms.fine_scale_system[2][1])
-  bases = BroadcastVector(compute_ms_basis, Ref(Vms), 1:num_coarse_cells)
-  BroadcastVector(sparsify_ms_basis, bases, 1:num_coarse_cells, Ref(Ωms), Ref(L_size), Ref(p))  
-end
 
 function build_basis_functions!(Bs, Vs)  
   println("Computing basis functions...")

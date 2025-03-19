@@ -36,12 +36,12 @@ if(length(ARGS)==7)
   nf, nc, p, l, ntimes, PROBLEM_NAME, BASIS_IND = ARGS
   nf, nc, p, l, ntimes, BASIS_IND = parse.(Int64, (nf, nc, p, l, ntimes, BASIS_IND));
 else
-  nf = 2^6
+  nf = 2^4
   nc = 2^2
   p = 1
   l = 1
   ntimes = 1
-  BASIS_IND = 2
+  BASIS_IND = 1
   PROBLEM_NAME = "Hello"  
 end
 
@@ -102,12 +102,12 @@ function read_basis_functions(FILENAME, ::Type{T}, mat_size) where T<:Real
 end
 
 MS_BASIS_FILENAME = "./"*string(PROBLEM_NAME)*"/"*string(PROBLEM_NAME)*"_$(nc)$(p)$(l)_"*string(BASIS_IND)*".csv"
-B1 = MultiscaleFEM.Stabilization.ReplaceBasis(γₘₛ,BASIS_IND).basis_vec_ms[1][BASIS_IND];
+B1 = γₘₛ.basis_vec_ms[BASIS_IND];
 write_basis_functions(B1, MS_BASIS_FILENAME);
 
 MS_BASIS_CORRECTION_FILENAME = Vector{String}(undef, ntimes)
 for j=1:ntimes
   MS_BASIS_CORRECTION_FILENAME[j] = "./"*string(PROBLEM_NAME)*"/"*string(PROBLEM_NAME)*"_$(nc)$(p)$(l)$(j)_"*string(BASIS_IND)*".csv"
-  local A = MultiscaleFEM.MultiscaleBases.sparsify_ms_space(Wₘₛ[j])[BASIS_IND];
+  local A = Wₘₛ[j].basis_vec_ms[BASIS_IND];
   write_basis_functions(A, MS_BASIS_CORRECTION_FILENAME[j]);
 end
