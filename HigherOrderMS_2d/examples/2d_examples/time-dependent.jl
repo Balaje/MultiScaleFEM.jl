@@ -1,3 +1,7 @@
+using LinearAlgebra
+using Preconditioners
+using IterativeSolvers
+
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
@@ -6,13 +10,17 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::Ab
   @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
   coeffs = dl!(dl_cache, k)
-  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))    
-  for i=0:k-1    
+  RHS = 1/coeffs[k+1]*(Δt)*(f!(fcache, tₙ+k*Δt))
+  for i=0:k-1
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
-  end 
+  end
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
-  Uₙ₊ₖ = LHS\RHS
+  p = DiagonalPreconditioner(LHS)
+  Uₙ₊ₖ = pc_solve(LHS, RHS, p)
   Uₙ₊ₖ
+end
+function pc_solve(LHS, RHS, p)
+    cg(LHS, RHS, Pl=p)
 end
 function get_dl_cache(k::Int64)
   0, 0, zeros(Float64,k+1)
@@ -25,7 +33,7 @@ function dl!(cache, k::Int64)
     res[i] = dlₖ!((sum,prod), Float64(k), xⱼ, i)
   end
   res
-end 
+end
 function dlₖ!(cache, t::Float64, tⱼ::AbstractVector{Float64}, j::Int64)
   sum, prod = cache
   sum = 0.0
@@ -35,11 +43,11 @@ function dlₖ!(cache, t::Float64, tⱼ::AbstractVector{Float64}, j::Int64)
       prod = 1/(tⱼ[j]- tⱼ[l])
       for m=1:lastindex(tⱼ)
         (m ≠ j) && (m ≠ l) && begin
-          prod = prod*(t - tⱼ[m])/(tⱼ[j]-tⱼ[m])        
+          prod = prod*(t - tⱼ[m])/(tⱼ[j]-tⱼ[m])
         end
       end
       sum += prod
-    end     
+    end
   end
   sum
 end
@@ -50,7 +58,7 @@ Function to setup the initial condition by evaluating the L² projection on the 
 function setup_initial_condition(u₀::Function, B::AbstractMatrix{T1}, fspace::FESpace; T=Float64) where T1<:Real
   massma = assemble_massma(fspace, x->1.0, 0; T=T)
   loadvec = assemble_loadvec(fspace, u₀, 4; T=T)
-  Mₘₛ = B'*massma*B  
+  Mₘₛ = B'*massma*B
   Lₘₛ = B'*loadvec
   collect(Mₘₛ)\Lₘₛ
-end 
+end
