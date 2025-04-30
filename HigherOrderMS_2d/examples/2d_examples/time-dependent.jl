@@ -15,7 +15,7 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::Ab
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
-  p = DiagonalPreconditioner(LHS)
+  p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(LHS);
   Uₙ₊ₖ = pc_solve(LHS, RHS, p)
   Uₙ₊ₖ
 end
