@@ -31,7 +31,7 @@ end
 Sum of two Schur Complement Matrices
 """
 function +(A::SchurComplementMatrix, B::SchurComplementMatrix)
-    SchurComplementMatrix((A.A11+B.A11), (A.A12+B.B12), (A.A21+B.A21), (A.A22+B.B22))
+    SchurComplementMatrix((A.A11+B.A11), (A.A12+B.A12), (A.A21+B.A21), (A.A22+B.A22))
 end
 
 """
