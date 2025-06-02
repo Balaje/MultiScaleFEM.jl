@@ -7,3 +7,7 @@
 *.txt
 Manifest.toml
 *.sh
+*~
+*.out
+*.txt
+*.zip
