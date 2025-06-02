@@ -87,17 +87,17 @@ function \(A::SchurComplementMatrix, b::SchurComplementVector)
     A₂₁ = A.A21
     A₂₂ = A.A22
     # Vector Components
-    b₁ = b.b1
-    b₂ = b.b2
+    F₁ = b.b1
+    F₂ = b.b2
     # Define the solver
-    solver = (y,A,b) -> cg!(fill!(y,0.0), A, b; reltol=1e-16, abstol=1e-16)
+    solver = (y,A,b) -> minres!(fill!(y,0.0), A, b; reltol=1e-16, abstol=1e-16)
     # Obtain the Schur Complement system
     A₂₂⁻¹ = InverseMap(A₂₂; solver=solver)
     Σ = A₁₁ - A₁₂*A₂₂⁻¹*A₂₁
     # Solve the Schur Complement system
-    Σ⁻¹ = InverseMap(Σ⁻¹; solver=solver)
-    F = F₁ - A₁₂*A₂₂⁻¹*F₂    
-    U₁ = Σ⁻¹*F₁
+    Σ⁻¹ = InverseMap(Σ; solver=solver)
+    F = F₁ - A₁₂*A₂₂⁻¹*F₂
+    U₁ = Σ⁻¹*F
     # Obtain the rest of the solution vector
     U₂ = A₂₂⁻¹*(F₂ - A₂₁*U₁)
     [U₁; U₂]
@@ -111,6 +111,3 @@ function \(A::SchurComplementMatrix, b::Vector{T}) where T
     N = size(A.A22,1)
     A\(SchurComplementVector(b, M, N))
 end
-
-
-
