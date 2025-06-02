@@ -1,6 +1,4 @@
-using LinearAlgebra
-using Preconditioners
-using IterativeSolvers
+include("schur.jl")
 
 """
 The Backward Difference Formula of order k for the linear heat equation
@@ -14,16 +12,9 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::Ab
   for i=0:k-1
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end
-  LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
-  p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(LHS);
-  # p = Preconditioners.AMGPreconditioner(RugeStuben, LHS)
-  Uₙ₊ₖ = pc_solve(LHS, RHS; p=p)
+  LHS = (M + 1.0/(coeffs[k+1])*Δt*K)    
+  Uₙ₊ₖ = LHS\RHS
   Uₙ₊ₖ
-end
-function pc_solve(LHS, RHS; p=p)
-  cg(LHS, RHS; Pl=p, reltol=1e-16)
-  # p\RHS
-  # LHS\RHS
 end
 function get_dl_cache(k::Int64)
   0, 0, zeros(Float64,k+1)

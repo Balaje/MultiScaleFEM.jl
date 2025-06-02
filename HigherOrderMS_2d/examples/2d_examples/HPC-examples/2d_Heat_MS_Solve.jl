@@ -87,8 +87,14 @@ write_basis_functions(sK, project_dir*"/"*project_name*"/$(project_name)_stiffne
 =#
 
 ms_problem_size = ( nc^2*(p+1)^2*(ntimes+1), nc^2*(p+1)^2*(ntimes+1) )
-sM = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
-sK = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
+M = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
+K = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
+
+### ### ### ### ### ### ### ### ### ### ### ###
+#  Construct the schur complement system
+### ### ### ### ### ### ### ### ### ### ### ###
+sM = SchurComplementMatrix( M, (nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2) )
+sK = SchurComplementMatrix( K, (nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2) )
 
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)
