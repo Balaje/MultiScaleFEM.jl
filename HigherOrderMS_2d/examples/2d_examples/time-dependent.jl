@@ -16,11 +16,14 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::Ab
   end
   LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
   p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(LHS);
-  Uₙ₊ₖ = pc_solve(LHS, RHS, p)
+  # p = Preconditioners.AMGPreconditioner(RugeStuben, LHS)
+  Uₙ₊ₖ = pc_solve(LHS, RHS; p=p)
   Uₙ₊ₖ
 end
-function pc_solve(LHS, RHS, p)
-    cg(LHS, RHS, Pl=p)
+function pc_solve(LHS, RHS; p=p)
+  cg(LHS, RHS; Pl=p, reltol=1e-16)
+  # p\RHS
+  # LHS\RHS
 end
 function get_dl_cache(k::Int64)
   0, 0, zeros(Float64,k+1)

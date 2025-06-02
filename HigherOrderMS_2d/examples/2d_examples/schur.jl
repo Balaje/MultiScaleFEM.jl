@@ -1,58 +1,46 @@
 ### Script to implement the schur complement method for solving the coupled system
+
 using LinearAlgebra
+import LinearAlgebra: \
+    using LinearMaps, IterativeSolvers, LinearAlgebra
 
-struct SchurComplementMatrix{T₁,T₂} <: AbstractMatrix{T₁}
-  A::NTuple{4,AbstractMatrix{T₁}}  
-  M::NTuple{2,T₂}  
+struct SchurComplementMatrix{T}
+    A11::AbstractMatrix{T}
+    A12::AbstractMatrix{T}
+    A21::AbstractMatrix{T}
+    A22::AbstractMatrix{T}
+end
+function SchurComplementMatrix(A::AbstractMatrix{T1}, M::T2, N::T2) where {T1,T2<:Integer}
+    SchurComplementMatrix(A[1:M, 1:M], A[1:M, M+1:M+N], A[M+1:M+N, 1:M], A[M+1:M+N, M+1:M+N])
 end
 
-function SchurComplementMatrix(A::AbstractMatrix{Float64}, M::NTuple{2,Int64})
-  m, n = M
-  A₁₁ = A[1:m, 1:m];  A₁ᵧ = A[1:m, 1+m:n+m]
-  Aᵧ₁ = A[1+m:n+m, 1:m];  Aᵧᵧ = A[1+m:n+m, 1+m:n+m]  
-  SchurComplementMatrix((A₁₁, A₁ᵧ, Aᵧ₁, Aᵧᵧ), M)
+struct SchurComplementVector{T}
+    b1::AbstractVector{T}
+    b2::AbstractVector{T}
+end
+function SchurComplementVector(b::AbstractVector{T1}, M::T2, N::T2) where {T1, T2<:Integer}
+    SchurComplementVector(b[1:M], b[M+1:M+N])
 end
 
-import Base.\
-function \(A::SchurComplementMatrix, f::AbstractVector{Float64})
-  m, n = A.M
-  f₁ = f[1:m];  fᵧ = f[m+1:m+n]
-  A₁₁, A₁ᵧ, Aᵧ₁, Aᵧᵧ = A.A
-  Lᵧ₁ = collect(Aᵧ₁)
-  L₁ᵧ = collect(A₁ᵧ)
-  Lᵧᵧ = LinearAlgebra.lu(Aᵧᵧ)
-  Σ = (A₁₁ - L₁ᵧ*(Lᵧᵧ\Lᵧ₁))
-  T = f₁ - L₁ᵧ*(Lᵧᵧ\fᵧ)
-  U₁ = Σ\T
-  Uᵧ = Lᵧᵧ\(fᵧ - Lᵧ₁*U₁)
-  vcat(U₁, Uᵧ)
-end
-
-import LinearAlgebra.cond
-function cond(A::SchurComplementMatrix)
-  A₁₁, A₁ᵧ, Aᵧ₁, Aᵧᵧ = A.A
-  Lᵧ₁ = collect(Aᵧ₁)
-  Lᵧᵧ = LinearAlgebra.lu(Aᵧᵧ)
-  Σ = (A₁₁ - A₁ᵧ*(Lᵧᵧ\Lᵧ₁))
-  LinearAlgebra.cond(collect(Σ)), LinearAlgebra.cond(collect(Aᵧᵧ))
-end
-
-import Base.*
-function *(α::T, A::SchurComplementMatrix) where T<:Number  
-  SchurComplementMatrix(α.*A.A, A.M)
-end
-function *(A::SchurComplementMatrix, v::AbstractVector{T}) where T<:Number
-  A_mat = [A.A[1] A.A[2]; A.A[3] A.A[4]]
-  A_mat*v
-end
-
-import Base.+
-function +(A::SchurComplementMatrix, B::SchurComplementMatrix)
-  @assert A.M == B.M "Matrices must be of the same dimensions"
-  SchurComplementMatrix(A.A .+ B.A, A.M)
-end
-
-import Base.size
-function size(A::SchurComplementMatrix)
-  ((A.M[1] + A.M[2]), (A.M[1] + A.M[2]))
+function \(A::SchurComplementMatrix, b::SchurComplementVector)
+    # Matrix Components
+    A₁₁ = A.A11
+    A₁₂ = A.A12
+    A₂₁ = A.A21
+    A₂₂ = A.A22
+    # Vector Components
+    b₁ = b.b1
+    b₂ = b.b2
+    # Define the solver
+    solver = (y,A,b) -> cg!(fill!(y,0.0), A, b; reltol=1e-16, abstol=1e-16)
+    # Obtain the Schur Complement system
+    A₂₂⁻¹ = InverseMap(A₂₂; solver=solver)
+    Σ = A₁₁ - A₁₂*A₂₂⁻¹*A₂₁
+    # Solve the Schur Complement system
+    Σ⁻¹ = InverseMap(Σ⁻¹; solver=solver)
+    F = F₁ - A₁₂*A₂₂⁻¹*F₂    
+    U₁ = Σ⁻¹*F₁
+    # Obtain the rest of the solution vector
+    U₂ = A₂₂⁻¹*(F₂ - A₂₁*U₁)
+    [U₁; U₂]
 end
