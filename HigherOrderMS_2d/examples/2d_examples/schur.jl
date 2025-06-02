@@ -92,14 +92,17 @@ function \(A::SchurComplementMatrix, b::SchurComplementVector)
     # Define the solver
     solver = (y,A,b) -> minres!(fill!(y,0.0), A, b; reltol=1e-16, abstol=1e-16)
     # Obtain the Schur Complement system
-    A₂₂⁻¹ = InverseMap(A₂₂; solver=solver)
-    Σ = A₁₁ - A₁₂*A₂₂⁻¹*A₂₁
+    # A₂₂⁻¹ = InverseMap(A₂₂; solver=solver)
+    A₂₂⁻¹A₂₁ = (A₂₂)\collect(A₂₁)
+    A₂₂⁻¹F₂ = (A₂₂)\F₂
+    Σ = A₁₁ - A₁₂*A₂₂⁻¹A₂₁
+    p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(Σ))
     # Solve the Schur Complement system
-    Σ⁻¹ = InverseMap(Σ; solver=solver)
-    F = F₁ - A₁₂*A₂₂⁻¹*F₂
-    U₁ = Σ⁻¹*F
+    # Σ⁻¹ = InverseMap(Σ; solver=solver)
+    F = F₁ - A₁₂*A₂₂⁻¹F₂
+    U₁ = cg(Σ, F; Pl=p, reltol=1e-16, abstol=1e-16)
     # Obtain the rest of the solution vector
-    U₂ = A₂₂⁻¹*(F₂ - A₂₁*U₁)
+    U₂ = A₂₂⁻¹F₂ - A₂₂⁻¹A₂₁*U₁
     [U₁; U₂]
 end
 
