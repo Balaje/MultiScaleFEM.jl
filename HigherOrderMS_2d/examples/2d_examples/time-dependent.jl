@@ -3,7 +3,7 @@ include("schur.jl")
 """
 The Backward Difference Formula of order k for the linear heat equation
 """
-function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::AbstractMatrix{T}, M::AbstractMatrix{T}, f!::Function, k::Int64) where T<:Real
+function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::AbstractMatrix{T}, M::AbstractMatrix{T}, f!::Function, k::Int64, ntimes::Int64) where T<:Real
   # U should be arranged in descending order (n+k), (n+k-1), ...
   @assert (size(U,2) == k) # Check if it is the right BDF-k
   dl_cache, fcache = cache
@@ -12,8 +12,10 @@ function BDFk!(cache, tₙ::Float64, U::AbstractVecOrMat{T}, Δt::Float64, K::Ab
   for i=0:k-1
     RHS += -(coeffs[k-i]/coeffs[k+1])*M*U[:,i+1]
   end
-  LHS = (M + 1.0/(coeffs[k+1])*Δt*K)    
-  Uₙ₊ₖ = LHS\RHS
+  LHS = (M + 1.0/(coeffs[k+1])*Δt*K)
+    # Uₙ₊ₖ = LHS\RHS
+  block_size = Int64(size(LHS,1)/ntimes)
+  Uₙ₊ₖ = BlockSchur(LHS, RHS, ntuple(i->block_size, ntimes))
   Uₙ₊ₖ
 end
 function get_dl_cache(k::Int64)
