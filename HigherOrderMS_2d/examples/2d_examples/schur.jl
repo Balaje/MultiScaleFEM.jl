@@ -46,7 +46,8 @@ function BlockSchur(A::AbstractMatrix{T1}, f::AbstractVector{T2}, N::NTuple{3, T
     F₂ = f₂ - A₂₁*A₁₁⁻¹*f₁
     F₃ = f₃ - A₃₁*A₁₁⁻¹*f₁
 
-    p = Preconditioners.CholeskyPreconditioner(sparse(B₂₂))
+    # p = Preconditioners.CholeskyPreconditioner(sparse(B₂₂))
+    p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(B₂₂))
     solver!(y,A,b; Pl=p) = cg!(fill!(y,0.0), A, b;
                                reltol=1e-16, abstol=1e-16, Pl=Pl,
                                maxiter=2000)
@@ -54,7 +55,8 @@ function BlockSchur(A::AbstractMatrix{T1}, f::AbstractVector{T2}, N::NTuple{3, T
     Σ₃ = B₃₃ - B₃₂*B₂₂⁻¹*B₂₃
     b₃ = F₃ - B₃₂*B₂₂⁻¹*F₂
 
-    p = Preconditioners.CholeskyPreconditioner(sparse(Σ₃))
+    # p = Preconditioners.CholeskyPreconditioner(sparse(Σ₃))
+    p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(Σ₃))
     U₃ = cg(Σ₃, b₃; abstol=1e-16, reltol=1e-16, Pl=p, maxiter=2000)
     U₂ = B₂₂⁻¹*(F₂ - B₂₃*U₃)
     U₁ = A₁₁⁻¹*(f₁ - A₁₂*U₂ - A₁₃*U₃)
