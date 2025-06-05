@@ -1,65 +1,116 @@
 ### Script to implement the schur complement method for solving the coupled system
 
-using BlockArrays
-using LinearMaps
-using IterativeSolvers
+using LinearAlgebra
+import LinearAlgebra: \
+    using LinearMaps, IterativeSolvers, LinearAlgebra, Preconditioners
+import Base: +, *, collect
 
-function BlockSchur(A::AbstractMatrix{T1}, f::AbstractVector{T2}, N::NTuple{2, T3}) where {T1, T2, T3<:Integer}
-    N1 = length(N)
-    Aᵦ = BlockArray(A, SVector{N1}(N), SVector{N1}(N))
-    fᵦ = BlockVector(f, SVector{N1}(N))
-    # Obtain the 2x2 components of the matrix
-    A₁₁ = Aᵦ[Block(1,1)];    A₁₂ = Aᵦ[Block(1,2)];
-    A₂₁ = Aᵦ[Block(2,1)];    A₂₂ = Aᵦ[Block(2,2)];
-    # Obtain the 2x1 component of the vector
-    f₁ = fᵦ[Block(1)];
-    f₂ = fᵦ[Block(2)];
-    # Obtain the inverse of the "good" block
-    A₁₁⁻¹ = InverseMap(lu(A₁₁))
-    # Calculate the Schur complement system and solve it numerically
-    Σ = A₂₂ - A₂₁*A₁₁⁻¹*A₁₂
-    F = f₂ - A₂₁*A₁₁⁻¹*f₁
+struct SchurComplementMatrix{T} <: AbstractMatrix{T}
+    A11::AbstractMatrix{T}
+    A12::AbstractMatrix{T}
+    A21::AbstractMatrix{T}
+    A22::AbstractMatrix{T}
+end
+function SchurComplementMatrix(A::AbstractMatrix{T1}, M::T2, N::T2) where {T1,T2<:Integer}
+    SchurComplementMatrix(A[1:M, 1:M], A[1:M, M+1:M+N], A[M+1:M+N, 1:M], A[M+1:M+N, M+1:M+N])
+end
+
+
+struct SchurComplementVector{T} <: AbstractMatrix{T}
+    b1::AbstractVector{T}
+    b2::AbstractVector{T}
+end
+function SchurComplementVector(b::AbstractVector{T1}, M::T2, N::T2) where {T1, T2<:Integer}
+    SchurComplementVector(b[1:M], b[M+1:M+N])
+end
+
+### ###### ###### ###### ###### ###### ###### ###### ###
+# Export some methods for matrix vector operators
+### ###### ###### ###### ###### ###### ###### ###### ###
+"""
+Sum of two Schur Complement Matrices
+"""
+function +(A::SchurComplementMatrix, B::SchurComplementMatrix)
+    SchurComplementMatrix((A.A11+B.A11), (A.A12+B.A12), (A.A21+B.A21), (A.A22+B.A22))
+end
+
+"""
+Matrix-vector product of a Schur Complement system
+"""
+function *(A::SchurComplementMatrix, b::SchurComplementVector)
+    SchurComplementVector((A.A11*b.b1+A.A12*b.b2), (A.A21*b.b1+A.A22*b.b22))
+end
+
+"""
+Scalar Multiplication of a Schur Complement Matrix
+"""
+function *(c::T, A::SchurComplementMatrix) where T<:Number
+    SchurComplementMatrix(c*A.A11, c*A.A12, c*A.A21, c*A.A22)
+end
+
+"""
+Scalar Multiplication of a Schur Complement vector
+"""
+function *(c::T, b::SchurComplementVector) where T<:Number
+    SchurComplementVector(c*b.b1, b*b.b2)
+end
+
+"""
+Convert Schur Complement Vector to a raw vector
+"""
+function collect(x::SchurComplementVector)
+    [x.b1; x.b2]
+end
+
+"""
+Convert Schur Complement Matrix to a raw matrix
+"""
+function collect(x::SchurComplementMatrix)
+    [x.A11 x.A12;
+     x.A21 x.A22]
+end
+
+"""
+Product of a Schur-Complement Matrix and a raw vector
+"""
+function *(A::SchurComplementMatrix, b::Vector{T}) where T
+    collect(A)*b
+end
+
+"""
+Solve a Schur Complement system
+"""
+function \(A::SchurComplementMatrix, b::SchurComplementVector)
+    # Matrix Components
+    A₁₁ = A.A11
+    A₁₂ = A.A12
+    A₂₁ = A.A21
+    A₂₂ = A.A22
+    # Vector Components
+    F₁ = b.b1
+    F₂ = b.b2
+    # Define the solver
+    solver = (y,A,b) -> minres!(fill!(y,0.0), A, b; reltol=1e-16, abstol=1e-16)
+    # Obtain the Schur Complement system
+    # A₂₂⁻¹ = InverseMap(A₂₂; solver=solver)
+    A₁₁⁻¹A₁₂ = (A₁₁)\collect(A₁₂)
+    A₁₁⁻¹F₁ = (A₁₁)\F₁
+    Σ = A₂₂ - A₂₁*A₁₁⁻¹A₁₂
     p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(Σ))
-    U₂ = cg(Σ, F; reltol=1e-16, abstol=1e-16, Pl=p, maxiter=2000)
-    # Obtain the second part
-    U₁ = A₁₁⁻¹*(f₁ - A₁₂*U₂)
+    # Solve the Schur Complement system
+    # Σ⁻¹ = InverseMap(Σ; solver=solver)
+    F = F₂ - A₂₁*A₁₁⁻¹F₁
+    U₂ = cg(Σ, F; Pl=p, reltol=1e-16, abstol=1e-16)
+    # Obtain the rest of the solution vector
+    U₁ = A₁₁⁻¹F₁ - A₁₁⁻¹A₁₂*U₂
     [U₁; U₂]
 end
 
-function BlockSchur(A::AbstractMatrix{T1}, f::AbstractVector{T2}, N::NTuple{3, T3}) where {T1, T2, T3<:Integer}
-    N1 = length(N)
-    Aᵦ = BlockArray(A, SVector{N1}(N), SVector{N1}(N))
-    fᵦ = BlockVector(f, SVector{N1}(N))
-    # Obtain the 2x2 components of the matrix
-    A₁₁ = Aᵦ[Block(1,1)];    A₁₂ = Aᵦ[Block(1,2)];    A₁₃ = Aᵦ[Block(1,3)];
-    A₂₁ = Aᵦ[Block(2,1)];    A₂₂ = Aᵦ[Block(2,2)];    A₂₃ = Aᵦ[Block(2,3)];
-    A₃₁ = Aᵦ[Block(3,1)];    A₃₂ = Aᵦ[Block(3,2)];    A₃₃ = Aᵦ[Block(3,3)];
-    # Obtain the 2x1 component of the vector
-    f₁ = fᵦ[Block(1)];
-    f₂ = fᵦ[Block(2)];
-    f₃ = fᵦ[Block(3)];
-    # Obtain the inverse of the "good" block
-    A₁₁⁻¹ = InverseMap(lu(A₁₁))
-    # Calculate the Schur complement system and solve it numerically
-    B₂₂ = A₂₂ - A₂₁*A₁₁⁻¹*A₁₂;   B₂₃ = A₂₃ - A₂₁*A₁₁⁻¹*A₁₃;
-    B₃₂ = A₃₂ - A₃₁*A₁₁⁻¹*A₁₂;   B₃₃ = A₃₃ - A₃₁*A₁₁⁻¹*A₁₃;
-    F₂ = f₂ - A₂₁*A₁₁⁻¹*f₁
-    F₃ = f₃ - A₃₁*A₁₁⁻¹*f₁
-
-    # p = Preconditioners.CholeskyPreconditioner(sparse(B₂₂))
-    p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(B₂₂))
-    solver!(y,A,b; Pl=p) = cg!(fill!(y,0.0), A, b;
-                               reltol=1e-16, abstol=1e-16, Pl=Pl,
-                               maxiter=2000)
-    B₂₂⁻¹ = InverseMap(B₂₂; solver=solver!)
-    Σ₃ = B₃₃ - B₃₂*B₂₂⁻¹*B₂₃
-    b₃ = F₃ - B₃₂*B₂₂⁻¹*F₂
-
-    # p = Preconditioners.CholeskyPreconditioner(sparse(Σ₃))
-    p = Preconditioners.AMGPreconditioner{SmoothedAggregation}(sparse(Σ₃))
-    U₃ = cg(Σ₃, b₃; abstol=1e-16, reltol=1e-16, Pl=p, maxiter=2000)
-    U₂ = B₂₂⁻¹*(F₂ - B₂₃*U₃)
-    U₁ = A₁₁⁻¹*(f₁ - A₁₂*U₂ - A₁₃*U₃)
-
-    [U₁; U₂; U₃]
+"""
+Solve a Schur Complement system with a schur complement matrix and a raw vector
+"""
+function \(A::SchurComplementMatrix, b::Vector{T}) where T
+    M = size(A.A11,1)
+    N = size(A.A22,1)
+    A\(SchurComplementVector(b, M, N))
 end

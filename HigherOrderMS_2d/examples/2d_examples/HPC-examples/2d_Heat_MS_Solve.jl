@@ -42,7 +42,7 @@ L = assemble_rect_matrix(Ωₘₛ, p);
 Λ = assemble_lm_l2_matrix(Ωₘₛ, p);
 
 function load_basis!(γₘₛ)
-    for i=2:nc*nc
+    @showprogress desc="Loading MS Bases..." for i=2:nc*nc
         filename = project_dir*"/"*project_name*"/$(project_name)_ms_basis_$(nc)$(p)$(l)_"*string(i)*".csv"
         γₘₛ += read_basis_functions(filename, T₁, size(L))
     end
@@ -50,7 +50,7 @@ function load_basis!(γₘₛ)
 end
 function load_additional_corrections!(Wₘₛ)
     for j=1:ntimes
-        for i=2:nc*nc
+        @showprogress desc="Loading Additional Corrections $j..." for i=2:nc*nc
             filename = project_dir*"/"*project_name*"/$(project_name)_ms_basis_$(nc)$(p)$(l)_correction_level_$(j)_"*string(i)*".csv"
             Wₘₛ[j] += read_basis_functions(filename, T₁, size(L))
         end
@@ -93,8 +93,8 @@ K = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_stiffnes
 ### ### ### ### ### ### ### ### ### ### ### ###
 #  Construct the schur complement system
 ### ### ### ### ### ### ### ### ### ### ### ###
-sM = SchurComplementMatrix( M, (nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2) )
-sK = SchurComplementMatrix( K, (nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2) )
+sM = SchurComplementMatrix( M, nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2 )
+sK = SchurComplementMatrix( K, nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2 )
 
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)
@@ -109,7 +109,7 @@ let
     t = 0.0
     # Starting BDF steps (1...k-1)
     fcache = (V₀, γₘₛ, Wₘₛ)
-    @showprogress for i=1:BDF-1
+    @showprogress desc="Time stepping 1 to $(BDF-1) ..." for i=1:BDF-1
         dlcache = get_dl_cache(i)
         cache = dlcache, fcache
         U₁ = BDFk!(cache, t, U₀, Δt, sK, sM, fₙ, i)
@@ -119,7 +119,7 @@ let
     # Remaining BDF steps
     dlcache = get_dl_cache(BDF)
     cache = dlcache, fcache
-    @showprogress for i=BDF:ntime
+    @showprogress desc="Time stepping $(BDF) to $ntime ..." for i=BDF:ntime
         U₁ = BDFk!(cache, t+Δt, U₀, Δt, sK, sM, fₙ, BDF)
         U₀[:,2:BDF] = U₀[:,1:BDF-1]
         U₀[:,1] = U₁
@@ -127,9 +127,11 @@ let
     end
     U = U₀[:,1] # Final time solution
 end
-Uₘₛ = Wₘₛ*U[(p+1)^2*num_cells(CoarseScale.trian)+1:end] + γₘₛ*U[1:(p+1)^2*num_cells(CoarseScale.trian)]
 
 using DataFrames, CSV
+CSV.write(project_dir*"/"*project_name*"/$(project_name)_ms_solution_raw.csv", DataFrame((a=U)))
+
+Uₘₛ = Wₘₛ*U[(p+1)^2*num_cells(CoarseScale.trian)+1:end] + γₘₛ*U[1:(p+1)^2*num_cells(CoarseScale.trian)]
 CSV.write(project_dir*"/"*project_name*"/$(project_name)_ms_solution.csv", DataFrame((a=Uₘₛ)))
 
 Uref = CSV.read(project_dir*"/"*project_name*"/$(project_name)_ref_solution_$nf.csv", DataFrame, types=[T₁]).a
