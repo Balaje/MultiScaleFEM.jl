@@ -1,22 +1,23 @@
 using Pkg
-Pkg.add("FastGaussQuadrature")
-Pkg.add("DoubleFloats")
-Pkg.add("LaTeXStrings")
-Pkg.add("ColorSchemes")
-Pkg.add("Gridap")
-Pkg.add("DoubleFloats")
-Pkg.add("Plots")
-Pkg.add("Quadmath")
-Pkg.add("DoubleFloats")
+# Pkg.add("FastGaussQuadrature")
+# Pkg.add("DoubleFloats")
+# Pkg.add("LaTeXStrings")
+# Pkg.add("ColorSchemes")
+# Pkg.add("Gridap")
+# Pkg.add("DoubleFloats")
+# Pkg.add("Plots")
+# Pkg.add("Quadmath")
+# Pkg.add("DoubleFloats")
 
 using FastGaussQuadrature
 using LinearAlgebra
 using SparseArrays   
 using Gridap
 using DoubleFloats
+using ProgressMeter
 
-using LaTeXStrings
-using ColorSchemes
+# using LaTeXStrings
+# using ColorSchemes
 
 
 include("coarse_to_fine.jl")

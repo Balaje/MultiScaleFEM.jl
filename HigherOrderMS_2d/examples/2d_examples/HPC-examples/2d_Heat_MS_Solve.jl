@@ -19,7 +19,7 @@ ntime = ceil(Int, tf/Δt)
 BDF = 4
 
 # Define the RHS and the initial condition
-f(x,t) = T₁(10*2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))^4)
+f(x,t) = T₁(10*2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))^5)
 u₀(x) = T₁(0.0)
 
 # Background fine scale discretization
@@ -68,7 +68,6 @@ Wₘₛ = [read_basis_functions(fname_2(j), T₁, size(L)) for j=1:ntimes]
 Wₘₛ = load_additional_corrections!(Wₘₛ);
 Wₘₛ = hcat(Wₘₛ...);
 
-#=
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
 # Compute the matrix system using the basis functions
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
@@ -79,16 +78,15 @@ Lₘₛ = γₘₛ'*M*Wₘₛ
 Kₘₛ′ = Wₘₛ'*K*Wₘₛ
 Mₘₛ′ = Wₘₛ'*M*Wₘₛ
 
-sM = [Mₘₛ Lₘₛ; Lₘₛ' Mₘₛ′]
-sK = [Kₘₛ Pₘₛ; Pₘₛ' Kₘₛ′]
+M = [Mₘₛ Lₘₛ; Lₘₛ' Mₘₛ′]
+K = [Kₘₛ Pₘₛ; Pₘₛ' Kₘₛ′]
 
-write_basis_functions(sM, project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv")
-write_basis_functions(sK, project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv")
-=#
+# write_basis_functions(M, project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv")
+# write_basis_functions(K, project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv")
 
 ms_problem_size = ( nc^2*(p+1)^2*(ntimes+1), nc^2*(p+1)^2*(ntimes+1) )
-M = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
-K = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
+# M = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_mass_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
+# K = read_basis_functions(project_dir*"/"*project_name*"/$(project_name)_stiffness_matrix_correction_level_$(ntimes).csv", T₁, ms_problem_size)
 
 ### ### ### ### ### ### ### ### ### ### ### ###
 #  Construct the schur complement system
@@ -99,7 +97,7 @@ sK = SchurComplementMatrix( K, nc^2*(p+1)^2*ntimes, nc^2*(p+1)^2 )
 println("Solving multiscale problem...")
 function fₙ(cache, tₙ::Float64)
     Vₕ, B, B₂ = cache
-    L = assemble_loadvec(Vₕ, y->f(y,tₙ), 4; T=T₁)
+    L = assemble_loadvec(Vₕ, y->f(y,tₙ), 8; T=T₁)
     [B'*L; B₂'*L]
 end
 
@@ -146,3 +144,4 @@ L²Error = sqrt(sum( ∫((err)*(err))dΩf ))
 H¹Error = sqrt(sum(∫(A*(∇(err))⊙(∇(err)))dΩf))
 # println("L²Error = $L²Error, \t H¹Error = $H¹Error");
 println("$nf \t $nc \t $p \t $l \t $ntimes \t $L²Error \t $H¹Error")
+

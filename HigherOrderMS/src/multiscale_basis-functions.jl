@@ -11,7 +11,7 @@ function compute_ms_basis(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int
   K, L, Λ = get_saddle_point_problem(fspace, D, p, nc)
   f1 = zeros(T,size(K,1))
   index = 1
-  for t=1:nc
+  @showprogress desc="Computing basis functions" for t=1:nc
     fullnodes = patch_indices_to_global_indices[t]
     bnodes = [fullnodes[1], fullnodes[end]]
     bvals = [0.0,0.0]
@@ -123,7 +123,7 @@ function Cˡιₖ(fspace::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::I
   # Compute the old multiscale bases for the νₖ component
   β = compute_ms_basis(fspace, D, p, nc, l, patch_indices_to_global_indices; T=T)
 
-  for t=1:nc 
+  @showprogress desc="Computing Stabilization" for t=1:nc 
     start = max(1,t-1); last = min(nc, t+1); # N¹(G)
     # Get the N¹(K) patch
     # start₁ = max(1,t-1); last₁ = min(nc, t+1); # N¹(G)

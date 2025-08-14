@@ -11,7 +11,7 @@ domain = T₁.((0.0, 1.0, 0.0, 1.0));
 ##### ##### ##### ##### ##### ##### #####
 # Temporal discretization parameters
 ##### ##### ##### ##### ##### ##### #####
-Δt = 2^-7
+Δt = 2^-8
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
@@ -33,12 +33,17 @@ else
 end
 
 # Random field
-epsilon = min(2^5, nf)
+epsilon = min(2^6, nf)
 repeat_dims = (Int64(nf/epsilon), Int64(nf/epsilon))
 a₁,b₁ = T₁.((0.1,1.0))
-rand_vals = rand(T₁,epsilon^2)
-vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)),
-                      inner=repeat_dims)
+
+# using Random
+# Random.seed!(1234); rand_vals = rand(T₁,epsilon^2)
+
+# vals_epsilon = repeat(reshape(a₁ .+ (b₁-a₁)*rand_vals, (epsilon, epsilon)),
+#                      inner=repeat_dims)
+using DelimitedFiles
+vals_epsilon = readdlm("./coeff_1.txt")
 
 filename = project_dir*"/"*project_name*"/$(project_name)_params.csv"
 write_problem_parameters(domain, nf, nc, p, l, ntimes, vals_epsilon, tf, Δt, filename)

@@ -2,7 +2,8 @@
 # Program to implement the corrected basis function
 ##### ###### ###### ###### ###### ###### ###### ###### #
 function compute_correction_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
-                                     patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64; T=Float64, ntimes=1, isStab=false)                                     
+                                  patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64,
+                                  basis_vec_ms₁::AbstractMatrix; T=Float64, ntimes=1, isStab=false)                                     
   ### To build the basis functions
   nf = fine_scale_space.nf
   q = fine_scale_space.q
@@ -10,15 +11,16 @@ function compute_correction_basis(fine_scale_space::FineScaleSpace, D::Function,
   _, L, Λ  = get_saddle_point_problem(fine_scale_space, D, p, nc)
   K = assemble_stiffness_matrix(fine_scale_space, D)
   M = assemble_mass_matrix(fine_scale_space, x->1.0)
-  β = compute_ms_basis(fine_scale_space, D, p′, nc, l, patch_indices_to_global_indices)  
-  if(nc > 1 && isStab)
-    γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
-    β[:, 1:(p+1):(p+1)*nc] = γ
-  end
+  # β = compute_ms_basis(fine_scale_space, D, p′, nc, l, patch_indices_to_global_indices)  
+  # if(nc > 1 && isStab)
+  #  γ = Cˡιₖ(fine_scale_space, D, p, nc, l);
+  #  β[:, 1:(p+1):(p+1)*nc] = γ
+  # end
+  β = basis_vec_ms₁ 
   index = 1
   for corr = 1:ntimes
     index_1 = 1
-    for t=1:nc
+    @showprogress desc="Computing the additional correction level $corr" for t=1:nc
       fullnodes₁ = patch_indices_to_global_indices[t]    
       bnodes₁ = [fullnodes₁[1], fullnodes₁[end]]        
       freenodes₁ = setdiff(fullnodes₁, bnodes₁)    

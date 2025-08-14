@@ -16,7 +16,7 @@ domain, nf, nc, p, l, ntimes, vals_epsilon, tf, Δt, T₁ = read_problem_paramet
 ntime = ceil(Int, tf/Δt)
 BDF = 4
 
-f(x,t) = T₁(10*2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))^4)
+f(x,t) = T₁(10*2π^2*sin(π*x[1])*sin(π*x[2])*(sin(t))^5)
 u₀(x) = T₁(0.0)
 
 ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
