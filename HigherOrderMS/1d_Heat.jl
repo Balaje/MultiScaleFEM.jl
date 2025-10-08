@@ -1,14 +1,23 @@
 include("./src/HigherOrderMS.jl");
 
+
 #=
 Problem data
 =#
-T₁ = Float64
+
+# using Quadmath
+# T₁ = Float128
+
+using Random
+Random.seed!(1234);
+
+using DoubleFloats
+T₁ = Double64
 domain = T₁.((0.0,1.0))
 # Random diffusion coefficient
-Neps = 2^7
+Neps = 2^8
 nds_micro = LinRange(domain[1], domain[2], Neps+1)
-diffusion_micro = 0.5 .+ (1-0.5)*rand(T₁,Neps+1)
+diffusion_micro = 0.1 .+ (1-0.1)*rand(T₁,Neps+1)
 function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) where {T<:Number, T1<:Number}
   n = size(nds_micro, 1)
   for i=1:n
@@ -24,11 +33,12 @@ function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) whe
   end
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-f(x,t) = T₁(10*sin(π*x[1])*(sin(t))^4)
+f(x,t) = (x[1]<0.5) ? T₁(0.0) : T₁(sin(π*x[1])*(sin(t))^5)
+# f(x,t) = T₁(1.0)
 u₀(x) = T₁(0.0)
 
 # Spatial discretization parameters
-(length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
+# (length(ARGS)==4) && begin (nf, nc, p, l) = parse.(Int64, ARGS) end
 if(length(ARGS)==0)
   nf = 2^11;
   p = 1;
@@ -36,8 +46,12 @@ if(length(ARGS)==0)
   l = 5; 
 end
 
+(nf, nc, p, l) = parse.(Int64, ARGS)
+
+@show nf, nc, p, l
+
 # Temporal discretization parameters
-Δt = 2^-7
+Δt = 2^-9
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4
@@ -66,10 +80,10 @@ let
   t = 0.0
   # Starting BDF steps (1...k-1) 
   fcache = fine_scale_space, freenodes
-  for i=1:BDF-1
+  @showprogress desc="Compute 1 to $(BDF-1)" for i=1:BDF-1
     dlcache = get_dl_cache(i)
     cache = dlcache, fcache
-    println("Done t = "*string(t))
+    # println("Done t = "*string(t))
     U₁ = BDFk!(cache, t, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, i)
     U₀ = hcat(U₁, U₀)
     t += Δt
@@ -77,12 +91,12 @@ let
   # Remaining BDF steps
   dlcache = get_dl_cache(BDF)
   cache = dlcache, fcache
-  for i=BDF:ntime
+  @showprogress desc="Compute $BDF to $ntime" for i=BDF:ntime
     U₁ = BDFk!(cache, t+Δt, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, BDF)
     U₀[:,2:BDF] = U₀[:,1:BDF-1]
     U₀[:,1] = U₁
     t += Δt
-    (i%(ntime/2^4) == 0) && println("Done t = "*string(t))
+    # (i%(ntime/2^4) == 0) && println("Done t = "*string(t))
   end
   Uex = U₀[:,1] # Final time solution
 end
@@ -128,23 +142,23 @@ let
   global U = zero(U₀)  
   t = 0.0
   # Starting BDF steps (1...k-1) 
-  for i=1:BDF-1
+  @showprogress desc="Compute 1 to $(BDF-1)" for i=1:BDF-1
     dlcache = get_dl_cache(i)
     cache = dlcache, fcache
     U₁ = BDFk!(cache, t, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, i)
     U₀ = hcat(U₁, U₀)
     t += Δt   
-    println("Done t = "*string(t))       
+    # println("Done t = "*string(t))       
   end
   # Remaining BDF steps
   dlcache = get_dl_cache(BDF)
   cache = dlcache, fcache
-  for i=BDF:ntime
+  @showprogress desc="Compute $BDF to $ntime" for i=BDF:ntime
     U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₘₛ, Mₘₛ, fₙ!, BDF)
     U₀[:,2:BDF] = U₀[:,1:BDF-1]
     U₀[:,1] = U₁
     t += Δt  
-    (i%(ntime/2^4) == 0) && println("Done t = "*string(t))        
+    # (i%(ntime/2^4) == 0) && println("Done t = "*string(t))        
   end
   U = U₀[:,1] # Final time solution
 end      
@@ -159,5 +173,5 @@ e = uₕ - uₘₛ
 L²Error = sqrt(sum(∫(e*e)dΩ));
 H¹Error = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
 
-println("")
-println("$p \t $nc \t $l \t $L²Error \t $H¹Error")
+println(" ")
+println("$nf \t $nc \t $p \t $l \t 0 \t $L²Error \t $H¹Error")

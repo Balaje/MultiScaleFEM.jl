@@ -37,10 +37,12 @@ Vₘₛ = MultiScaleFESpace(Ωₘₛ, p, V₀, (K, L, Λ));
 γₘₛ = StabilizedMultiScaleFESpace(Vₘₛ, p, V₀, (K, L, Λ), domain, A);
 
 # Multiscale Additional Corrections for the heat equation
-Wₘₛ = Vector{MultiScaleCorrections}(undef, ntimes)
-Wₘₛ[1] = MultiScaleCorrections(γₘₛ, p, (K, L, M, L));
-for j=2:ntimes
-  Wₘₛ[j] = MultiScaleCorrections(Wₘₛ[j-1], p, (K, L, M, L));
+if(ntimes > 0)
+  Wₘₛ = Vector{MultiScaleCorrections}(undef, ntimes)
+  Wₘₛ[1] = MultiScaleCorrections(γₘₛ, p, (K, L, M, L));
+  for j=2:ntimes
+    Wₘₛ[j] = MultiScaleCorrections(Wₘₛ[j-1], p, (K, L, M, L));
+  end
 end
 
 #### #### #### #### #### #### #### #### #### ####
@@ -50,9 +52,11 @@ filename = project_dir*"/"*project_name*"/$(project_name)_ms_basis_$(nc)$(p)$(l)
 B1 = γₘₛ.basis_vec_ms[cell_index];
 write_basis_functions(B1, filename);
 
-filename = Vector{String}(undef, ntimes)
-for j=1:ntimes
-    filename[j] = project_dir*"/"*project_name*"/$(project_name)_ms_basis_$(nc)$(p)$(l)_correction_level_$(j)_"*string(cell_index)*".csv"
-    Bj = Wₘₛ[j].basis_vec_ms[cell_index];
-    write_basis_functions(Bj, filename[j]);
+if(ntimes > 0)
+  filename = Vector{String}(undef, ntimes)
+  for j=1:ntimes
+   filename[j] = project_dir*"/"*project_name*"/$(project_name)_ms_basis_$(nc)$(p)$(l)_correction_level_$(j)_"*string(cell_index)*".csv"
+   Bj = Wₘₛ[j].basis_vec_ms[cell_index];
+   write_basis_functions(Bj, filename[j]);
+  end
 end

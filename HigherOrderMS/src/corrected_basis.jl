@@ -3,7 +3,8 @@
 ##### ###### ###### ###### ###### ###### ###### ###### #
 function compute_correction_basis(fine_scale_space::FineScaleSpace, D::Function, p::Int64, nc::Int64, l::Int64, 
                                   patch_indices_to_global_indices::Vector{AbstractVector{Int64}}, p′::Int64,
-                                  basis_vec_ms₁::AbstractMatrix; T=Float64, ntimes=1, isStab=false)                                     
+                                  basis_vec_ms₁::AbstractMatrix; T=Float64, ntimes=1, isStab=false)
+  (ntimes==0) && return T[]
   ### To build the basis functions
   nf = fine_scale_space.nf
   q = fine_scale_space.q

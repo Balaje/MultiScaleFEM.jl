@@ -34,6 +34,7 @@ function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) whe
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
 f(x,t) = (x[1]<0.5) ? T₁(0.0) : T₁(sin(π*x[1])*(sin(t))^5)
+# f(x,t) = T₁(1.0)
 u₀(x) = T₁(0.0)
 
 # Spatial discretization parameters
@@ -47,6 +48,8 @@ if(length(ARGS)==0)
 end
 
 (nf, nc, p, l, ntimes) = parse.(Int64, ARGS)
+
+@show nf, nc, p, l, ntimes
 
 # Temporal discretization parameters
 Δt = 2^-9
@@ -141,8 +144,9 @@ Mₘₛ′ = basis_vec_ms₂'*massma*basis_vec_ms₂;
 Lₘₛ = basis_vec_ms₂'*massma*basis_vec_ms₁
 Pₘₛ = basis_vec_ms₂'*stima*basis_vec_ms₁
 
-𝐌 = [Mₘₛ′ Lₘₛ; Lₘₛ'  Mₘₛ]
-𝐊 = [Kₘₛ′ Pₘₛ; Pₘₛ' Kₘₛ]
+fac = (ntimes==0) ? 0 : 1
+𝐌 = [Mₘₛ′ fac*Lₘₛ; fac*Lₘₛ'  Mₘₛ]
+𝐊 = [Kₘₛ′ fac*Pₘₛ; fac*Pₘₛ' Kₘₛ]
 
 # Time marching
 let         
