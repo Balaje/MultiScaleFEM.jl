@@ -1,3 +1,5 @@
+__precompile__()
+
 module HigherOrderMS_1d
 
 include("./coarse_to_fine.jl")

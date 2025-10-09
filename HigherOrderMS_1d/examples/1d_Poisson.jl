@@ -1,7 +1,3 @@
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-
 using HigherOrderMS_1d
 
 using Gridap

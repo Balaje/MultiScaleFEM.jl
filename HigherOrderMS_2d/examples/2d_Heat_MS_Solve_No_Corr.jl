@@ -78,7 +78,7 @@ let
     t = 0.0
     # Starting BDF steps (1...k-1)
     fcache = (V₀, γₘₛ)
-    @showprogress desc="Time stepping 1 to $(BDF-1) ..." for i=1:BDF-1
+    @showprogress desc="Solving MS system 1 to $(BDF-1) ..." for i=1:BDF-1
         dlcache = get_dl_cache(i)
         cache = dlcache, fcache
         U₁ = BDFk!(cache, t, U₀, Δt, K, M, fₙ, i)
@@ -88,7 +88,7 @@ let
     # Remaining BDF steps
     dlcache = get_dl_cache(BDF)
     cache = dlcache, fcache
-    @showprogress desc="Time stepping $(BDF) to $ntime ..." for i=BDF:ntime
+    @showprogress desc="Solving MS system $(BDF) to $ntime ..." for i=BDF:ntime
         U₁ = BDFk!(cache, t+Δt, U₀, Δt, K, M, fₙ, BDF)
         U₀[:,2:BDF] = U₀[:,1:BDF-1]
         U₀[:,1] = U₁

@@ -22,7 +22,6 @@ u₀(x) = T₁(0.0)
 ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 # Compute the reference solution with the BDFk scheme
 ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
-println("Computing reference solution ...");
 model = CartesianDiscreteModel(domain, (nf, nf))
 Ω = Triangulation(model)
 dΩ = Measure(Ω, 5; T=T₁)
@@ -46,7 +45,7 @@ let
   t = 0.0
   # Starting BDF steps (1...k-1)
   fcache = (f, Vh0, dΩ)
-  @showprogress for i=1:BDF-1
+  @showprogress "Computing Reference Solution 1 to $(BDF-1)" for i=1:BDF-1
     dlcache = get_dl_cache(i)
     cache = dlcache, fcache
     U₁ = BDFk!(cache, t, U₀, Δt, Kₑ, Mₑ, fₙ, i)
@@ -56,7 +55,7 @@ let
   # Remaining BDF steps
   dlcache = get_dl_cache(BDF)
   cache = dlcache, fcache
-  @showprogress for i=BDF:ntime
+  @showprogress "Computing Reference Solution $BDF to $ntime" for i=BDF:ntime
     U₁ = BDFk!(cache, t+Δt, U₀, Δt, Kₑ, Mₑ, fₙ, BDF)
     U₀[:,2:BDF] = U₀[:,1:BDF-1]
     U₀[:,1] = U₁
