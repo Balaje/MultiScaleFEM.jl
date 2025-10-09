@@ -1,0 +1,20 @@
+name = "HigherOrderMS_1d"
+uuid = "1987bdf0-05c6-4685-bcf6-145292105bb7"
+authors = ["Balaje K <balaje6@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[compat]
+DoubleFloats = "1.4.3"
+Gridap = "0.19.5"
+LinearAlgebra = "1.11.0"
+ProgressMeter = "1.11.0"
+Quadmath = "0.5.13"
+SparseArrays = "1.11.0"
