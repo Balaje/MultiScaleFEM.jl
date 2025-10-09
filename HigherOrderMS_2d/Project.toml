@@ -1,4 +1,4 @@
-name = "MultiscaleFEM"
+name = "HigherOrderMS_2d"
 uuid = "342a7f96-e52c-4cdb-9be9-d266c16c2b78"
 authors = ["Balaje K <balaje6@gmail.com>"]
 version = "0.1.0"

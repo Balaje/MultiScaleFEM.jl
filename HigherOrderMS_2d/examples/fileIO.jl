@@ -2,13 +2,8 @@
 # Functions to perform the read/write operations
 ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
-# Run this the first time
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-
 using Gridap
-using MultiscaleFEM
+using HigherOrderMS_2d
 using SparseArrays
 using ProgressMeter
 

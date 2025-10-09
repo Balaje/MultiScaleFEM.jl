@@ -33,8 +33,8 @@ using ProgressMeter
 using FastGaussQuadrature
 
 # Import functions from other modules
-using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
-using MultiscaleFEM.Assemblers: assemble_loadvec, assemble_stima, poly_exps, Λₖ
+using HigherOrderMS_2d.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
+using HigherOrderMS_2d.Assemblers: assemble_loadvec, assemble_stima, poly_exps, Λₖ
 
 using Quadmath
 using DoubleFloats

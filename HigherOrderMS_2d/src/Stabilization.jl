@@ -7,15 +7,15 @@ using SplitApplyCombine
 using LazyArrays
 using LinearAlgebra
 
-using MultiscaleFEM.MultiscaleBases: get_basis_functions
-using MultiscaleFEM.MultiscaleBases: CoarseTriangulation, FineTriangulation, MultiScaleTriangulation, MultiScaleFESpace, lazy_fill
-using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale_patch_fine_scale_boundary_node_indices
-using MultiscaleFEM.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
-using MultiscaleFEM.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
-using MultiscaleFEM.MultiscaleBases: MultiScaleCorrections, get_basis_functions, build_basis_functions!
-using MultiscaleFEM.MultiscaleBases: get_patch_coarse_elem
+using HigherOrderMS_2d.MultiscaleBases: get_basis_functions
+using HigherOrderMS_2d.MultiscaleBases: CoarseTriangulation, FineTriangulation, MultiScaleTriangulation, MultiScaleFESpace, lazy_fill
+using HigherOrderMS_2d.MultiscaleBases: get_coarse_scale_patch_fine_scale_interior_node_indices, get_coarse_scale_patch_fine_scale_boundary_node_indices
+using HigherOrderMS_2d.MultiscaleBases: get_coarse_scale_patch_coarse_elem_ids, get_coarse_scale_elem_fine_scale_node_indices
+using HigherOrderMS_2d.MultiscaleBases: assemble_rect_matrix, assemble_lm_l2_matrix
+using HigherOrderMS_2d.MultiscaleBases: MultiScaleCorrections, get_basis_functions, build_basis_functions!
+using HigherOrderMS_2d.MultiscaleBases: get_patch_coarse_elem
 
-using MultiscaleFEM.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
+using HigherOrderMS_2d.CoarseToFine: coarsen, get_fine_nodes_in_coarse_elems
 
 # using MPI
 # comm = MPI.COMM_WORLD
@@ -443,7 +443,7 @@ function _replace_new_basis!(α, γ, p, i)
   α
 end
 
-import MultiscaleFEM.MultiscaleBases: get_basis_functions
+import HigherOrderMS_2d.MultiscaleBases: get_basis_functions
 get_basis_functions(V::StabilizedMultiScaleFESpace) = V.basis_vec_ms
 
 end
