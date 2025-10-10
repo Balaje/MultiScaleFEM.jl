@@ -6,9 +6,9 @@ This repository contains the source code to implement the enhanced Higher Order 
 
 $$
 \begin{align*}
-  \partial_t u - \nabla\cdot\left(A_{\varepsilon}(x) \nabla u\right) &= f(x,t) \quad x\in\Omega, \,\, t > 0,\\
-  u(x,0) &= u_0(x) \quad x \in \Omega,\\
-  u(x,t) &= 0, \quad x \in \partial\Omega, \,\,t > 0,
+  \partial_t u - \nabla\cdot\left(A_{\varepsilon}(x) \nabla u\right) = f(x,t), &\quad x\in\Omega, \quad t > 0,\\
+  u(x,0) = u_0(x), &\quad x \in \Omega,\\
+  u(x,t) = 0, &\quad x \in \partial\Omega, \quad t > 0,
 \end{align*}
 $$
 
