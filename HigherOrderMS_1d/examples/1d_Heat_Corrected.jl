@@ -184,5 +184,7 @@ e = uₕ - uₘₛ
 L²Error = sqrt(sum(∫(e*e)dΩ));
 H¹Error = sqrt(sum(∫(∇(e)⋅∇(e))dΩ));
 
-println(" ")
+println("")
+println("(1/h) \t (1/H) \t p \t l \t j \t ||⋅||₀ \t √(a(⋅,⋅))")
+println("")
 println("$nf \t $nc \t $p \t $l \t $ntimes \t $L²Error \t $H¹Error")

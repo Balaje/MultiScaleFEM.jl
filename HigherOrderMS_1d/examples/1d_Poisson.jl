@@ -16,7 +16,7 @@ if(length(ARGS)==0)
   nf = 2^11;
   p = 1;
   nc = 2^3;  
-  l = 5; 
+  l = nc; 
 end
 
 # Use Gridap to construct the space
@@ -37,12 +37,8 @@ uₕ = FEFunction(U, [0.0; sol_ϵ; 0.0])
 patch_indices_to_global_indices, coarse_indices_to_fine_indices, ms_elem = coarse_space_to_fine_space(nc, nf, l, (1,p));
 # Compute MS bases
 basis_vec_ms = compute_ms_basis(fine_scale_space, D, p, nc, l, patch_indices_to_global_indices);
-isStab = true;
-(isStab) && begin println("Stabilization on ..."); println(""); end
-if(nc > 1 && isStab)
-  γ = compute_stabilized_ms_basis(fine_scale_space, D, p, nc, l);
-  basis_vec_ms[:, 1:(p+1):(p+1)*nc] = γ;
-end;
+γ = compute_stabilized_ms_basis(fine_scale_space, D, p, nc, l);
+basis_vec_ms[:, 1:(p+1):(p+1)*nc] = γ;
 
 # Solve the problem
 Kₘₛ = basis_vec_ms'*stima*basis_vec_ms;
@@ -58,4 +54,6 @@ L²Error = sqrt(sum(∫(e*e)dΩ));
 H¹Error = sqrt(sum(∫(D*∇(e)⋅∇(e))dΩ));
 
 println("")
-println("$p \t $nc \t $l \t $L²Error \t $H¹Error")
+println("(1/h) \t (1/H) \t p \t l \t ||⋅||₀ \t √(a(⋅,⋅))")
+println("")
+println("$nf \t $nc \t $p \t $l \t $L²Error \t $H¹Error")
