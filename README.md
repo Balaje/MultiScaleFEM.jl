@@ -14,7 +14,7 @@ $$
 
 where $A_{\varepsilon}(x)$ is an oscillatory diffusion coefficient at a scale $\varepsilon \ll 1$. It is well-known that the classical finite element method with mesh-size $h < \varepsilon$ is computationally expensive. Higher order methods based on the LOD framework [(Maier R., 2021)](https://epubs.siam.org/doi/10.1137/20M1364321) aim to construct basis functions on a coarse mesh $H \gg \varepsilon$ that contains the information about the fine-scale. This then leads to a computationally efficient method that depends on coarse-scale discretization $H$. However, for time-dependent problems, it was shown in [(Krumbeigel F. and Maier R., 2024)](https://academic.oup.com/imajna/article-abstract/45/4/2248/7759638?redirectedFrom=fulltext) that for oscillatory diffusion coefficients, the higher order LOD methods exhibit at most $O(H^2)$ convergence for any $p > 0$. In this work, we develop an **enhanced-higher-order** LOD method that, for oscillatory diffusion coefficients, shows the optimal rate $O(H^{p+2})$ in the energy norm.
 
-The `README.md` file is divided into three sections, with the first and second sections discussing the minimum working examples in 1D and 2D, respectively. The third section will discuss scaling the 2D code to a HPC system and possible future work.
+The `README.md` file is divided into two sections, with the first and second sections discussing the minimum working examples in 1D and 2D, respectively.
 
 ## 1D Example
 
@@ -35,12 +35,12 @@ $$
 
 ### How to run the code?
 
-The code for the 1D example is located `HigherOrderMS_1d/examples/`. There are three main scripts: 
+The code for the 1D example is located in `HigherOrderMS_1d/examples/`. There are three main scripts: 
 - `1d_Poisson.jl`: Julia code to solve the Poisson problem using the higher-order multiscale method.
 - `1d_Heat.jl`: Code to solve the heat equation using higher-order multiscale method (HMM).
 - `1d_Heat_Corrected.jl`: Code to solve the heat equation using the **enhanced-higher-order** multiscale method (eho-HMM).
 
-To run the code, open terminal, change directory to `HigherOrderMS_1d/` and run
+To run the code, open a terminal, change the directory to `HigherOrderMS_1d/` and run
 
 ```zsh
 >> cd /path/to/package/HigherOrderMS_1d/
@@ -73,14 +73,14 @@ julia> include("examples/1d_Heat_Corrected.jl");
 2048 	 16 	 1 	 16 	 1 	 1.2708506354990224e-8 	 2.8928773641723775e-6
 ```
 
-We observe that in case of the enhanced-higher-order multiscale method (`1d_Heat_Corrected.jl`), the error is almost an order of magnitude better! For larger values of $p$, we observed that the matrix becomes ill-conditioned. Since we are solving a 1D problem, to get around this problem, we use high-precision arithmetic. In `1d_Heat_Corrected.jl`, we can set the data type of the problem globally by assigning the variable `T₁` (line 17). We have an interface to export `\` for solving linear systems for two implementations of high-precision arithmetic: `Float128` from Quadmath.jl and `Double64` from DoubleFloats.jl.
+We observe that in the case of the enhanced-higher-order multiscale method (`1d_Heat_Corrected.jl`), the error is almost an order of magnitude better! For larger values of $p$, we observed that the matrix becomes ill-conditioned. Since we are solving a 1D problem, to get around this problem, we use high-precision arithmetic. In `1d_Heat_Corrected.jl`, we can set the data type of the problem globally by assigning the variable `T₁` (line 17). We have an interface to export `\` for solving linear systems for two implementations of high-precision arithmetic: `Float128` from Quadmath.jl and `Double64` from DoubleFloats.jl.
 
 ## 2D Example
 
-One of the most important features of the high-order multiscale methods is that the basis functions on the coarse scale can be precomupted and then saved to be used for testing multiple forcing functions. The main motivation for this is that in applications where the diffusion coefficient could be treated as a material property, the basis functions need not be re-computed everytime. For 2D especially, it is thus desirable to separate the computation, into different modules and use files to read/write the basis functions. Following are scripts in `HigherOrderMS_2d/examples` folder:
+One of the most important features of high-order multiscale methods is that the basis functions on the coarse scale can be precomputed and saved for testing multiple forcing functions. The main motivation for this is that in applications where the diffusion coefficient is treated as a material property, the basis functions do not need to be recomputed every time. For 2D, it is especially desirable to separate the computation into different modules and use files to read/write the basis functions. Following are scripts in `HigherOrderMS_2d/examples` folder:
 
 1. `2d_Heat_Params.jl`: Write all the problem parameters into a directory.
-2. `2d_Heat_Ref_Sol.jl`: Compute the reference solution using the classical finite element method on the fine scale discretization $h$.
+2. `2d_Heat_Ref_Sol.jl`: Compute the reference solution using the classical finite element method on the fine-scale discretization $h$.
 3. `2d_Heat_Basis.jl`: Compute the multiscale basis functions on the coarse scale and write the solution to the working directory.
 4. `2d_Heat_MS_Solve.jl` and `2d_Heat_MS_Solve_No_Corr.jl`: Solve the heat equation using the multiscale basis generated in Step 3.
 
