@@ -21,7 +21,7 @@ The `README.md` file is divided into three sections, with the first and second s
 We assume $\Omega = [0,1]$ and a randomly oscillating diffusion coefficient 
 
 $$
-A_{\varepsilon}(x) = \text{rand}\left(0.1, 1; \;\varepsilon=2^{-9}\right)
+A_{\varepsilon}(x) = \text{rand}\left(0.1, 1; \varepsilon=2^{-9}\right)
 $$
 
 and the right hand side
