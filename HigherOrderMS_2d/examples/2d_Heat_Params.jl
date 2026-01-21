@@ -11,7 +11,7 @@ domain = T₁.((0.0, 1.0, 0.0, 1.0));
 ##### ##### ##### ##### ##### ##### #####
 # Temporal discretization parameters
 ##### ##### ##### ##### ##### ##### #####
-Δt = 2^-8
+Δt = 2^-9
 tf = 1.0
 ntime = ceil(Int, tf/Δt)
 BDF = 4

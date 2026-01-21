@@ -46,10 +46,13 @@ function _D(x::T, nds_micro::AbstractVector{T}, diffusion_micro::Vector{T1}) whe
   end
 end
 A(x; nds_micro = nds_micro, diffusion_micro = diffusion_micro) = _D(x[1], nds_micro, diffusion_micro)
-f(x,t) = (x[1]<0.5) ? T₁(0.0) : T₁(sin(π*x[1])*(sin(t))^5)
-# f(x,t) = T₁(1.0)
+# A(x) = 0.45;
+# f(x,t) = (x[1]<0.5) ? T₁(0.0) : T₁(sin(π*x[1])*(sin(t))^5)
+f(x,t) = T₁(sin(π*x[1])*sin(t)^7)
 u₀(x) = T₁(0.0)
 uₜ₀(x) = T₁(0.0)
+
+ode_solver = RKN4()
 
 # Spatial discretization parameters
 # (length(ARGS)==5) && begin (nf, nc, p, l, ntimes) = parse.(Int64, ARGS) end
@@ -64,17 +67,14 @@ else
 end
 
 # Temporal discretization parameters
-Δt = 2^-12
 tf = 1.0
-ntime = ceil(Int, tf/Δt)
-BDF = 4
 
 # Solve the fine scale problem onfce for exact solution
 model = CartesianDiscreteModel(domain, (nf,));
 Ω = Triangulation(model);
 dΩ = Measure(Ω, 2);
 
-Uₕ = TestFESpace(model, ReferenceFE(lagrangian, T₁, 1), conformity=:H1, dirichlet_tags="boundary"); # Test Space
+Uₕ = TestFESpace(model, ReferenceFE(lagrangian, T₁, 1), conformity=:H1, dirichlet_tags="boundary", vector_type=Vector{T₁}); # Test Space
 Uₕ₀ = TrialFESpace(Uₕ, 0.0); # Trial Space
 
 aₕ(u,v) = ∫(A*(∇(u)⋅∇(v)))dΩ;
@@ -86,36 +86,9 @@ end
 
 K = assemble_matrix(aₕ, Uₕ₀, Uₕ);
 M = assemble_matrix(mₕ, Uₕ₀, Uₕ);
-solver = (y,A,b) -> minres!(fill!(y,0.0), A, b; reltol=eps(T₁), abstol=eps(T₁));
+# solver = (y,A,b) -> minres!(fill!(y,0.0), A, b; reltol=eps(T₁), abstol=eps(T₁));
+solver = (y,A,b) -> y .= A\b;
 M⁻¹ = InverseMap(M; solver=solver);
-
-#= # Time marching
-let 
-  U₀ = u₀.(nds_fine[freenodes])
-  global Uex = zero(U₀)  
-  t = 0.0
-  # Starting BDF steps (1...k-1) 
-  fcache = fine_scale_space, freenodes
-  @showprogress desc="Compute Reference Solution 1 to $(BDF-1)" for i=1:BDF-1
-    dlcache = get_dl_cache(i)
-    cache = dlcache, fcache
-    # println("Done t = "*string(t))
-    U₁ = BDFk!(cache, t, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, i)
-    U₀ = hcat(U₁, U₀)
-    t += Δt
-  end
-  # Remaining BDF steps
-  dlcache = get_dl_cache(BDF)
-  cache = dlcache, fcache
-  @showprogress desc="Compute Reference Solution $BDF to $ntime" for i=BDF:ntime
-    U₁ = BDFk!(cache, t+Δt, U₀, Δt, stima[freenodes,freenodes], massma[freenodes,freenodes], fₙϵ!, BDF)
-    U₀[:,2:BDF] = U₀[:,1:BDF-1]
-    U₀[:,1] = U₁
-    t += Δt
-    # (i%(ntime/2^4) == 0) && println("Done t = "*string(t))
-  end
-  Uex = U₀[:,1] # Final time solution
-end =#
 
 """
 Solver function for the wave equation
@@ -134,7 +107,7 @@ function W(M⁻¹::InverseMap, K::AbstractMatrix{T₁}, U₀::Vector{T₁},
   end;
 
   ode_prob = SecondOrderODEProblem(W, Uₜ₀, U₀, tspan, p)
-  OrdinaryDiffEq.solve(ode_prob, RKN4(), dt = dt);
+  OrdinaryDiffEq.solve(ode_prob, ode_solver, dt = dt);
 end;
 
 function get_sol(u)
@@ -146,6 +119,14 @@ tspan = (0.0,tf);
 
 U₀ = M⁻¹*assemble_vector(v->∫(u₀*v)dΩ, Uₕ₀);
 Uₜ₀ = M⁻¹*assemble_vector(v->∫(uₜ₀*v)dΩ, Uₕ₀);
+
+# println("\nSolving the Reference Problem:\n")
+# Δt = 2^-6
+# println("Trying to solve using Δt = $Δt.")
+# s = W(M⁻¹, K, U₀, Uₜ₀, Uₕ, Uₕ₀, Δt, tspan);
+
+Δt = 2^-12
+# println("Trying to solve using Δt = $Δt.")
 s = W(M⁻¹, K, U₀, Uₜ₀, Uₕ, Uₕ₀, Δt, tspan);
 
 Uex = get_sol(s.u[end]);
@@ -212,13 +193,17 @@ function Wₘₛ(M⁻¹::InverseMap, K::AbstractMatrix{T₁}, U₀::Vector{T₁}
   end;
 
   ode_prob = SecondOrderODEProblem(W, Uₜ₀, U₀, tspan, p)
-  OrdinaryDiffEq.solve(ode_prob, RKN4(), dt = dt);
+  OrdinaryDiffEq.solve(ode_prob, ode_solver, dt = dt);
 end;
 
 U₀ = 𝐌⁻¹*[basis_vec_ms₂'*(zeros(T₁, num_free_dofs(fine_scale_space.U))); 
            basis_vec_ms₁'*(assemble_vector(v->∫(u₀*v)fine_scale_space.dΩ, fine_scale_space.U))];
 Uₜ₀ = 𝐌⁻¹*[basis_vec_ms₂'*(zeros(T₁, num_free_dofs(fine_scale_space.U))); 
            basis_vec_ms₁'*(assemble_vector(v->∫(uₜ₀*v)fine_scale_space.dΩ, fine_scale_space.U))];
+
+# println("\nSolving the Multiscale Problem:\n")
+# Δt = 2^-4;
+# println("Trying to solve using Δt = $Δt.")
 s = Wₘₛ(𝐌⁻¹, 𝐊, U₀, Uₜ₀, fine_scale_space, basis_vec_ms₁, basis_vec_ms₂, Δt, tspan);
 
 U = get_sol(s.u[end])

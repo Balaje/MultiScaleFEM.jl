@@ -1,5 +1,7 @@
 module CoarseBases
 
+using SparseArrays
+
 ##### ###### ###### ###### ###### ###### ####
 # Contains the shifted Legendre polynomials #
 ##### ###### ###### ###### ###### ###### ####
