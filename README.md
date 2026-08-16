@@ -1,5 +1,7 @@
 # MultiscaleFEM.jl
 
+🚧🚧🚧🚧 A more recent version of the code can be found in [MsFEM.jl](https://github.com/Balaje/MsFEM.jl). This repository will no longer be maintained. 🚧🚧🚧🚧
+
 ## Introduction
 
 This repository contains the source code to implement the enriched Higher Order Localized Orthogonal Decomposition (eho-LOD) method discussed in [(Kalyanaraman B., Krumbeigel F., Maier R., and Wang S.)](https://arxiv.org/abs/2510.09514v1). The code can be used to generate the results presented in the manuscript. In the manuscript, we consider solving the heat equation:
